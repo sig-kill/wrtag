@@ -25,7 +25,7 @@ type Client struct {
 func NewClient() *Client {
 	return &Client{
 		httpClient: &http.Client{},
-		limiter:    rate.NewLimiter(rate.Every(time.Second), 1),
+		limiter:    rate.NewLimiter(rate.Every(time.Second), 1), // https://beta.musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting
 	}
 }
 
