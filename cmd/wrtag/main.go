@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -18,26 +18,34 @@ import (
 func main() {
 	flag.Parse()
 
-	dir := flag.Arg(0)
-	if dir == "" {
-		return
+	tg := taglib.TagLib{}
+	mb := musicbrainz.NewClient()
+
+	for _, dir := range flag.Args() {
+		if err := processDir(tg, mb, dir); err != nil {
+			log.Printf("error processing dir %q: %v", dir, err)
+		}
 	}
+}
 
-	var tg taglib.TagLib
-
+func processDir(tg taglib.TagLib, mb *musicbrainz.Client, dir string) error {
 	entries, err := os.ReadDir(dir)
-	cerr(err)
+	if err != nil {
+		return fmt.Errorf("read dir: %w", err)
+	}
 
 	var tracks []tagcommon.Info
 	for _, entry := range entries {
 		if path := filepath.Join(dir, entry.Name()); tg.CanRead(path) {
 			info, err := tg.Read(path)
-			cerr(err)
+			if err != nil {
+				return fmt.Errorf("read track info: %w", err)
+			}
 			tracks = append(tracks, info)
 		}
 	}
 	if len(tracks) == 0 {
-		return
+		return fmt.Errorf("no tracks in dir")
 	}
 	sort.Slice(tracks, func(i, j int) bool {
 		return tracks[i].TrackNumber() < tracks[j].TrackNumber()
@@ -56,18 +64,24 @@ func main() {
 	query.CatalogueNum = releaseInfo.CatalogueNum()
 	query.NumTracks = len(tracks)
 
-	mb := musicbrainz.NewClient()
 	score, release, err := mb.SearchRelease(context.Background(), query)
-	cerr(err)
+	if err != nil {
+		return fmt.Errorf("search release: %w", err)
+	}
 
 	var flatTracks []musicbrainz.Track
 	for _, ts := range release.Media {
 		flatTracks = append(flatTracks, ts.Tracks...)
 	}
 	if len(tracks) == 0 {
-		cerr(errors.New("no tracks in response"))
+		return fmt.Errorf("search release: %w", err)
+	}
+	if score < 90 {
+		return fmt.Errorf("score too low")
 	}
 
+	fmt.Println()
+	fmt.Printf("dir: %q\n", dir)
 	fmt.Printf("score: %d\n", score)
 	fmt.Printf("release:\n")
 	fmt.Printf("  name      : %q -> %q\n", releaseInfo.Album(), release.Title)
@@ -82,12 +96,8 @@ func main() {
 			tracks[i].Artist(), tracks[i].Title(),
 			creditString(flatTracks[i].ArtistCredit), flatTracks[i].Title)
 	}
-}
 
-func cerr(err error) {
-	if err != nil {
-		panic(err)
-	}
+	return nil
 }
 
 func first[T comparable](is []T) T {
