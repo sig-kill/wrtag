@@ -1,13 +1,16 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"go.senan.xyz/wrtag/musicbrainz"
+	"go.senan.xyz/wrtag/tags/tagcommon"
 	"go.senan.xyz/wrtag/tags/taglib"
 )
 
@@ -24,43 +27,60 @@ func main() {
 	entries, err := os.ReadDir(dir)
 	cerr(err)
 
-	var tracks []string
+	var tracks []tagcommon.Info
 	for _, entry := range entries {
 		if path := filepath.Join(dir, entry.Name()); tg.CanRead(path) {
-			tracks = append(tracks, path)
+			info, err := tg.Read(path)
+			cerr(err)
+			tracks = append(tracks, info)
 		}
 	}
 	if len(tracks) == 0 {
 		return
 	}
-
-	info, err := tg.Read(tracks[0])
-	cerr(err)
+	sort.Slice(tracks, func(i, j int) bool {
+		return tracks[i].TrackNumber() < tracks[j].TrackNumber()
+	})
+	releaseInfo := tracks[0]
 
 	var query musicbrainz.Query
-	query.MBReleaseID = info.MBReleaseID()
-	query.MBArtistID = first(info.MBArtistID())
-	query.MBReleaseGroupID = info.MBReleaseGroupID()
-	query.Release = info.Album()
-	query.Artist = info.AlbumArtist()
-	query.Format = info.Media()
-	query.Date = info.Date()
-	query.Label = info.Label()
-	query.CatalogueNum = info.CatalogueNum()
+	query.MBReleaseID = releaseInfo.MBReleaseID()
+	query.MBArtistID = first(releaseInfo.MBArtistID())
+	query.MBReleaseGroupID = releaseInfo.MBReleaseGroupID()
+	query.Release = releaseInfo.Album()
+	query.Artist = releaseInfo.AlbumArtist()
+	query.Format = releaseInfo.Media()
+	query.Date = releaseInfo.Date()
+	query.Label = releaseInfo.Label()
+	query.CatalogueNum = releaseInfo.CatalogueNum()
 	query.NumTracks = len(tracks)
 
 	var mb musicbrainz.Client
 	score, release, err := mb.SearchRelease(query)
 	cerr(err)
 
+	var flatTracks []musicbrainz.Track
+	for _, ts := range release.Media {
+		flatTracks = append(flatTracks, ts.Tracks...)
+	}
+	if len(tracks) == 0 {
+		cerr(errors.New("no tracks in response"))
+	}
+
 	fmt.Printf("score: %d\n", score)
 	fmt.Printf("release:\n")
-	fmt.Printf("  name      : %q -> %q\n", info.Album(), release.Title)
-	fmt.Printf("  artist    : %q -> %q\n", info.AlbumArtist(), creditString(release.ArtistCredit))
-	fmt.Printf("  label     : %q -> %q\n", info.Label(), first(release.LabelInfo).Label.Name)
-	fmt.Printf("  catalogue : %q -> %q\n", info.CatalogueNum(), first(release.LabelInfo).CatalogNumber)
-	fmt.Printf("  media     : %q -> %q\n", info.Media(), release.Media[0].Format)
+	fmt.Printf("  name      : %q -> %q\n", releaseInfo.Album(), release.Title)
+	fmt.Printf("  artist    : %q -> %q\n", releaseInfo.AlbumArtist(), creditString(release.ArtistCredit))
+	fmt.Printf("  label     : %q -> %q\n", releaseInfo.Label(), first(release.LabelInfo).Label.Name)
+	fmt.Printf("  catalogue : %q -> %q\n", releaseInfo.CatalogueNum(), first(release.LabelInfo).CatalogNumber)
+	fmt.Printf("  media     : %q -> %q\n", releaseInfo.Media(), release.Media[0].Format)
 	fmt.Printf("tracks:\n")
+	for i := range tracks {
+		fmt.Printf("  %02d  : %q %q\n     -> %q %q\n",
+			i,
+			tracks[i].Artist(), tracks[i].Title(),
+			creditString(flatTracks[i].ArtistCredit), flatTracks[i].Title)
+	}
 }
 
 func cerr(err error) {

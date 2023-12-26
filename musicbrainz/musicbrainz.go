@@ -168,6 +168,35 @@ type ArtistCredit struct {
 	} `json:"artist"`
 }
 
+type Track struct {
+	ID        string `json:"id"`
+	Length    int    `json:"length"`
+	Recording struct {
+		FirstReleaseDate string `json:"first-release-date"`
+		Video            bool   `json:"video"`
+		Disambiguation   string `json:"disambiguation"`
+		ID               string `json:"id"`
+		Length           int    `json:"length"`
+		Title            string `json:"title"`
+		ArtistCredit     []struct {
+			Name   string `json:"name"`
+			Artist struct {
+				TypeID         string `json:"type-id"`
+				Name           string `json:"name"`
+				ID             string `json:"id"`
+				Type           string `json:"type"`
+				Disambiguation string `json:"disambiguation"`
+				SortName       string `json:"sort-name"`
+			} `json:"artist"`
+			Joinphrase string `json:"joinphrase"`
+		} `json:"artist-credit"`
+	} `json:"recording"`
+	Number       string         `json:"number"`
+	Position     int            `json:"position"`
+	Title        string         `json:"title"`
+	ArtistCredit []ArtistCredit `json:"artist-credit"`
+}
+
 type ReleaseResponse struct {
 	Title              string `json:"title"`
 	ID                 string `json:"id"`
@@ -192,51 +221,13 @@ type ReleaseResponse struct {
 	Date         string         `json:"date"`
 	Quality      string         `json:"quality"`
 	Media        []struct {
-		TrackOffset int `json:"track-offset"`
-		TrackCount  int `json:"track-count"`
-		Tracks      []struct {
-			ID        string `json:"id"`
-			Length    int    `json:"length"`
-			Recording struct {
-				FirstReleaseDate string `json:"first-release-date"`
-				Video            bool   `json:"video"`
-				Disambiguation   string `json:"disambiguation"`
-				ID               string `json:"id"`
-				Length           int    `json:"length"`
-				Title            string `json:"title"`
-				ArtistCredit     []struct {
-					Name   string `json:"name"`
-					Artist struct {
-						TypeID         string `json:"type-id"`
-						Name           string `json:"name"`
-						ID             string `json:"id"`
-						Type           string `json:"type"`
-						Disambiguation string `json:"disambiguation"`
-						SortName       string `json:"sort-name"`
-					} `json:"artist"`
-					Joinphrase string `json:"joinphrase"`
-				} `json:"artist-credit"`
-			} `json:"recording"`
-			Number       string `json:"number"`
-			Position     int    `json:"position"`
-			Title        string `json:"title"`
-			ArtistCredit []struct {
-				Name   string `json:"name"`
-				Artist struct {
-					Type           string `json:"type"`
-					Disambiguation string `json:"disambiguation"`
-					SortName       string `json:"sort-name"`
-					TypeID         string `json:"type-id"`
-					ID             string `json:"id"`
-					Name           string `json:"name"`
-				} `json:"artist"`
-				Joinphrase string `json:"joinphrase"`
-			} `json:"artist-credit"`
-		} `json:"tracks"`
-		Format   string `json:"format"`
-		FormatID string `json:"format-id"`
-		Title    string `json:"title"`
-		Position int    `json:"position"`
+		TrackOffset int     `json:"track-offset"`
+		TrackCount  int     `json:"track-count"`
+		Tracks      []Track `json:"tracks"`
+		Format      string  `json:"format"`
+		FormatID    string  `json:"format-id"`
+		Title       string  `json:"title"`
+		Position    int     `json:"position"`
 	} `json:"media"`
 	Status        string `json:"status"`
 	ReleaseEvents []struct {
