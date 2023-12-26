@@ -1,17 +1,69 @@
 package musicbrainz
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
+
+	"golang.org/x/time/rate"
 )
 
 const base = "https://musicbrainz.org/ws/2/"
 
 var ErrNoResults = fmt.Errorf("no results")
+
+type Client struct {
+	httpClient *http.Client
+	limiter    *rate.Limiter
+}
+
+func NewClient() *Client {
+	return &Client{
+		httpClient: &http.Client{},
+		limiter:    rate.NewLimiter(rate.Every(time.Second), 1),
+	}
+}
+
+func (c *Client) request(ctx context.Context, r *http.Request, dest any) error {
+	if err := c.limiter.Wait(ctx); err != nil {
+		return fmt.Errorf("wait: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(r.WithContext(ctx))
+	if err != nil {
+		return fmt.Errorf("search: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		return fmt.Errorf("search returned non 2xx: %d", resp.StatusCode)
+	}
+	if err := json.NewDecoder(resp.Body).Decode(dest); err != nil {
+		return fmt.Errorf("decode response")
+	}
+	return nil
+}
+
+func (c *Client) GetRelease(ctx context.Context, mbid string) (*ReleaseResponse, error) {
+	urlV := url.Values{}
+	urlV.Set("fmt", "json")
+	urlV.Set("inc", "recordings+artist-credits+labels")
+
+	url, _ := url.Parse(joinPath(base, "release", mbid))
+	url.RawQuery = urlV.Encode()
+	req, _ := http.NewRequest(http.MethodGet, url.String(), nil)
+
+	var sr ReleaseResponse
+	if err := c.request(ctx, req, &sr); err != nil {
+		return nil, fmt.Errorf("request release: %w", err)
+	}
+
+	return &sr, nil
+}
 
 type Query struct {
 	MBReleaseID      string
@@ -27,36 +79,9 @@ type Query struct {
 	NumTracks    int
 }
 
-type Client struct{}
-
-func (c *Client) GetRelease(mbid string) (*ReleaseResponse, error) {
-	urlV := url.Values{}
-	urlV.Set("fmt", "json")
-	urlV.Set("inc", "recordings+artist-credits+labels")
-
-	url, _ := url.Parse(joinPath(base, "release", mbid))
-	url.RawQuery = urlV.Encode()
-
-	resp, err := http.Get(url.String())
-	if err != nil {
-		return nil, fmt.Errorf("search: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode/100 != 2 {
-		return nil, fmt.Errorf("search returned non 2xx: %d", resp.StatusCode)
-	}
-
-	var sr ReleaseResponse
-	if err := json.NewDecoder(resp.Body).Decode(&sr); err != nil {
-		return nil, fmt.Errorf("decode response")
-	}
-
-	return &sr, nil
-}
-
-func (c *Client) SearchRelease(q Query) (int, *ReleaseResponse, error) {
+func (c *Client) SearchRelease(ctx context.Context, q Query) (int, *ReleaseResponse, error) {
 	if q.MBReleaseID != "" {
-		release, err := c.GetRelease(q.MBReleaseID)
+		release, err := c.GetRelease(ctx, q.MBReleaseID)
 		if err != nil {
 			return 0, nil, fmt.Errorf("get direct release: %w", err)
 		}
@@ -107,26 +132,18 @@ func (c *Client) SearchRelease(q Query) (int, *ReleaseResponse, error) {
 
 	url, _ := url.Parse(joinPath(base, "release"))
 	url.RawQuery = urlV.Encode()
-
-	resp, err := http.Get(url.String())
-	if err != nil {
-		return 0, nil, fmt.Errorf("search: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode/100 != 2 {
-		return 0, nil, fmt.Errorf("search returned non 2xx: %d", resp.StatusCode)
-	}
+	req, _ := http.NewRequest(http.MethodGet, url.String(), nil)
 
 	var sr SearchResponse
-	if err := json.NewDecoder(resp.Body).Decode(&sr); err != nil {
-		return 0, nil, fmt.Errorf("decode response")
+	if err := c.request(ctx, req, &sr); err != nil {
+		return 0, nil, fmt.Errorf("request release: %w", err)
 	}
 	if len(sr.Releases) == 0 || sr.Releases[0].ID == "" {
 		return 0, nil, ErrNoResults
 	}
 	releaseKey := sr.Releases[0]
 
-	release, err := c.GetRelease(releaseKey.ID)
+	release, err := c.GetRelease(ctx, releaseKey.ID)
 	if err != nil {
 		return 0, nil, fmt.Errorf("get release by mbid %s: %w", releaseKey.ID, err)
 	}

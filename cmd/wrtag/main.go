@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -55,8 +56,8 @@ func main() {
 	query.CatalogueNum = releaseInfo.CatalogueNum()
 	query.NumTracks = len(tracks)
 
-	var mb musicbrainz.Client
-	score, release, err := mb.SearchRelease(query)
+	mb := musicbrainz.NewClient()
+	score, release, err := mb.SearchRelease(context.Background(), query)
 	cerr(err)
 
 	var flatTracks []musicbrainz.Track
