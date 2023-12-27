@@ -186,24 +186,13 @@ type Track struct {
 	ID        string `json:"id"`
 	Length    int    `json:"length"`
 	Recording struct {
-		FirstReleaseDate string `json:"first-release-date"`
-		Video            bool   `json:"video"`
-		Disambiguation   string `json:"disambiguation"`
-		ID               string `json:"id"`
-		Length           int    `json:"length"`
-		Title            string `json:"title"`
-		ArtistCredit     []struct {
-			Name   string `json:"name"`
-			Artist struct {
-				TypeID         string `json:"type-id"`
-				Name           string `json:"name"`
-				ID             string `json:"id"`
-				Type           string `json:"type"`
-				Disambiguation string `json:"disambiguation"`
-				SortName       string `json:"sort-name"`
-			} `json:"artist"`
-			Joinphrase string `json:"joinphrase"`
-		} `json:"artist-credit"`
+		FirstReleaseDate string         `json:"first-release-date"`
+		Video            bool           `json:"video"`
+		Disambiguation   string         `json:"disambiguation"`
+		ID               string         `json:"id"`
+		Length           int            `json:"length"`
+		Title            string         `json:"title"`
+		ArtistCredit     []ArtistCredit `json:"artist-credit"`
 	} `json:"recording"`
 	Number       string         `json:"number"`
 	Position     int            `json:"position"`
