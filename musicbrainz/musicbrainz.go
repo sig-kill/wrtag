@@ -98,22 +98,22 @@ func (c *Client) SearchRelease(ctx context.Context, q Query) (int, *ReleaseRespo
 		params = append(params, field("rgid", q.MBReleaseGroupID))
 	}
 	if q.Release != "" {
-		params = append(params, field("release", q.Release))
+		params = append(params, field("release", strings.ToLower(q.Release)))
 	}
 	if q.Artist != "" {
-		params = append(params, field("artist", q.Artist))
+		params = append(params, field("artist", strings.ToLower(q.Artist)))
 	}
 	if q.Date != "" {
 		params = append(params, field("date", q.Date))
 	}
 	if q.Format != "" {
-		params = append(params, field("format", q.Format))
+		params = append(params, field("format", strings.ToLower(q.Format)))
 	}
 	if q.Label != "" {
-		params = append(params, field("label", q.Label))
+		params = append(params, field("label", strings.ToLower(q.Label)))
 	}
 	if q.CatalogueNum != "" {
-		params = append(params, field("catno", q.CatalogueNum))
+		params = append(params, field("catno", strings.ToLower(q.CatalogueNum)))
 	}
 	if q.NumTracks > 0 {
 		params = append(params, field("tracks", q.NumTracks))
@@ -152,12 +152,9 @@ func (c *Client) SearchRelease(ctx context.Context, q Query) (int, *ReleaseRespo
 }
 
 func field(k string, v any) string {
-	switch v.(type) {
-	case int:
-		return fmt.Sprintf("%s:%d", k, v)
-	default:
-		return fmt.Sprintf("%s:%q", k, v)
-	}
+	vstr := fmt.Sprint(v)
+	vstr = escapeLucene.Replace(vstr)
+	return fmt.Sprintf("%s:(%v)", k, vstr)
 }
 
 func joinPath(base string, p ...string) string {
@@ -272,4 +269,15 @@ type ReleaseResponse struct {
 		} `json:"label"`
 		CatalogNumber string `json:"catalog-number"`
 	} `json:"label-info"`
+}
+
+// https://lucene.apache.org/core/7_7_2/queryparser/org/apache/lucene/queryparser/classic/package-summary.html#Escaping_Special_Characters
+var escapeLucene *strings.Replacer
+
+func init() {
+	var pairs []string
+	for _, c := range []string{`&&`, `||`, `+`, `-`, `!`, `(`, `)`, `{`, `}`, `[`, `]`, `^`, `"`, `~`, `*`, `?`, `:`, `\`, `/`} {
+		pairs = append(pairs, c, `\`+c)
+	}
+	escapeLucene = strings.NewReplacer(pairs...)
 }
