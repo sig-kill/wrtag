@@ -42,7 +42,7 @@ func (i *info) Genre() string          { return first(find(i.raw, "genre")) }
 func (i *info) Genres() []string       { return find(i.raw, "genres") }
 func (i *info) TrackNumber() int       { return intSep("/", first(find(i.raw, "tracknumber"))) } // eg. 5/12
 func (i *info) DiscNumber() int        { return intSep("/", first(find(i.raw, "discnumber"))) }  // eg. 1/2
-func (i *info) Media() string          { return first(find(i.raw, "media")) }
+func (i *info) MediaFormat() string    { return first(find(i.raw, "media")) }
 func (i *info) Date() string           { return first(find(i.raw, "date", "year")) }
 func (i *info) OriginalDate() string   { return first(find(i.raw, "originaldate", "date", "year")) }
 func (i *info) Label() string          { return first(find(i.raw, "label")) }

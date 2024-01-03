@@ -22,7 +22,7 @@ type Info interface {
 	Genres() []string
 	TrackNumber() int
 	DiscNumber() int
-	Media() string
+	MediaFormat() string
 	Date() string
 	OriginalDate() string
 	Label() string
