@@ -140,9 +140,13 @@ func tagTrackArtists(t tagcommon.Info) []Artist {
 	return artists
 }
 
+func DiffScore(a, b *Release) int {
+	return 0
+}
+
 func Diff(a, b *Release) string {
 	var buf strings.Builder
-	fmt.Fprintf(&buf, "score: %d\n", 0)
+	fmt.Fprintf(&buf, "score: %d\n", DiffScore(a, b))
 	fmt.Fprintf(&buf, "release:\n")
 	fmt.Fprintf(&buf, "  name      : %q -> %q\n", a.Title, b.Title)
 	fmt.Fprintf(&buf, "  artist    : %q -> %q\n", a.ArtistCredit, b.ArtistCredit)
