@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -54,56 +55,68 @@ func processDir(tg taglib.TagLib, mb *musicbrainz.Client, dir string) error {
 	if err != nil {
 		return fmt.Errorf("read dir: %w", err)
 	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name() < entries[j].Name()
+	})
 
-	var tags []tagcommon.Info
+	var files []tagcommon.File
 	for _, entry := range entries {
 		if path := filepath.Join(dir, entry.Name()); tg.CanRead(path) {
-			info, err := tg.Read(path)
+			file, err := tg.Read(path)
 			if err != nil {
-				return fmt.Errorf("read track info: %w", err)
+				return fmt.Errorf("read track: %w", err)
 			}
-			tags = append(tags, info)
+			files = append(files, file)
 		}
 	}
-	if len(tags) == 0 {
+	if len(files) == 0 {
 		return fmt.Errorf("no tracks in dir")
 	}
-	sort.Slice(tags, func(i, j int) bool {
-		return tags[i].TrackNumber() < tags[j].TrackNumber()
+	sort.SliceStable(files, func(i, j int) bool {
+		return files[i].TrackNumber() < files[j].TrackNumber()
 	})
-	tag := tags[0]
 
 	var query musicbrainz.Query
-	query.MBReleaseID = tag.MBReleaseID()
-	query.MBArtistID = first(tag.MBArtistID())
-	query.MBReleaseGroupID = tag.MBReleaseGroupID()
-	query.Release = tag.Album()
-	query.Artist = tag.AlbumArtist()
-	query.Format = tag.MediaFormat()
-	query.Date = tag.Date()
-	query.Label = tag.Label()
-	query.CatalogueNum = tag.CatalogueNum()
-	query.NumTracks = len(tags)
+	{
+		f := files[0] // search with first file only
+		query.MBReleaseID = f.MBReleaseID()
+		query.MBArtistID = first(f.MBArtistID())
+		query.MBReleaseGroupID = f.MBReleaseGroupID()
+		query.Release = f.Album()
+		query.Artist = f.AlbumArtist()
+		query.Format = f.MediaFormat()
+		query.Date = f.Date()
+		query.Label = f.Label()
+		query.CatalogueNum = f.CatalogueNum()
+		query.NumTracks = len(files)
+	}
 
 	score, resp, err := mb.SearchRelease(context.Background(), query)
 	if err != nil {
 		return fmt.Errorf("search release: %w", err)
 	}
-	if score < 90 {
+	if score < 100 {
 		return fmt.Errorf("score too low")
 	}
 
-	releaseA := release.FromTagInfo(tags)
-	releaseB := release.FromMusicBrainz(resp)
-	if len(releaseA.Tracks) != len(releaseB.Tracks) {
-		return fmt.Errorf("track count mismatch %d/%d", len(releaseA.Tracks), len(releaseB.Tracks))
+	releaseTags := release.FromTags(files)
+	releaseMB := release.FromMusicBrainz(resp)
+	if len(releaseTags.Tracks) != len(releaseMB.Tracks) {
+		return fmt.Errorf("track count mismatch %d/%d", len(releaseTags.Tracks), len(releaseMB.Tracks))
 	}
 
 	fmt.Println()
 	fmt.Printf("dir: %q\n", dir)
-	fmt.Print(release.Diff(releaseA, releaseB))
+	fmt.Print(release.Diff(releaseTags, releaseMB))
 
-	return nil
+	release.ToTags(releaseMB, files)
+
+	var errs []error
+	for _, t := range files {
+		errs = append(errs, t.Close())
+	}
+
+	return errors.Join(errs...)
 }
 
 func first[T comparable](is []T) T {
