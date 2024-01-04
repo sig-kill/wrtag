@@ -1,14 +1,16 @@
 package taglib
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/sentriz/audiotags"
-	"go.senan.xyz/wrtag/tags/tagcommon"
 )
+
+var ErrWrite = errors.New("error writing tags")
 
 type TagLib struct{}
 
@@ -20,49 +22,101 @@ func (TagLib) CanRead(absPath string) bool {
 	return false
 }
 
-func (TagLib) Read(absPath string) (tagcommon.Info, error) {
-	raw, props, err := audiotags.Read(absPath)
-	return &info{raw, props}, err
+func (TagLib) Read(absPath string) (*File, error) {
+	f, err := audiotags.Open(absPath)
+	if err != nil {
+		return nil, fmt.Errorf("open: %w", err)
+	}
+	props := f.ReadAudioProperties()
+	raw := f.ReadTags()
+	return &File{raw, props, f}, nil
 }
 
-type info struct {
+type File struct {
 	raw   map[string][]string
 	props *audiotags.AudioProperties
+	file  *audiotags.File
 }
 
 // https://picard-docs.musicbrainz.org/downloads/MusicBrainz_Picard_Tag_Map.html
 
-func (i *info) Title() string          { return first(find(i.raw, "title")) }
-func (i *info) Artist() string         { return first(find(i.raw, "artist")) }
-func (i *info) Artists() []string      { return find(i.raw, "artists") }
-func (i *info) Album() string          { return first(find(i.raw, "album")) }
-func (i *info) AlbumArtist() string    { return first(find(i.raw, "albumartist", "album artist")) }
-func (i *info) AlbumArtists() []string { return find(i.raw, "albumartists", "album_artists") }
-func (i *info) Genre() string          { return first(find(i.raw, "genre")) }
-func (i *info) Genres() []string       { return find(i.raw, "genres") }
-func (i *info) TrackNumber() int       { return intSep("/", first(find(i.raw, "tracknumber"))) } // eg. 5/12
-func (i *info) DiscNumber() int        { return intSep("/", first(find(i.raw, "discnumber"))) }  // eg. 1/2
-func (i *info) MediaFormat() string    { return first(find(i.raw, "media")) }
-func (i *info) Date() string           { return first(find(i.raw, "date", "year")) }
-func (i *info) OriginalDate() string   { return first(find(i.raw, "originaldate", "date", "year")) }
-func (i *info) Label() string          { return first(find(i.raw, "label")) }
-func (i *info) CatalogueNum() string   { return first(find(i.raw, "catalognumber")) }
+func (f *File) Album() string          { return first(find(f.raw, "album")) }
+func (f *File) AlbumArtist() string    { return first(find(f.raw, "albumartist", "album artist")) }
+func (f *File) AlbumArtists() []string { return find(f.raw, "albumartists", "album_artists") }
+func (f *File) Date() string           { return first(find(f.raw, "date", "year")) }
+func (f *File) OriginalDate() string   { return first(find(f.raw, "originaldate", "date", "year")) }
+func (f *File) MediaFormat() string    { return first(find(f.raw, "media")) }
+func (f *File) Label() string          { return first(find(f.raw, "label")) }
+func (f *File) CatalogueNum() string   { return first(find(f.raw, "catalognumber")) }
 
-func (i *info) MBRecordingID() string     { return first(find(i.raw, "musicbrainz_trackid")) }
-func (i *info) MBReleaseID() string       { return first(find(i.raw, "musicbrainz_albumid")) }
-func (i *info) MBReleaseGroupID() string  { return first(find(i.raw, "musicbrainz_releasegroupid")) }
-func (i *info) MBArtistID() []string      { return find(i.raw, "musicbrainz_artistid") }
-func (i *info) MBAlbumArtistID() []string { return find(i.raw, "musicbrainz_albumartistid") }
+func (f *File) MBReleaseID() string       { return first(find(f.raw, "musicbrainz_albumid")) }
+func (f *File) MBReleaseGroupID() string  { return first(find(f.raw, "musicbrainz_releasegroupid")) }
+func (f *File) MBAlbumArtistID() []string { return find(f.raw, "musicbrainz_albumartistid") }
 
-func (i *info) Length() int  { return i.props.Length }
-func (i *info) Bitrate() int { return i.props.Bitrate }
+func (f *File) Title() string     { return first(find(f.raw, "title")) }
+func (f *File) Artist() string    { return first(find(f.raw, "artist")) }
+func (f *File) Artists() []string { return find(f.raw, "artists") }
+func (f *File) Genre() string     { return first(find(f.raw, "genre")) }
+func (f *File) Genres() []string  { return find(f.raw, "genres") }
+func (f *File) TrackNumber() int  { return intSep("/", first(find(f.raw, "tracknumber", "track"))) } // eg. 5/12
+func (f *File) DiscNumber() int   { return intSep("/", first(find(f.raw, "discnumber"))) }           // eg. 1/2
 
-func (i *info) String() string {
+func (f *File) MBRecordingID() string { return first(find(f.raw, "musicbrainz_trackid")) }
+func (f *File) MBArtistID() []string  { return find(f.raw, "musicbrainz_artistid") }
+
+func (f *File) WriteAlbum(v string)          { f.raw["album"] = []string{v} }
+func (f *File) WriteAlbumArtist(v string)    { f.raw["albumartist"] = []string{v} }
+func (f *File) WriteAlbumArtists(v []string) { f.raw["albumartists"] = v }
+func (f *File) WriteDate(v string)           { f.raw["date"] = []string{v} }
+func (f *File) WriteOriginalDate(v string)   { f.raw["originaldate"] = []string{v} }
+func (f *File) WriteMediaFormat(v string)    { f.raw["media"] = []string{v} }
+func (f *File) WriteLabel(v string)          { f.raw["label"] = []string{v} }
+func (f *File) WriteCatalogueNum(v string)   { f.raw["catalognumber"] = []string{v} }
+
+func (f *File) WriteMBReleaseID(v string)       { f.raw["musicbrainz_albumid"] = []string{v} }
+func (f *File) WriteMBReleaseGroupID(v string)  { f.raw["musicbrainz_releasegroupid"] = []string{v} }
+func (f *File) WriteMBAlbumArtistID(v []string) { f.raw["musicbrainz_albumartistid"] = v }
+
+func (f *File) WriteTitle(v string)     { f.raw["title"] = []string{v} }
+func (f *File) WriteArtist(v string)    { f.raw["artist"] = []string{v} }
+func (f *File) WriteArtists(v []string) { f.raw["artists"] = v }
+func (f *File) WriteGenre(v string)     { f.raw["genre"] = []string{v} }
+func (f *File) WriteGenres(v []string)  { f.raw["genres"] = v }
+func (f *File) WriteTrackNumber(v int)  { f.raw["track"] = []string{fmt.Sprintf("%d", v)} }
+func (f *File) WriteDiscNumber(v int)   { f.raw["discnumber"] = []string{fmt.Sprintf("%d", v)} }
+
+func (f *File) WriteMBRecordingID(v string) { f.raw["musicbrainz_trackid"] = []string{v} }
+func (f *File) WriteMBArtistID(v []string)  { f.raw["musicbrainz_artistid"] = v }
+
+func (f *File) Length() int  { return f.props.Length }
+func (f *File) Bitrate() int { return f.props.Bitrate }
+
+func (f *File) Raw() map[string][]string { return f.raw }
+
+func (f *File) String() string {
 	var buf strings.Builder
-	for k, v := range i.raw {
+	for k, v := range f.raw {
 		fmt.Fprintf(&buf, "%s\t%v\n", k, strings.Join(v, "; "))
 	}
 	return buf.String()
+}
+
+func (f *File) Close() error {
+	// delete unknown keys
+	for k := range f.raw {
+		switch strings.ToLower(k) {
+		// TODO: re use from above somehow
+		case "title", "artist", "artists", "album", "albumartist", "albumartists", "genre", "genres", "track", "discnumber", "media", "date", "originaldate", "label", "catalognumber",
+			"musicbrainz_trackid", "musicbrainz_albumid", "musicbrainz_releasegroupid", "musicbrainz_artistid", "musicbrainz_albumartistid":
+		default:
+			delete(f.raw, k)
+		}
+	}
+	if !f.file.WriteTags(f.raw) {
+		return ErrWrite
+	}
+	f.file.Close()
+	return nil
 }
 
 func first[T comparable](is []T) T {
