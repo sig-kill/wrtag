@@ -1,0 +1,1 @@
+path-format /home/senan/downloads/musicbeets/albums/{{ .R.Artists | title | join "; " }}/({{ .R.OriginalDate | year }}) {{ .R.Title }}/{{ .T.Number | pad0 2 }}.{{ .R.Tracks | len | pad0 2 }} {{ .T.Title }}{{ .Ext }}
