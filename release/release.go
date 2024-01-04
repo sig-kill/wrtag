@@ -131,7 +131,7 @@ func FromTags(ti []tagcommon.File) *Release {
 }
 
 func ToTags(r *Release, ti []tagcommon.File) {
-	for i, mbt := range r.Tracks {
+	for i, t := range r.Tracks {
 		ti[i].WriteAlbum(r.Title)
 		ti[i].WriteAlbumArtist(r.ArtistCredit)
 		ti[i].WriteAlbumArtists(mapp(r.Artists, func(i int, v Artist) string {
@@ -149,9 +149,9 @@ func ToTags(r *Release, ti []tagcommon.File) {
 			return v.MBID
 		}))
 
-		ti[i].WriteTitle(mbt.Title)
-		ti[i].WriteArtist(mbt.ArtistCredit)
-		ti[i].WriteArtists(mapp(mbt.Artists, func(i int, v Artist) string {
+		ti[i].WriteTitle(t.Title)
+		ti[i].WriteArtist(t.ArtistCredit)
+		ti[i].WriteArtists(mapp(t.Artists, func(i int, v Artist) string {
 			return v.Title
 		}))
 		ti[i].WriteGenre("")
@@ -159,8 +159,8 @@ func ToTags(r *Release, ti []tagcommon.File) {
 		ti[i].WriteTrackNumber(i + 1)
 		ti[i].WriteDiscNumber(1)
 
-		ti[i].WriteMBRecordingID(mbt.RecordingMBID)
-		ti[i].WriteMBArtistID(mapp(mbt.Artists, func(i int, v Artist) string {
+		ti[i].WriteMBRecordingID(t.RecordingMBID)
+		ti[i].WriteMBArtistID(mapp(t.Artists, func(i int, v Artist) string {
 			return v.MBID
 		}))
 	}
