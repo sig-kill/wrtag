@@ -2,6 +2,7 @@ package release
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -71,7 +72,7 @@ func FromMusicBrainz(mb *musicbrainz.ReleaseResponse) *Release {
 
 	r.Tracks = mapp(mbTracks, func(i int, v musicbrainz.Track) Track {
 		return Track{
-			Number:        i,
+			Number:        i + 1,
 			Title:         v.Title,
 			RecordingMBID: v.Recording.ID,
 			ArtistCredit:  mbArtistCredit(v.ArtistCredit),
@@ -91,6 +92,10 @@ func FromTags(ti []tagcommon.File) *Release {
 	if len(ti) == 0 {
 		return nil
 	}
+	sort.SliceStable(ti, func(i, j int) bool {
+		return ti[i].TrackNumber() < ti[j].TrackNumber()
+	})
+
 	t := ti[0]
 
 	var r Release
@@ -114,7 +119,7 @@ func FromTags(ti []tagcommon.File) *Release {
 
 	r.Tracks = mapp(ti, func(i int, v tagcommon.File) Track {
 		return Track{
-			Number:        i,
+			Number:        i + 1,
 			Title:         v.Title(),
 			RecordingMBID: v.MBRecordingID(),
 			ArtistCredit:  v.Artist(),

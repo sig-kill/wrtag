@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -47,21 +46,11 @@ func main() {
 		New("template").
 		Funcs(template.FuncMap{
 			"title": func(ar []release.Artist) []string {
-				res := make([]string, len(ar))
-				for i, v := range ar {
-					res[i] = v.Title
-				}
-				return res
+				return mapp(ar, func(_ int, v release.Artist) string { return v.Title })
 			},
-			"join": func(delim string, items []string) string {
-				return strings.Join(items, delim)
-			},
-			"year": func(t time.Time) string {
-				return fmt.Sprintf("%d", t.Year())
-			},
-			"pad0": func(amount, n int) string {
-				return fmt.Sprintf("%0*d", amount, n)
-			},
+			"join": func(delim string, items []string) string { return strings.Join(items, delim) },
+			"year": func(t time.Time) string { return fmt.Sprintf("%d", t.Year()) },
+			"pad0": func(amount, n int) string { return fmt.Sprintf("%0*d", amount, n) },
 		}).
 		Parse(*confPathFormat)
 	if err != nil {
@@ -75,50 +64,28 @@ func main() {
 	for _, dir := range fs.GetArgs() {
 		if err := processDir(tg, mb, pathFormat, dir); err != nil {
 			log.Printf("error processing dir %q: %v", dir, err)
+			continue
 		}
 	}
 }
 
 func processDir(tg taglib.TagLib, mb *musicbrainz.Client, pathFormat *template.Template, dir string) error {
-	entries, err := os.ReadDir(dir)
+	rtags, err := readReleaseDir(tg, dir)
 	if err != nil {
-		return fmt.Errorf("read dir: %w", err)
+		return fmt.Errorf("read release dir: %w", err)
 	}
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Name() < entries[j].Name()
-	})
-
-	var files []tagcommon.File
-	for _, entry := range entries {
-		if path := filepath.Join(dir, entry.Name()); tg.CanRead(path) {
-			file, err := tg.Read(path)
-			if err != nil {
-				return fmt.Errorf("read track: %w", err)
-			}
-			files = append(files, file)
-		}
-	}
-	if len(files) == 0 {
-		return fmt.Errorf("no tracks in dir")
-	}
-	sort.SliceStable(files, func(i, j int) bool {
-		return files[i].TrackNumber() < files[j].TrackNumber()
-	})
 
 	var query musicbrainz.Query
-	{
-		f := files[0] // search with first file only
-		query.MBReleaseID = f.MBReleaseID()
-		query.MBArtistID = first(f.MBArtistID())
-		query.MBReleaseGroupID = f.MBReleaseGroupID()
-		query.Release = f.Album()
-		query.Artist = f.AlbumArtist()
-		query.Format = f.MediaFormat()
-		query.Date = f.Date()
-		query.Label = f.Label()
-		query.CatalogueNum = f.CatalogueNum()
-		query.NumTracks = len(files)
-	}
+	query.MBReleaseID = rtags.MBID
+	query.MBArtistID = first(rtags.Artists).MBID
+	query.MBReleaseGroupID = rtags.ReleaseGroupMBID
+	query.Release = rtags.Title
+	query.Artist = rtags.ArtistCredit
+	query.Format = rtags.MediaFormat
+	query.Date = fmt.Sprint(rtags.Date.Year())
+	query.Label = rtags.Label
+	query.CatalogueNum = rtags.CatalogueNum
+	query.NumTracks = len(rtags.Tracks)
 
 	score, resp, err := mb.SearchRelease(context.Background(), query)
 	if err != nil {
@@ -128,28 +95,37 @@ func processDir(tg taglib.TagLib, mb *musicbrainz.Client, pathFormat *template.T
 		return fmt.Errorf("score too low")
 	}
 
-	releaseTags := release.FromTags(files)
 	releaseMB := release.FromMusicBrainz(resp)
-	if len(releaseTags.Tracks) != len(releaseMB.Tracks) {
-		return fmt.Errorf("track count mismatch %d/%d", len(releaseTags.Tracks), len(releaseMB.Tracks))
+	if len(rtags.Tracks) != len(releaseMB.Tracks) {
+		return fmt.Errorf("track count mismatch %d/%d", len(rtags.Tracks), len(releaseMB.Tracks))
 	}
 
 	fmt.Println()
-	fmt.Printf("dir: %q\n", dir)
-	fmt.Print(release.Diff(releaseTags, releaseMB))
+	fmt.Print(release.Diff(rtags, releaseMB))
 
-	release.ToTags(releaseMB, files)
+	return nil
+}
 
-	var errs []error
-	for _, t := range files {
-		errs = append(errs, t.Close())
-	}
-	if err := errors.Join(errs...); err != nil {
-		return fmt.Errorf("write tags to files: %w", err)
-	}
+func a() {
+	//
+	// release.ToTags(releaseMB, files)
+	//
+	// var errs []error
+	// for _, t := range files {
+	// 	errs = append(errs, t.Close())
+	// }
+	// if err := errors.Join(errs...); err != nil {
+	// 	return fmt.Errorf("write tags to files: %w", err)
+	// }
+	// if err := moveFiles(pathFormat, releaseMB, paths); err != nil {
+	// 	log.Printf("error processing dir %q: %v", dir, err)
+	// }
+	// return nil
+}
 
+func moveFiles(pathFormat *template.Template, releaseMB *release.Release, paths []string) error {
 	for i, t := range releaseMB.Tracks {
-		path := filepath.Join(dir, entries[i].Name())
+		path := paths[i]
 		pathFormatData := struct {
 			R   *release.Release
 			T   *release.Track
@@ -160,15 +136,41 @@ func processDir(tg taglib.TagLib, mb *musicbrainz.Client, pathFormat *template.T
 			Ext: filepath.Ext(path),
 		}
 
-		var newPath strings.Builder
-		if err := pathFormat.Execute(&newPath, pathFormatData); err != nil {
+		var newPathBuilder strings.Builder
+		if err := pathFormat.Execute(&newPathBuilder, pathFormatData); err != nil {
 			return fmt.Errorf("create path: %w", err)
 		}
-
-		fmt.Println(newPath.String())
 	}
-
 	return nil
+}
+
+func readReleaseDir(tg taglib.TagLib, dir string) (*release.Release, error) {
+	paths, err := filepath.Glob(filepath.Join(dir, "*"))
+	if err != nil {
+		return nil, fmt.Errorf("glob dir: %w", err)
+	}
+	sort.Strings(paths)
+
+	var files []tagcommon.File
+	for _, path := range paths {
+		if tg.CanRead(path) {
+			file, err := tg.Read(path)
+			if err != nil {
+				return nil, fmt.Errorf("read track: %w", err)
+			}
+			files = append(files, file)
+		}
+	}
+	if len(files) == 0 {
+		return nil, fmt.Errorf("no tracks in dir")
+	}
+	defer func() {
+		for _, f := range files {
+			f.Close()
+		}
+	}()
+
+	return release.FromTags(files), nil
 }
 
 func first[T comparable](is []T) T {
@@ -179,4 +181,12 @@ func first[T comparable](is []T) T {
 		}
 	}
 	return z
+}
+
+func mapp[F, T any](s []F, f func(int, F) T) []T {
+	res := make([]T, len(s))
+	for i, v := range s {
+		res[i] = f(i, v)
+	}
+	return res
 }
