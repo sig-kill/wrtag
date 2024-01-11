@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/araddon/dateparse"
+	"github.com/sergi/go-diff/diffmatchpatch"
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/tags/tagcommon"
 )
@@ -187,11 +188,16 @@ func mapp[F, T any](s []F, f func(int, F) T) []T {
 	return res
 }
 
+type Diff struct {
+	Field  string
+	Changes  []diffmatchpatch.Diff
+}
+
 func DiffScore(a, b *Release) int {
 	return 0
 }
 
-func Diff(a, b *Release) string {
+func DiffString(a, b *Release) string {
 	var buf strings.Builder
 	fmt.Fprintf(&buf, "score: %d\n", DiffScore(a, b))
 	fmt.Fprintf(&buf, "release:\n")
@@ -201,11 +207,38 @@ func Diff(a, b *Release) string {
 	fmt.Fprintf(&buf, "  catalogue : %q -> %q\n", a.CatalogueNum, b.CatalogueNum)
 	fmt.Fprintf(&buf, "  media     : %q -> %q\n", a.MediaFormat, b.MediaFormat)
 	fmt.Fprintf(&buf, "tracks:\n")
-	for i := range a.Tracks {
+	for i := range a.Tracks { 
 		fmt.Fprintf(&buf, "  %02d  : %q %q\n     -> %q %q\n",
 			i,
 			a.Tracks[i].ArtistCredit, a.Tracks[i].Title,
 			b.Tracks[i].ArtistCredit, b.Tracks[i].Title)
 	}
 	return buf.String()
+}
+
+func DiffReleases(a, b *Release) []Diff {
+	dmp := diffmatchpatch.New()
+
+	d := func(f, a, b string) Diff {
+		return Diff{Field: f, Changes: dmp.DiffMain(a, b, false)}
+	}
+
+	var diffs []Diff
+	diffs = append(diffs,
+		d("title", a.Title, b.Title),
+		d("artist", a.ArtistCredit, b.ArtistCredit),
+		d("label", a.Label, b.Label),
+		d("catalogue num", a.CatalogueNum, b.CatalogueNum),
+		d("media format", a.MediaFormat, b.MediaFormat),
+	)
+
+	for i := range a.Tracks {
+		diffs = append(diffs, d(
+			fmt.Sprintf("track %d", i+1),
+			fmt.Sprintf("%s - %s", a.Tracks[i].ArtistCredit, a.Tracks[i].Title),
+			fmt.Sprintf("%s - %s", b.Tracks[i].ArtistCredit, b.Tracks[i].Title),
+		))
+	}
+
+	return diffs
 }

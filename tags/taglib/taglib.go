@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/sentriz/audiotags"
+	"go.senan.xyz/wrtag/tags/tagcommon"
 )
 
 var ErrWrite = errors.New("error writing tags")
@@ -22,7 +23,7 @@ func (TagLib) CanRead(absPath string) bool {
 	return false
 }
 
-func (TagLib) Read(absPath string) (*File, error) {
+func (TagLib) Read(absPath string) (tagcommon.File, error) {
 	f, err := audiotags.Open(absPath)
 	if err != nil {
 		return nil, fmt.Errorf("open: %w", err)

@@ -1,19 +1,16 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"text/template"
 	"time"
 
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/release"
-	"go.senan.xyz/wrtag/tags/tagcommon"
 	"go.senan.xyz/wrtag/tags/taglib"
 
 	"github.com/peterbourgon/ff/v4"
@@ -69,43 +66,6 @@ func main() {
 	}
 }
 
-func processDir(tg taglib.TagLib, mb *musicbrainz.Client, pathFormat *template.Template, dir string) error {
-	rtags, err := readReleaseDir(tg, dir)
-	if err != nil {
-		return fmt.Errorf("read release dir: %w", err)
-	}
-
-	var query musicbrainz.Query
-	query.MBReleaseID = rtags.MBID
-	query.MBArtistID = first(rtags.Artists).MBID
-	query.MBReleaseGroupID = rtags.ReleaseGroupMBID
-	query.Release = rtags.Title
-	query.Artist = rtags.ArtistCredit
-	query.Format = rtags.MediaFormat
-	query.Date = fmt.Sprint(rtags.Date.Year())
-	query.Label = rtags.Label
-	query.CatalogueNum = rtags.CatalogueNum
-	query.NumTracks = len(rtags.Tracks)
-
-	score, resp, err := mb.SearchRelease(context.Background(), query)
-	if err != nil {
-		return fmt.Errorf("search release: %w", err)
-	}
-	if score < 100 {
-		return fmt.Errorf("score too low")
-	}
-
-	releaseMB := release.FromMusicBrainz(resp)
-	if len(rtags.Tracks) != len(releaseMB.Tracks) {
-		return fmt.Errorf("track count mismatch %d/%d", len(rtags.Tracks), len(releaseMB.Tracks))
-	}
-
-	fmt.Println()
-	fmt.Print(release.Diff(rtags, releaseMB))
-
-	return nil
-}
-
 func a() {
 	//
 	// release.ToTags(releaseMB, files)
@@ -142,35 +102,6 @@ func moveFiles(pathFormat *template.Template, releaseMB *release.Release, paths 
 		}
 	}
 	return nil
-}
-
-func readReleaseDir(tg taglib.TagLib, dir string) (*release.Release, error) {
-	paths, err := filepath.Glob(filepath.Join(dir, "*"))
-	if err != nil {
-		return nil, fmt.Errorf("glob dir: %w", err)
-	}
-	sort.Strings(paths)
-
-	var files []tagcommon.File
-	for _, path := range paths {
-		if tg.CanRead(path) {
-			file, err := tg.Read(path)
-			if err != nil {
-				return nil, fmt.Errorf("read track: %w", err)
-			}
-			files = append(files, file)
-		}
-	}
-	if len(files) == 0 {
-		return nil, fmt.Errorf("no tracks in dir")
-	}
-	defer func() {
-		for _, f := range files {
-			f.Close()
-		}
-	}()
-
-	return release.FromTags(files), nil
 }
 
 func first[T comparable](is []T) T {
