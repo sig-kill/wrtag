@@ -4,9 +4,9 @@ import (
 	"context"
 	"crypto/subtle"
 	"embed"
+	"errors"
 	"fmt"
 	"html/template"
-	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -21,10 +21,19 @@ import (
 	"go.senan.xyz/wrtag/tags/taglib"
 )
 
-//go:embed ui
+//go:embed *.html
 var ui embed.FS
-var uiFS, _ = fs.Sub(ui, "ui")
-var templ = template.Must(template.ParseFS(uiFS, "*.html"))
+var templ = template.Must(
+	template.
+		New("").
+		Funcs(template.FuncMap{
+			"query": template.URLQueryEscaper,
+			"nomatch": func(err error) bool {
+				return errors.Is(err, wrtag.ErrNoMatch)
+			},
+		}).
+		ParseFS(ui, "*.html"),
+)
 
 func main() {
 	ffs := ff.NewFlagSet("wrtag")
@@ -53,18 +62,18 @@ func main() {
 	tg := &taglib.TagLib{}
 	mb := musicbrainz.NewClient()
 
-	jobs := map[string]*Job{} // TODO sync
+	jobs := map[string]*Job{} // TODO: sync
 	jobQueue := make(chan string)
 
 	for i := 0; i < 5; i++ {
 		go func() {
 			for jobPath := range jobQueue {
-				if _, ok := jobs[jobPath]; ok {
-					continue
+				if _, ok := jobs[jobPath]; !ok {
+					jobs[jobPath] = &Job{Path: jobPath}
 				}
-				jobs[jobPath] = &Job{Path: jobPath}
 				if err := processJob(context.Background(), mb, tg, jobs[jobPath]); err != nil {
-					jobs[jobPath].Error = err.Error()
+					jobs[jobPath].Error = err
+					log.Printf("error processing %q: %v", jobPath, err)
 					continue
 				}
 			}
@@ -84,8 +93,32 @@ func main() {
 		jobQueue <- path
 	})
 
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		templ.ExecuteTemplate(w, "index.html", struct{ Jobs map[string]*Job }{Jobs: jobs})
+	mux.HandleFunc("POST /job/{id}", func(w http.ResponseWriter, r *http.Request) {
+		jobPath := muxpatterns.PathValue(r, "id")
+		job, ok := jobs[jobPath]
+		if !ok {
+			http.Error(w, "unknown job", http.StatusBadRequest)
+			return
+		}
+		*job = Job{
+			Path:    job.Path,
+			UseMBID: r.FormValue("mbid"),
+		}
+		jobQueue <- job.Path
+		if err := templ.ExecuteTemplate(w, "release.html", job); err != nil {
+			log.Printf("err in template: %v", err)
+		}
+	})
+
+	mux.HandleFunc("/{$}", func(w http.ResponseWriter, r *http.Request) {
+		data := struct {
+			Jobs map[string]*Job
+		}{
+			Jobs: jobs,
+		}
+		if err := templ.ExecuteTemplate(w, "index.html", data); err != nil {
+			log.Printf("err in template: %v", err)
+		}
 	})
 
 	log.Printf("starting on %s", *confListenAddr)
@@ -101,23 +134,44 @@ func main() {
 
 type Job struct {
 	Path    string
+	UseMBID string
 	Release *release.Release
+	Score   float64
 	Diff    []release.Diff
-	Error   string
+	Error   error
 }
 
-func processJob(ctx context.Context, mb *musicbrainz.Client, tg tagcommon.Reader, job *Job) error {
-	releaseTags, err := wrtag.ReadDir(tg, job.Path)
+func processJob(ctx context.Context, mb *musicbrainz.Client, tg tagcommon.Reader, job *Job) (err error) {
+	releaseFiles, err := wrtag.ReadDir(tg, job.Path)
 	if err != nil {
 		return fmt.Errorf("read dir: %w", err)
 	}
+	defer func() {
+		var fileErrs []error
+		for _, f := range releaseFiles {
+			fileErrs = append(fileErrs, f.Close())
+		}
+		if err != nil {
+			return
+		}
+		err = errors.Join(fileErrs...)
+	}()
+
+	releaseTags := release.FromTags(releaseFiles)
 
 	releaseMB, err := wrtag.SearchReleaseMusicBrainz(ctx, mb, releaseTags)
 	if err != nil {
 		return fmt.Errorf("search musicbrainz: %w", err)
 	}
 
-	job.Diff = release.DiffReleases(releaseTags, releaseMB) // TOD0 return?
+	job.Release = releaseMB
+	job.Score, job.Diff = release.DiffReleases(releaseTags, releaseMB)
+
+	if job.Score < 95 {
+		return wrtag.ErrNoMatch
+	}
+
+	release.ToTags(releaseMB, releaseFiles)
 
 	return nil
 }

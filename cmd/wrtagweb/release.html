@@ -1,0 +1,40 @@
+<div class="release bg-gray-100 p-2 flex flex-col gap-2 shadow-sm">
+  <p class="italic">{{ .Path }}</p>
+  {{ if .Release }}
+    <p class="font-bold">
+      {{ printf "%.2f%%" .Score }} match with
+      <a class="font-normal text-blue-700 underline" href="https://musicbrainz.org/release/{{ .Release.MBID }}" target="_blank">https://musicbrainz.org/release/{{ .Release.MBID }}</a>
+    </p>
+    <table>
+      {{ range .Diff }}
+      <tr class="{{ if gt (len .Changes) 1 }}bg-gray-200{{ end }}">
+        <td class="border-b px-2 text-gray-500">{{ .Field }}</td>
+        <td class="border-b px-2">
+          {{ if eq .Before "" }}<span class="text-gray-400">[empty]</span>{{ end }}
+          {{ range .Changes }}
+            {{- if (eq .Type 0) }}<span>{{ .Text }}</span>{{ end -}}
+            {{- if (eq .Type -1) }}<span class="text-red-600 font-bold">{{ .Text }}</span>{{ end -}}
+          {{ end }}
+        </td>
+        <td class="border-b px-2">
+          {{ if eq .After "" }}<span class="text-gray-400">[empty]</span>{{ end }}
+          {{ range .Changes }}
+            {{- if (eq .Type 0) }}<span>{{ .Text }}</span>{{ end -}}
+            {{- if (eq .Type 1) }}<span class="text-green-600 font-bold">{{ .Text }}</span>{{ end -}}
+          {{ end }}
+        </td>
+      </tr>
+      {{ end }}
+    </table>
+  {{ end }}
+  {{ if .Error }}
+    <p class="text-red-600">{{ .Error }}</p>
+  {{ end }}
+  {{ if nomatch .Error }}
+    <form hx-post="/job/{{ .Path | query }}" hx-swap="outerHTML" hx-target="closest .release" class="flex gap-2">
+      <label>release mbid/url</label>
+      <input type="text" name="mbid" class="border w-[310px]" placeholder="74a7e992-4366-427a-91ff-f3cf6aa7524d">
+      <button class="text-blue-700">use</button>
+    </form>
+  {{ end }}
+</div>

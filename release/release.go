@@ -2,6 +2,7 @@ package release
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -189,8 +190,9 @@ func mapp[F, T any](s []F, f func(int, F) T) []T {
 }
 
 type Diff struct {
-	Field  string
-	Changes  []diffmatchpatch.Diff
+	Field         string
+	Before, After string
+	Changes       []diffmatchpatch.Diff
 }
 
 func DiffScore(a, b *Release) int {
@@ -207,7 +209,7 @@ func DiffString(a, b *Release) string {
 	fmt.Fprintf(&buf, "  catalogue : %q -> %q\n", a.CatalogueNum, b.CatalogueNum)
 	fmt.Fprintf(&buf, "  media     : %q -> %q\n", a.MediaFormat, b.MediaFormat)
 	fmt.Fprintf(&buf, "tracks:\n")
-	for i := range a.Tracks { 
+	for i := range a.Tracks {
 		fmt.Fprintf(&buf, "  %02d  : %q %q\n     -> %q %q\n",
 			i,
 			a.Tracks[i].ArtistCredit, a.Tracks[i].Title,
@@ -216,11 +218,16 @@ func DiffString(a, b *Release) string {
 	return buf.String()
 }
 
-func DiffReleases(a, b *Release) []Diff {
+func DiffReleases(a, b *Release) (float64, []Diff) {
 	dmp := diffmatchpatch.New()
 
+	var charsTotal int
+	var charsDiff int
 	d := func(f, a, b string) Diff {
-		return Diff{Field: f, Changes: dmp.DiffMain(a, b, false)}
+		diffs := dmp.DiffMain(a, b, false)
+		charsTotal += len([]rune(b))
+		charsDiff += dmp.DiffLevenshtein(diffs)
+		return Diff{Field: f, Changes: diffs, Before: a, After: b}
 	}
 
 	var diffs []Diff
@@ -235,10 +242,19 @@ func DiffReleases(a, b *Release) []Diff {
 	for i := range a.Tracks {
 		diffs = append(diffs, d(
 			fmt.Sprintf("track %d", i+1),
-			fmt.Sprintf("%s - %s", a.Tracks[i].ArtistCredit, a.Tracks[i].Title),
-			fmt.Sprintf("%s - %s", b.Tracks[i].ArtistCredit, b.Tracks[i].Title),
+			strings.Join(filter(a.Tracks[i].ArtistCredit, a.Tracks[i].Title), " – "),
+			strings.Join(filter(b.Tracks[i].ArtistCredit, b.Tracks[i].Title), " – "),
 		))
 	}
 
-	return diffs
+	score := 100 - (float64(charsDiff) * 100 / float64(charsTotal))
+
+	return score, diffs
+}
+
+func filter[T comparable](elms ...T) []T {
+	var zero T
+	return slices.DeleteFunc(elms, func(t T) bool {
+		return t == zero
+	})
 }
