@@ -49,6 +49,8 @@ func (c *Client) request(ctx context.Context, r *http.Request, dest any) error {
 }
 
 func (c *Client) GetRelease(ctx context.Context, mbid string) (*ReleaseResponse, error) {
+	fmt.Printf("get release by id %q\n", mbid)
+
 	urlV := url.Values{}
 	urlV.Set("fmt", "json")
 	urlV.Set("inc", "recordings+artist-credits+labels")
