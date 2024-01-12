@@ -1,5 +1,5 @@
-<div class="release bg-gray-100 p-2 flex flex-col gap-2 shadow-sm">
-  <p class="italic">{{ .Path }}</p>
+<div id="{{ .ID }}" hx-swap-oob="true" class="bg-gray-100 p-2 flex flex-col gap-2 shadow-sm">
+  <p class="italic">{{ now }} {{ .Path }}</p>
   {{ if .Release }}
     <p class="font-bold">
       {{ printf "%.2f%%" .Score }} match with
@@ -31,10 +31,10 @@
     <p class="text-red-600">{{ .Error }}</p>
   {{ end }}
   {{ if nomatch .Error }}
-    <form hx-post="/job/{{ .Path | query }}" hx-swap="outerHTML" hx-target="closest .release" class="flex gap-2">
+      <form hx-post="/job/{{ .ID }}" hx-target="#{{ .ID }}" class="flex gap-2">
       <label>release mbid/url</label>
       <input type="text" name="mbid" class="border w-[310px]" placeholder="74a7e992-4366-427a-91ff-f3cf6aa7524d">
-      <button class="text-blue-700">use</button>
+      <button class="text-blue-700">submit</button>
     </form>
   {{ end }}
 </div>
