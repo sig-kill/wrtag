@@ -13,11 +13,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/jba/muxpatterns"
 	"github.com/peterbourgon/ff/v4"
+	"github.com/r3labs/sse/v2"
 	"go.senan.xyz/wrtag"
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/release"
@@ -72,91 +74,73 @@ func main() {
 	tg := &taglib.TagLib{}
 	mb := musicbrainz.NewClient()
 
-	jobs := map[string]*Job{} // TODO: sync
-	jobQueue := make(chan string)
+	_jobs := map[string]*Job{} // TODO: sync
+	jobQueue := make(chan JobConfig)
 
-	wsc := map[*websocket.Conn]struct{}{}
+	ssesrv := sse.New()
+	defer ssesrv.Close()
 
-	sendJobWS := func(jobPath string) {
-		job, ok := jobs[jobPath]
-		if !ok {
-			return
-		}
+	const jobsStream = "jobs"
+	ssesrv.CreateStream(jobsStream)
+
+	sendJobWS := func() {
 		var buff bytes.Buffer
-		if err := templ.ExecuteTemplate(&buff, "release.html", job); err != nil {
+		if err := templ.ExecuteTemplate(&buff, "jobs.html", jobList(_jobs)); err != nil {
 			log.Printf("render job: %v", err)
 			return
 		}
-		for c := range wsc {
-			if err := c.WriteMessage(websocket.TextMessage, buff.Bytes()); err != nil {
-				c.Close()
-				delete(wsc, c)
-			}
-		}
+		data := bytes.ReplaceAll(buff.Bytes(),
+			[]byte("\n"), []byte(""),
+		)
+		ssesrv.Publish(jobsStream, &sse.Event{Data: data})
 	}
-
-	for i := 0; i < 5; i++ {
-		go func() {
-			for jobPath := range jobQueue {
-				if _, ok := jobs[jobPath]; !ok {
-					jobs[jobPath] = newJob(jobPath, "")
-				}
-				if err := processJob(context.Background(), mb, tg, jobs[jobPath]); err != nil {
-					jobs[jobPath].Error = err
-					log.Printf("error processing %q: %v", jobPath, err)
-					continue
-				}
-				sendJobWS(jobPath)
-			}
-		}()
-	}
-
-	jobQueue <- "/home/senan/downloads/(2019) Fouk - Release The Kraken EP [FLAC]"
-	jobQueue <- "/home/senan/downloads/testalb/"
 
 	mux := muxpatterns.NewServeMux()
+	mux.Handle("GET /events", ssesrv)
+
 	mux.HandleFunc("POST /copy", func(w http.ResponseWriter, r *http.Request) {
 		path := r.FormValue("path")
 		if stat, err := os.Stat(path); err != nil || !stat.IsDir() {
 			http.Error(w, "bad path", http.StatusBadRequest)
 			return
 		}
-		jobQueue <- path
-	})
-
-	mux.HandleFunc("GET /ws", func(w http.ResponseWriter, r *http.Request) {
-		conn, err := wsu.Upgrade(w, r, nil)
-		if err != nil {
-			fmt.Printf("error upgrading: %v", err)
-			return
-		}
-		wsc[conn] = struct{}{}
+		jobQueue <- JobConfig{Path: path}
 	})
 
 	mux.HandleFunc("POST /job/{id}", func(w http.ResponseWriter, r *http.Request) {
 		jobPath := decodeJobID(muxpatterns.PathValue(r, "id"))
+		mbid := r.FormValue("mbid")
+		jobQueue <- JobConfig{jobPath, mbid, false}
 
-		useMBID := muxpatterns.PathValue(r, "mbid")
-		job := newJob(jobPath, useMBID)
-		jobs[jobPath] = job
-
-		jobQueue <- jobPath
-
-		if err := templ.ExecuteTemplate(w, "release.html", job); err != nil {
+		if err := templ.ExecuteTemplate(w, "release.html", _jobs[jobPath]); err != nil {
+			log.Printf("err in template: %v", err)
+		}
+	})
+	mux.HandleFunc("POST /job/{id}/confirm", func(w http.ResponseWriter, r *http.Request) {
+		jobPath := decodeJobID(muxpatterns.PathValue(r, "id"))
+		jobQueue <- JobConfig{jobPath, "", true}
+		if err := templ.ExecuteTemplate(w, "release.html", _jobs[jobPath]); err != nil {
 			log.Printf("err in template: %v", err)
 		}
 	})
 
 	mux.HandleFunc("/{$}", func(w http.ResponseWriter, r *http.Request) {
-		data := struct {
-			Jobs map[string]*Job
-		}{
-			Jobs: jobs,
-		}
+		data := struct{ Jobs []*Job }{Jobs: jobList(_jobs)}
 		if err := templ.ExecuteTemplate(w, "index.html", data); err != nil {
 			log.Printf("err in template: %v", err)
 		}
 	})
+
+	for i := 0; i < 5; i++ {
+		go func() {
+			for jobConfig := range jobQueue {
+				if err := processJob(context.Background(), mb, tg, _jobs, jobConfig); err != nil {
+					log.Printf("error processing %q: %v", jobConfig.Path, err)
+				}
+				sendJobWS()
+			}
+		}()
+	}
 
 	log.Printf("starting on %s", *confListenAddr)
 	log.Panicln(http.ListenAndServe(*confListenAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -169,21 +153,37 @@ func main() {
 	})))
 }
 
-type Job struct {
-	ID      string
+type JobConfig struct {
 	Path    string
 	UseMBID string
-	Release *release.Release
-	Score   float64
-	Diff    []release.Diff
-	Error   error
+	ConfirmAnyway bool
 }
 
-func newJob(path string, mbid string) *Job {
-	return &Job{ID: encodeJobID(path), Path: path, UseMBID: mbid}
+type Job struct {
+	ID       string
+	Path     string
+	Release  *release.Release
+	Score    float64
+	Diff     []release.Diff
+	Complete bool
+	Error    error
 }
 
-func processJob(ctx context.Context, mb *musicbrainz.Client, tg tagcommon.Reader, job *Job) (err error) {
+func newJob(path string) *Job {
+	return &Job{ID: encodeJobID(path), Path: path}
+}
+
+func processJob(ctx context.Context, mb *musicbrainz.Client, tg tagcommon.Reader, jobs map[string]*Job, jobConfig JobConfig) (err error) {
+	if _, ok := jobs[jobConfig.Path]; !ok {
+		jobs[jobConfig.Path] = newJob(jobConfig.Path)
+	}
+
+	job := jobs[jobConfig.Path]
+	defer func() {
+		job.Error = err
+		job.Complete = true
+	}()
+
 	releaseFiles, err := wrtag.ReadDir(tg, job.Path)
 	if err != nil {
 		return fmt.Errorf("read dir: %w", err)
@@ -200,6 +200,9 @@ func processJob(ctx context.Context, mb *musicbrainz.Client, tg tagcommon.Reader
 	}()
 
 	releaseTags := release.FromTags(releaseFiles)
+	if jobConfig.UseMBID != "" {
+		releaseTags.MBID = jobConfig.UseMBID
+	}
 
 	releaseMB, err := wrtag.SearchReleaseMusicBrainz(ctx, mb, releaseTags)
 	if err != nil {
@@ -209,7 +212,7 @@ func processJob(ctx context.Context, mb *musicbrainz.Client, tg tagcommon.Reader
 	job.Release = releaseMB
 	job.Score, job.Diff = release.DiffReleases(releaseTags, releaseMB)
 
-	if job.Score < 95 {
+	if !jobConfig.ConfirmAnyway && job.Score < 95 {
 		return wrtag.ErrNoMatch
 	}
 
@@ -225,4 +228,15 @@ func encodeJobID(path string) string {
 func decodeJobID(id string) string {
 	r, _ := base64.RawURLEncoding.DecodeString(id)
 	return string(r)
+}
+
+func jobList(jobs map[string]*Job) []*Job {
+	var r []*Job
+	for _, j := range jobs {
+		r = append(r, j)
+	}
+	sort.Slice(r, func(i, j int) bool {
+		return r[i].Path < r[j].Path
+	})
+	return r
 }
