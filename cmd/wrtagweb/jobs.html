@@ -1,1 +1,3 @@
+{{ if eq (len .) 0 }}<p class="text-gray-600">no jobs yet ...</p>{{ end }}
+
 {{ range $k, $v := .}}{{ template "release.html" $v }}{{ end }}
