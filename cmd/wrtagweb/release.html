@@ -1,12 +1,12 @@
 <div id="{{ .ID }}" class="bg-gray-100 p-2 flex flex-col items-start gap-2 shadow-sm">
-  <p class="italic">{{ now }} {{ .Path }}</p>
-  {{ if not .Complete }}
+  <p class="italic">{{ now }} <a href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></p>
+  {{ if .Loading }}
     <p class="text-grey-600">loading ...</p>
   {{ end  }}
-  {{ if .Release }}
+  {{ if .MBID }}
     <p class="font-bold">
       {{ printf "%.2f%%" .Score }} match with
-      <a class="font-normal text-blue-700 underline" href="https://musicbrainz.org/release/{{ .Release.MBID }}" target="_blank">https://musicbrainz.org/release/{{ .Release.MBID }}</a>
+      <a href="https://musicbrainz.org/release/{{ .MBID }}" target="_blank">https://musicbrainz.org/release/{{ .MBID }}</a>
     </p>
     <table>
       {{ range .Diff }}
@@ -29,16 +29,17 @@
       </tr>
       {{ end }}
     </table>
-    <button hx-post="/job/{{ .ID }}/confirm" hx-target="#{{ .ID }}" hx-swap="outerHTML" class="text-blue-700">use this release</button>
+    <p>sucessfully moved to <a href="{{ .DestPath | file | url }}">{{ .DestPath }}</a> | <button hx-post="/job/{{ .ID }}" hx-target="#{{ .ID }}" hx-swap="outerHTML" class="text-blue-700">reimport</button></p>
   {{ end }}
   {{ if .Error }}
     <hr class="h-px my-0 bg-gray-300 border-0 w-full" />
     <p class="text-red-600">{{ .Error }}</p>
     {{ if nomatch .Error }}
-        <form hx-post="/job/{{ .ID }}" hx-target="#{{ .ID }}" hx-swap="outerHTML" class="flex gap-2">
+      <form hx-post="/job/{{ .ID }}" hx-target="#{{ .ID }}" hx-swap="outerHTML" class="flex gap-2">
         <label>release mbid/url</label>
         <input type="text" name="mbid" class="border w-[310px]" placeholder="74a7e992-4366-427a-91ff-f3cf6aa7524d">
         <button class="text-blue-700">search</button>
+        <button hx-post="/job/{{ .ID }}/confirm" hx-target="#{{ .ID }}" hx-swap="outerHTML" class="text-blue-700">use anyway</button>
       </form>
     {{ end }}
   {{ end }}
