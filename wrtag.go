@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
+	"text/template"
+	"time"
 
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/release"
@@ -38,7 +41,7 @@ func ReadDir(tg tagcommon.Reader, dir string) ([]tagcommon.File, error) {
 	return files, nil
 }
 
-func SearchReleaseMusicBrainz(ctx context.Context, mb *musicbrainz.Client, releaseTags *release.Release) (*release.Release, error) {
+func SearchReleaseMusicBrainz(ctx context.Context, mb *musicbrainz.Client, releaseTags *release.Release, useMBID string) (*release.Release, error) {
 	var query musicbrainz.Query
 	query.MBReleaseID = releaseTags.MBID
 	query.MBReleaseGroupID = releaseTags.ReleaseGroupMBID
@@ -53,6 +56,10 @@ func SearchReleaseMusicBrainz(ctx context.Context, mb *musicbrainz.Client, relea
 	for _, artist := range releaseTags.Artists {
 		query.MBArtistID = artist.MBID
 		break
+	}
+
+	if useMBID != "" {
+		query.MBReleaseID = useMBID
 	}
 
 	score, resp, err := mb.SearchRelease(ctx, query)
@@ -71,23 +78,50 @@ func SearchReleaseMusicBrainz(ctx context.Context, mb *musicbrainz.Client, relea
 	return releaseMB, nil
 }
 
-// func MoveFiles(pathFormat *template.Template, releaseMB *release.Release, paths []string) error {
-// 	for i, t := range releaseMB.Tracks {
-// 		path := paths[i]
-// 		pathFormatData := struct {
-// 			R   *release.Release
-// 			T   *release.Track
-// 			Ext string
-// 		}{
-// 			R:   releaseMB,
-// 			T:   &t,
-// 			Ext: filepath.Ext(path),
-// 		}
-//
-// 		var newPathBuilder strings.Builder
-// 		if err := pathFormat.Execute(&newPathBuilder, pathFormatData); err != nil {
-// 			return fmt.Errorf("create path: %w", err)
-// 		}
-// 	}
-// 	return nil
-// }
+var PathFormat = template.
+	New("template").
+	Funcs(template.FuncMap{
+		"title": func(ar []release.Artist) []string {
+			return mapp(ar, func(_ int, v release.Artist) string { return v.Title })
+		},
+		"join": func(delim string, items []string) string { return strings.Join(items, delim) },
+		"year": func(t time.Time) string { return fmt.Sprintf("%d", t.Year()) },
+		"pad0": func(amount, n int) string { return fmt.Sprintf("%0*d", amount, n) },
+	})
+
+type pathFormatData struct {
+	R   release.Release
+	T   release.Track
+	Ext string
+}
+
+func DestDir(pathFormat *template.Template, releaseMB release.Release) (string, error) {
+	var buff strings.Builder
+	if err := pathFormat.Execute(&buff, pathFormatData{R: releaseMB}); err != nil {
+		return "", fmt.Errorf("create path: %w", err)
+	}
+	path := buff.String()
+
+	return filepath.Dir(path), nil
+}
+
+func MoveFiles(pathFormat *template.Template, releaseMB release.Release, paths []string) error {
+	for i, t := range releaseMB.Tracks {
+		path := paths[i]
+		data := pathFormatData{R: releaseMB, T: t, Ext: filepath.Ext(path)}
+
+		var buff strings.Builder
+		if err := pathFormat.Execute(&buff, data); err != nil {
+			return fmt.Errorf("create path: %w", err)
+		}
+	}
+	return nil
+}
+
+func mapp[F, T any](s []F, f func(int, F) T) []T {
+	res := make([]T, len(s))
+	for i, v := range s {
+		res[i] = f(i, v)
+	}
+	return res
+}

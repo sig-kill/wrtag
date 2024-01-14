@@ -17,9 +17,9 @@ import (
 )
 
 func main() {
-	fs := ff.NewFlagSet("wrtag")
-	confPathFormat := fs.StringLong("path-format", "", "path format")
-	_ = fs.StringLong("config", "", "config file (optional)")
+	ffs := ff.NewFlagSet("wrtag")
+	confPathFormat := ffs.StringLong("path-format", "", "path format")
+	_ = ffs.StringLong("config", "", "config file (optional)")
 
 	userConfig, _ := os.UserConfigDir()
 	configPath := filepath.Join(userConfig, "wrtag", "config")
@@ -34,7 +34,7 @@ func main() {
 			ff.WithConfigFileParser(ff.PlainParser),
 		)
 	}
-	if err := ff.Parse(fs, os.Args[1:], ffopt...); err != nil {
+	if err := ff.Parse(ffs, os.Args[1:], ffopt...); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -58,7 +58,7 @@ func main() {
 	tg := taglib.TagLib{}
 	mb := musicbrainz.NewClient()
 
-	for _, dir := range fs.GetArgs() {
+	for _, dir := range ffs.GetArgs() {
 		if err := processDir(tg, mb, pathFormat, dir); err != nil {
 			log.Printf("error processing dir %q: %v", dir, err)
 			continue
