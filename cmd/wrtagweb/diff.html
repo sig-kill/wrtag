@@ -1,0 +1,21 @@
+<table>
+{{ range . }}
+<tr class="{{ if gt (len .Changes) 1 }}bg-gray-200{{ end }}">
+  <td class="px-2 text-gray-500">{{ .Field }}</td>
+  <td class="px-2">
+    {{ if eq .Before "" }}<span class="text-gray-400">[empty]</span>{{ end }}
+    {{ range .Changes }}
+      {{- if (eq .Type 0) }}<span>{{ .Text }}</span>{{ end -}}
+      {{- if (eq .Type -1) }}<span class="text-red-500 font-bold">{{ .Text }}</span>{{ end -}}
+    {{ end }}
+  </td>
+  <td class="px-2">
+    {{ if eq .After "" }}<span class="text-gray-400">[empty]</span>{{ end }}
+    {{ range .Changes }}
+      {{- if (eq .Type 0) }}<span>{{ .Text }}</span>{{ end -}}
+      {{- if (eq .Type 1) }}<span class="text-green-600 font-bold">{{ .Text }}</span>{{ end -}}
+    {{ end }}
+  </td>
+</tr>
+{{ end }}
+</table>

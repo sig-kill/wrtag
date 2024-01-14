@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/subtle"
 	"embed"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"html/template"
@@ -25,12 +24,10 @@ import (
 	"github.com/r3labs/sse/v2"
 	"go.senan.xyz/wrtag"
 	"go.senan.xyz/wrtag/musicbrainz"
-	"go.senan.xyz/wrtag/release"
-	"go.senan.xyz/wrtag/tags/tagcommon"
 	"go.senan.xyz/wrtag/tags/taglib"
 )
 
-//go:embed *.html
+//go:embed *.html *.ico
 var ui embed.FS
 
 var templ = template.Must(
@@ -45,7 +42,7 @@ var templ = template.Must(
 				ur.Path = p
 				return ur.String()
 			},
-			"url": func(u string) template.URL{
+			"url": func(u string) template.URL {
 				return template.URL(u)
 			},
 			"query": template.URLQueryEscaper,
@@ -86,8 +83,8 @@ func main() {
 	mb := musicbrainz.NewClient()
 	pathFormat := texttemplate.Must(wrtag.PathFormat.Parse(*confPathFormat))
 
-	jobs := map[string]*Job{}
-	jobQueue := make(chan JobConfig)
+	jobs := map[string]*wrtag.Job{}
+	jobQueue := make(chan wrtag.JobConfig)
 	var jmu sync.RWMutex
 
 	sseServ := sse.New()
@@ -114,13 +111,13 @@ func main() {
 	for i := 0; i < 5; i++ {
 		go func() {
 			for jobConfig := range jobQueue {
-				var job *Job
+				var job *wrtag.Job
 				jmu.RLock()
 				job = jobs[jobConfig.Path]
 				jmu.RUnlock()
 				notifyClient()
 
-				if err := processJob(context.Background(), mb, tg, pathFormat, job, jobConfig); err != nil {
+				if err := wrtag.ProcessJob(context.Background(), mb, tg, pathFormat, job, jobConfig); err != nil {
 					log.Printf("error processing %q: %v", jobConfig.Path, err)
 				}
 				notifyClient()
@@ -135,21 +132,29 @@ func main() {
 		path := r.FormValue("path")
 
 		jmu.Lock()
-		jobs[path] = newJob(path)
+		jobs[path] = wrtag.NewJob(path)
 		jmu.Unlock()
 
-		jobQueue <- JobConfig{Path: path}
+		jobQueue <- wrtag.JobConfig{Path: path}
 	})
 
-	mux.HandleFunc("POST /job/{id}", func(w http.ResponseWriter, r *http.Request) {
-		jobPath := decodeJobID(muxpatterns.PathValue(r, "id"))
+	mux.HandleFunc("POST /job/{id}/{action...}", func(w http.ResponseWriter, r *http.Request) {
+		id := muxpatterns.PathValue(r, "id")
+		action := muxpatterns.PathValue(r, "action")
+		mbid := r.FormValue("mbid")
+
+		jobPath := wrtag.DecodeJobID(id)
 
 		jmu.Lock()
-		jobs[jobPath] = newJob(jobPath)
+		jobs[jobPath] = wrtag.NewJob(jobPath)
 		jmu.Unlock()
 
-		mbid := r.FormValue("mbid")
-		jobQueue <- JobConfig{jobPath, mbid, false}
+		switch action {
+		case "confirm":
+			jobQueue <- wrtag.JobConfig{Path: jobPath, UseMBID: mbid, ConfirmAnyway: true}
+		default:
+			jobQueue <- wrtag.JobConfig{Path: jobPath, UseMBID: mbid}
+		}
 
 		jmu.RLock()
 		if err := templ.ExecuteTemplate(w, "release.html", jobs[jobPath]); err != nil {
@@ -158,22 +163,7 @@ func main() {
 		jmu.RUnlock()
 	})
 
-	mux.HandleFunc("POST /job/{id}/confirm", func(w http.ResponseWriter, r *http.Request) {
-		jobPath := decodeJobID(muxpatterns.PathValue(r, "id"))
-
-		jmu.Lock()
-		jobs[jobPath] = newJob(jobPath)
-		jmu.Unlock()
-
-		mbid := r.FormValue("mbid")
-		jobQueue <- JobConfig{jobPath, mbid, true}
-
-		jmu.RLock()
-		if err := templ.ExecuteTemplate(w, "release.html", jobs[jobPath]); err != nil {
-			log.Printf("err in template: %v", err)
-		}
-		jmu.RUnlock()
-	})
+	mux.Handle("/", http.FileServer(http.FS(ui)))
 
 	mux.HandleFunc("/{$}", func(w http.ResponseWriter, r *http.Request) {
 		jmu.RLock()
@@ -195,65 +185,8 @@ func main() {
 	})))
 }
 
-func processJob(ctx context.Context, mb *musicbrainz.Client, tg tagcommon.Reader, pathFormat *texttemplate.Template, job *Job, jobConfig JobConfig) (err error) {
-	job.mu.Lock()
-	defer job.mu.Unlock()
-
-	defer func() {
-		job.Loading = false
-		job.Error = err
-	}()
-
-	releaseFiles, err := wrtag.ReadDir(tg, job.SourcePath)
-	if err != nil {
-		return fmt.Errorf("read dir: %w", err)
-	}
-	defer func() {
-		var fileErrs []error
-		for _, f := range releaseFiles {
-			fileErrs = append(fileErrs, f.Close())
-		}
-		if err != nil {
-			return
-		}
-		err = errors.Join(fileErrs...)
-	}()
-
-	releaseTags := release.FromTags(releaseFiles)
-	releaseMB, err := wrtag.SearchReleaseMusicBrainz(ctx, mb, releaseTags, jobConfig.UseMBID)
-	if err != nil {
-		return fmt.Errorf("search musicbrainz: %w", err)
-	}
-
-	job.MBID = releaseMB.MBID
-	job.Score, job.Diff = release.DiffReleases(releaseTags, releaseMB)
-
-	job.DestPath, err = wrtag.DestDir(pathFormat, *releaseMB)
-	if err != nil {
-		return fmt.Errorf("gen dest dir: %w", err)
-	}
-
-	if !jobConfig.ConfirmAnyway && job.Score < 95 {
-		return wrtag.ErrNoMatch
-	}
-
-	release.ToTags(releaseMB, releaseFiles)
-	job.Score, job.Diff = release.DiffReleases(releaseMB, releaseMB)
-
-	return nil
-}
-
-func encodeJobID(path string) string {
-	return base64.RawURLEncoding.EncodeToString([]byte(path))
-}
-
-func decodeJobID(id string) string {
-	r, _ := base64.RawURLEncoding.DecodeString(id)
-	return string(r)
-}
-
-func listJobs(jobs map[string]*Job) []*Job {
-	var r []*Job
+func listJobs(jobs map[string]*wrtag.Job) []*wrtag.Job {
+	var r []*wrtag.Job
 	for _, j := range jobs {
 		r = append(r, j)
 	}
@@ -261,27 +194,4 @@ func listJobs(jobs map[string]*Job) []*Job {
 		return r[i].SourcePath < r[j].SourcePath
 	})
 	return r
-}
-
-type JobConfig struct {
-	Path          string
-	UseMBID       string
-	ConfirmAnyway bool
-}
-
-type Job struct {
-	mu sync.Mutex
-
-	ID, SourcePath, DestPath string
-
-	MBID  string
-	Score float64
-	Diff  []release.Diff
-
-	Loading bool
-	Error   error
-}
-
-func newJob(path string) *Job {
-	return &Job{ID: encodeJobID(path), SourcePath: path, Loading: true}
 }

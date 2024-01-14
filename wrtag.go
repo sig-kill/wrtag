@@ -2,12 +2,15 @@ package wrtag
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"text/template"
+	texttemplate "text/template"
 	"time"
 
 	"go.senan.xyz/wrtag/musicbrainz"
@@ -15,7 +18,10 @@ import (
 	"go.senan.xyz/wrtag/tags/tagcommon"
 )
 
-var ErrNoMatch = errors.New("no match or score too low")
+var (
+	ErrNoMatch            = errors.New("no match or score too low")
+	ErrTrackCountMismatch = errors.New("track count mismatch")
+)
 
 func ReadDir(tg tagcommon.Reader, dir string) ([]tagcommon.File, error) {
 	paths, err := filepath.Glob(filepath.Join(dir, "*"))
@@ -59,7 +65,7 @@ func SearchReleaseMusicBrainz(ctx context.Context, mb *musicbrainz.Client, relea
 	}
 
 	if useMBID != "" {
-		query.MBReleaseID = useMBID
+		query.MBReleaseID = filepath.Base(useMBID)
 	}
 
 	score, resp, err := mb.SearchRelease(ctx, query)
@@ -71,9 +77,6 @@ func SearchReleaseMusicBrainz(ctx context.Context, mb *musicbrainz.Client, relea
 	}
 
 	releaseMB := release.FromMusicBrainz(resp)
-	if len(releaseTags.Tracks) != len(releaseMB.Tracks) {
-		return nil, fmt.Errorf("%w: track count mismatch %d/%d", ErrNoMatch, len(releaseTags.Tracks), len(releaseMB.Tracks))
-	}
 
 	return releaseMB, nil
 }
@@ -116,6 +119,91 @@ func MoveFiles(pathFormat *template.Template, releaseMB release.Release, paths [
 		}
 	}
 	return nil
+}
+
+type JobConfig struct {
+	Path          string
+	UseMBID       string
+	ConfirmAnyway bool
+}
+
+// TODO: split with web Requirements
+type Job struct {
+	mu sync.Mutex
+
+	ID                   string
+	SourcePath, DestPath string
+
+	MBID  string
+	Score float64
+	Diff  []release.Diff
+
+	Loading bool
+	Error   error
+}
+
+func NewJob(path string) *Job {
+	return &Job{ID: EncodeJobID(path), SourcePath: path, Loading: true}
+}
+
+func ProcessJob(ctx context.Context, mb *musicbrainz.Client, tg tagcommon.Reader, pathFormat *texttemplate.Template, job *Job, jobConfig JobConfig) (err error) {
+	job.mu.Lock()
+	defer job.mu.Unlock()
+
+	defer func() {
+		job.Loading = false
+		job.Error = err
+	}()
+
+	releaseFiles, err := ReadDir(tg, job.SourcePath)
+	if err != nil {
+		return fmt.Errorf("read dir: %w", err)
+	}
+	defer func() {
+		var fileErrs []error
+		for _, f := range releaseFiles {
+			fileErrs = append(fileErrs, f.Close())
+		}
+		if err != nil {
+			return
+		}
+		err = errors.Join(fileErrs...)
+	}()
+
+	releaseTags := release.FromTags(releaseFiles)
+	releaseMB, err := SearchReleaseMusicBrainz(ctx, mb, releaseTags, jobConfig.UseMBID)
+	if err != nil {
+		return fmt.Errorf("search musicbrainz: %w", err)
+	}
+
+	job.MBID = releaseMB.MBID
+	job.Score, job.Diff = release.DiffReleases(releaseTags, releaseMB)
+
+	job.DestPath, err = DestDir(pathFormat, *releaseMB)
+	if err != nil {
+		return fmt.Errorf("gen dest dir: %w", err)
+	}
+
+	if len(releaseTags.Tracks) != len(releaseMB.Tracks) {
+		return fmt.Errorf("%w: %d/%d", ErrTrackCountMismatch, len(releaseTags.Tracks), len(releaseMB.Tracks))
+	}
+	if !jobConfig.ConfirmAnyway && job.Score < 95 {
+		return ErrNoMatch
+	}
+
+	release.ToTags(releaseMB, releaseFiles)
+	job.Score, job.Diff = release.DiffReleases(releaseMB, releaseMB)
+
+	return nil
+}
+
+func EncodeJobID(path string) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(path))
+}
+
+func DecodeJobID(id string) string {
+	r, _ := base64.RawURLEncoding.DecodeString(id)
+	return string(r)
 }
 
 func mapp[F, T any](s []F, f func(int, F) T) []T {

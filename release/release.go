@@ -181,14 +181,6 @@ func mbArtistCredit(artists []musicbrainz.ArtistCredit) string {
 	return sb.String()
 }
 
-func mapp[F, T any](s []F, f func(int, F) T) []T {
-	res := make([]T, len(s))
-	for i, v := range s {
-		res[i] = f(i, v)
-	}
-	return res
-}
-
 type Diff struct {
 	Field         string
 	Before, After string
@@ -210,6 +202,10 @@ func DiffString(a, b *Release) string {
 	fmt.Fprintf(&buf, "  media     : %q -> %q\n", a.MediaFormat, b.MediaFormat)
 	fmt.Fprintf(&buf, "tracks:\n")
 	for i := range a.Tracks {
+		if i > len(b.Tracks)-1 {
+			fmt.Fprintf(&buf, "  %02d  : %q %q\n     -> [none]\n", i, a.Tracks[i].ArtistCredit, a.Tracks[i].Title)
+			continue
+		}
 		fmt.Fprintf(&buf, "  %02d  : %q %q\n     -> %q %q\n",
 			i,
 			a.Tracks[i].ArtistCredit, a.Tracks[i].Title,
@@ -223,7 +219,7 @@ func DiffReleases(a, b *Release) (float64, []Diff) {
 
 	var charsTotal int
 	var charsDiff int
-	d := func(f, a, b string) Diff {
+	add := func(f, a, b string) Diff {
 		diffs := dmp.DiffMain(a, b, false)
 		charsTotal += len([]rune(b))
 		charsDiff += dmp.DiffLevenshtein(diffs)
@@ -232,15 +228,23 @@ func DiffReleases(a, b *Release) (float64, []Diff) {
 
 	var diffs []Diff
 	diffs = append(diffs,
-		d("title", a.Title, b.Title),
-		d("artist", a.ArtistCredit, b.ArtistCredit),
-		d("label", a.Label, b.Label),
-		d("catalogue num", a.CatalogueNum, b.CatalogueNum),
-		d("media format", a.MediaFormat, b.MediaFormat),
+		add("title", a.Title, b.Title),
+		add("artist", a.ArtistCredit, b.ArtistCredit),
+		add("label", a.Label, b.Label),
+		add("catalogue num", a.CatalogueNum, b.CatalogueNum),
+		add("media format", a.MediaFormat, b.MediaFormat),
 	)
 
 	for i := range a.Tracks {
-		diffs = append(diffs, d(
+		if i > len(b.Tracks)-1 {
+			diffs = append(diffs, add(
+				fmt.Sprintf("track %d", i+1),
+				strings.Join(filter(a.Tracks[i].ArtistCredit, a.Tracks[i].Title), " – "),
+				"",
+			))
+			continue
+		}
+		diffs = append(diffs, add(
 			fmt.Sprintf("track %d", i+1),
 			strings.Join(filter(a.Tracks[i].ArtistCredit, a.Tracks[i].Title), " – "),
 			strings.Join(filter(b.Tracks[i].ArtistCredit, b.Tracks[i].Title), " – "),
@@ -257,4 +261,12 @@ func filter[T comparable](elms ...T) []T {
 	return slices.DeleteFunc(elms, func(t T) bool {
 		return t == zero
 	})
+}
+
+func mapp[F, T any](s []F, f func(int, F) T) []T {
+	res := make([]T, len(s))
+	for i, v := range s {
+		res[i] = f(i, v)
+	}
+	return res
 }
