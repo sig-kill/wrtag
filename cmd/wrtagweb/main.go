@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"embed"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"html/template"
@@ -14,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"sync"
 	texttemplate "text/template"
 	"time"
@@ -107,15 +109,18 @@ func main() {
 
 	for i := 0; i < 5; i++ {
 		go func() {
-			for jobConfig := range jobQueue {
+			for jobC := range jobQueue {
 				var job *wrtag.Job
-				jmu.RLock()
-				job = jobs[jobConfig.Path]
-				jmu.RUnlock()
+				jmu.Lock()
+				if _, ok := jobs[jobC.Path]; !ok {
+					jobs[jobC.Path] = &wrtag.Job{ID: encodeJobID(jobC.Path), SourcePath: jobC.Path}
+				}
+				job = jobs[jobC.Path]
+				jmu.Unlock()
 				notifyClient()
 
-				if err := wrtag.ProcessJob(context.Background(), mb, tg, pathFormat, job, jobConfig); err != nil {
-					log.Printf("error processing %q: %v", jobConfig.Path, err)
+				if err := wrtag.ProcessJob(context.Background(), mb, tg, pathFormat, job, jobC); err != nil {
+					log.Printf("error processing %q: %v", jobC.Path, err)
 				}
 				notifyClient()
 			}
@@ -127,40 +132,24 @@ func main() {
 
 	mux.HandleFunc("POST /copy", func(w http.ResponseWriter, r *http.Request) {
 		path := r.FormValue("path")
-
-		jmu.Lock()
-		jobs[path] = wrtag.NewJob(path)
-		jmu.Unlock()
-
 		jobQueue <- wrtag.JobConfig{Path: path}
 	})
 
-	mux.HandleFunc("POST /job/{id}/{action...}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /job/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := muxpatterns.PathValue(r, "id")
-		action := muxpatterns.PathValue(r, "action")
+		jobPath := decodeJobID(id)
+
+		confirm, _ := strconv.ParseBool(r.FormValue("confirm"))
 		mbid := r.FormValue("mbid")
 
-		jobPath := wrtag.DecodeJobID(id)
-
-		jmu.Lock()
-		jobs[jobPath] = wrtag.NewJob(jobPath)
-		jmu.Unlock()
-
-		switch action {
-		case "confirm":
-			jobQueue <- wrtag.JobConfig{Path: jobPath, UseMBID: mbid, ConfirmAnyway: true}
-		default:
-			jobQueue <- wrtag.JobConfig{Path: jobPath, UseMBID: mbid}
-		}
+		jobQueue <- wrtag.JobConfig{Path: jobPath, UseMBID: mbid, ConfirmAnyway: confirm}
 
 		jmu.RLock()
-		if err := templ.ExecuteTemplate(w, "release.html", jobs[jobPath]); err != nil {
+		if err := templ.ExecuteTemplate(w, "release.html", &wrtag.Job{Loading: true}); err != nil {
 			log.Printf("err in template: %v", err)
 		}
 		jmu.RUnlock()
 	})
-
-	mux.Handle("/", http.FileServer(http.FS(ui)))
 
 	mux.HandleFunc("/{$}", func(w http.ResponseWriter, r *http.Request) {
 		jmu.RLock()
@@ -170,6 +159,8 @@ func main() {
 			log.Printf("err in template: %v", err)
 		}
 	})
+
+	mux.Handle("/", http.FileServer(http.FS(ui)))
 
 	log.Printf("starting on %s", *confListenAddr)
 	log.Panicln(http.ListenAndServe(*confListenAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -192,3 +183,6 @@ func listJobs(jobs map[string]*wrtag.Job) []*wrtag.Job {
 	})
 	return r
 }
+
+func encodeJobID(path string) string { return base64.RawURLEncoding.EncodeToString([]byte(path)) }
+func decodeJobID(id string) string { r, _ := base64.RawURLEncoding.DecodeString(id); return string(r) }

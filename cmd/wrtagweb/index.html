@@ -5,6 +5,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org/dist/htmx.js"></script>
     <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
+    <script src="https://unpkg.com/htmx.org/dist/ext/debug.js"></script> 
     <style type="text/tailwindcss">
       @layer base {
         a { @apply font-normal text-blue-700 underline; }
@@ -13,9 +14,9 @@
       }
     </style>
   </head>
-  <body class="font-mono antialiased leading-none text-sm text-gray-800 m-0 p-3">
+  <body class="font-mono antialiased leading-none text-sm text-gray-800 flex flex-col items-start gap-2 m-0 p-3">
     <h1 class="text-lg">wrtag</h1>
-    <div hx-ext="sse" sse-connect="/events?stream=jobs" sse-swap="message" hx-swap="innerHTML" class="flex flex-col items-start gap-3">
+    <div hx-ext="sse" sse-connect="/events?stream=jobs" sse-swap="message" hx-swap="innerHTML" class="contents">
       {{ template "jobs.html" . }}
     </div>
   </body>
