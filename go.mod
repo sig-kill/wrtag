@@ -4,7 +4,6 @@ go 1.21.5
 
 require (
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
-	github.com/gorilla/websocket v1.5.1
 	github.com/jba/muxpatterns v0.3.0
 	github.com/peterbourgon/ff/v4 v4.0.0-alpha.4
 	github.com/r3labs/sse/v2 v2.10.0

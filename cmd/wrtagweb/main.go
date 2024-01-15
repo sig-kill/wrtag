@@ -18,7 +18,6 @@ import (
 	texttemplate "text/template"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/jba/muxpatterns"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/r3labs/sse/v2"
@@ -52,8 +51,6 @@ var templ = template.Must(
 		}).
 		ParseFS(ui, "*.html"),
 )
-
-var wsu websocket.Upgrader
 
 func main() {
 	ffs := ff.NewFlagSet("wrtag")
