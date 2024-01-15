@@ -6,19 +6,16 @@ import (
 	"crypto/subtle"
 	"embed"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"sync"
 	texttemplate "text/template"
-	"time"
 
 	"github.com/jba/muxpatterns"
 	"github.com/peterbourgon/ff/v4"
@@ -33,24 +30,8 @@ var ui embed.FS
 
 var templ = template.Must(
 	template.
-		New("").
-		Funcs(template.FuncMap{
-			"now": func() int64 {
-				return time.Now().UnixMilli()
-			},
-			"file": func(p string) string {
-				ur, _ := url.Parse("file://")
-				ur.Path = p
-				return ur.String()
-			},
-			"url": func(u string) template.URL {
-				return template.URL(u)
-			},
-			"query": template.URLQueryEscaper,
-			"nomatch": func(err error) bool {
-				return errors.Is(err, wrtag.ErrNoMatch)
-			},
-		}).
+		New("template").
+		Funcs(wrtag.TemplateFuncMap).
 		ParseFS(ui, "*.html"),
 )
 
@@ -58,6 +39,10 @@ func main() {
 	ffs := ff.NewFlagSet("wrtag")
 	confPathFormat := ffs.StringLong("path-format", "", "path format")
 	confListenAddr := ffs.StringLong("listen-addr", "", "listen addr")
+
+	var confSearchLinkTemplates wrtag.SearchLinkTemplates
+	ffs.ValueLong("search-link", &confSearchLinkTemplates, "search link")
+
 	confAPIKey := ffs.StringLong("api-key", "", "api-key")
 
 	userConfig, _ := os.UserConfigDir()
@@ -119,7 +104,7 @@ func main() {
 				jmu.Unlock()
 				notifyClient()
 
-				if err := wrtag.ProcessJob(context.Background(), mb, tg, pathFormat, job, jobC); err != nil {
+				if err := wrtag.ProcessJob(context.Background(), mb, tg, pathFormat, confSearchLinkTemplates, job, jobC); err != nil {
 					log.Printf("error processing %q: %v", jobC.Path, err)
 				}
 				notifyClient()
@@ -185,4 +170,4 @@ func listJobs(jobs map[string]*wrtag.Job) []*wrtag.Job {
 }
 
 func encodeJobID(path string) string { return base64.RawURLEncoding.EncodeToString([]byte(path)) }
-func decodeJobID(id string) string { r, _ := base64.RawURLEncoding.DecodeString(id); return string(r) }
+func decodeJobID(id string) string   { r, _ := base64.RawURLEncoding.DecodeString(id); return string(r) }
