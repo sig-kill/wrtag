@@ -7,7 +7,7 @@ require (
 	github.com/jba/muxpatterns v0.3.0
 	github.com/peterbourgon/ff/v4 v4.0.0-alpha.4
 	github.com/r3labs/sse/v2 v2.10.0
-	github.com/sentriz/audiotags v0.0.0-20240104093258-e5a7532a58e1
+	github.com/sentriz/audiotags v0.0.0-20240115153244-7894c63b9a1c
 	github.com/sergi/go-diff v1.3.1
 	golang.org/x/time v0.5.0
 )

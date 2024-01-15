@@ -2,7 +2,6 @@ package wrtag
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -142,13 +141,17 @@ type Job struct {
 	Error   error
 }
 
-func NewJob(path string) *Job {
-	return &Job{ID: EncodeJobID(path), SourcePath: path, Loading: true}
-}
-
-func ProcessJob(ctx context.Context, mb *musicbrainz.Client, tg tagcommon.Reader, pathFormat *texttemplate.Template, job *Job, jobConfig JobConfig) (err error) {
+func ProcessJob(
+	ctx context.Context, mb *musicbrainz.Client, tg tagcommon.Reader,
+	pathFormat *texttemplate.Template, job *Job, jobC JobConfig,
+) (err error) {
 	job.mu.Lock()
 	defer job.mu.Unlock()
+
+	job.Loading = true
+	job.Score = 0
+	job.Diff = nil
+	job.Error = nil
 
 	defer func() {
 		job.Loading = false
@@ -170,8 +173,13 @@ func ProcessJob(ctx context.Context, mb *musicbrainz.Client, tg tagcommon.Reader
 		err = errors.Join(fileErrs...)
 	}()
 
+	var prevMBID = job.MBID
+	if jobC.UseMBID != "" {
+		prevMBID = jobC.UseMBID
+	}
+
 	releaseTags := release.FromTags(releaseFiles)
-	releaseMB, err := SearchReleaseMusicBrainz(ctx, mb, releaseTags, jobConfig.UseMBID)
+	releaseMB, err := SearchReleaseMusicBrainz(ctx, mb, releaseTags, prevMBID)
 	if err != nil {
 		return fmt.Errorf("search musicbrainz: %w", err)
 	}
@@ -187,23 +195,15 @@ func ProcessJob(ctx context.Context, mb *musicbrainz.Client, tg tagcommon.Reader
 	if len(releaseTags.Tracks) != len(releaseMB.Tracks) {
 		return fmt.Errorf("%w: %d/%d", ErrTrackCountMismatch, len(releaseTags.Tracks), len(releaseMB.Tracks))
 	}
-	if !jobConfig.ConfirmAnyway && job.Score < 95 {
+	if !jobC.ConfirmAnyway && job.Score < 95 {
 		return ErrNoMatch
 	}
 
 	release.ToTags(releaseMB, releaseFiles)
 	job.Score, job.Diff = release.DiffReleases(releaseMB, releaseMB)
+	job.SourcePath = job.DestPath
 
 	return nil
-}
-
-func EncodeJobID(path string) string {
-	return base64.RawURLEncoding.EncodeToString([]byte(path))
-}
-
-func DecodeJobID(id string) string {
-	r, _ := base64.RawURLEncoding.DecodeString(id)
-	return string(r)
 }
 
 func mapp[F, T any](s []F, f func(int, F) T) []T {
