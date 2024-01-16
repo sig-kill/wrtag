@@ -14,8 +14,8 @@ import (
 	texttemplate "text/template"
 	"time"
 
+	"go.senan.xyz/wrtag/diff"
 	"go.senan.xyz/wrtag/musicbrainz"
-	"go.senan.xyz/wrtag/release"
 	"go.senan.xyz/wrtag/tags/tagcommon"
 )
 
@@ -48,51 +48,7 @@ func ReadDir(tg tagcommon.Reader, dir string) ([]tagcommon.File, error) {
 	return files, nil
 }
 
-func SearchReleaseMusicBrainz(ctx context.Context, mb *musicbrainz.Client, releaseTags *release.Release, useMBID string) (*release.Release, error) {
-	var query musicbrainz.Query
-	query.MBReleaseID = releaseTags.MBID
-	query.MBReleaseGroupID = releaseTags.ReleaseGroupMBID
-	query.Release = releaseTags.Title
-	query.Artist = releaseTags.ArtistCredit
-	query.Format = releaseTags.MediaFormat
-	query.Label = releaseTags.Label
-	query.CatalogueNum = releaseTags.CatalogueNum
-	query.NumTracks = len(releaseTags.Tracks)
-
-	if !releaseTags.Date.IsZero() {
-		query.Date = fmt.Sprint(releaseTags.Date.Year())
-	}
-
-	if query.Artist == "" {
-		for _, track := range releaseTags.Tracks {
-			query.Artist = track.ArtistCredit
-			break
-		}
-	}
-
-	for _, artist := range releaseTags.Artists {
-		query.MBArtistID = artist.MBID
-		break
-	}
-
-	if useMBID != "" {
-		query.MBReleaseID = filepath.Base(useMBID)
-	}
-
-	score, resp, err := mb.SearchRelease(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("search release: %w", err)
-	}
-	if score < 100 {
-		return nil, ErrNoMatch
-	}
-
-	releaseMB := release.FromMusicBrainz(resp)
-
-	return releaseMB, nil
-}
-
-func DestDir(pathFormat *texttemplate.Template, releaseMB release.Release) (string, error) {
+func DestDir(pathFormat *texttemplate.Template, releaseMB musicbrainz.Release) (string, error) {
 	var buff strings.Builder
 	if err := pathFormat.Execute(&buff, releasePathFormatData{R: releaseMB}); err != nil {
 		return "", fmt.Errorf("create path: %w", err)
@@ -102,10 +58,10 @@ func DestDir(pathFormat *texttemplate.Template, releaseMB release.Release) (stri
 	return filepath.Dir(path), nil
 }
 
-func MoveFiles(pathFormat *htmltemplate.Template, releaseMB release.Release, paths []string) error {
-	for i, t := range releaseMB.Tracks {
+func MoveFiles(pathFormat *texttemplate.Template, releaseMB *musicbrainz.Release, paths []string) error {
+	for i, t := range musicbrainz.FlatTracks(releaseMB.Media) {
 		path := paths[i]
-		data := releasePathFormatData{R: releaseMB, T: t, Ext: filepath.Ext(path)}
+		data := releasePathFormatData{R: *releaseMB, T: t, Ext: filepath.Ext(path)}
 
 		var buff strings.Builder
 		if err := pathFormat.Execute(&buff, data); err != nil {
@@ -133,7 +89,7 @@ type Job struct {
 
 	MBID        string
 	Score       float64
-	Diff        []release.Diff
+	Diff        []diff.Diff
 	SearchLinks []JobSearchLink
 
 	Loading bool
@@ -159,13 +115,13 @@ func ProcessJob(
 		job.Error = err
 	}()
 
-	releaseFiles, err := ReadDir(tg, job.SourcePath)
+	tagFiles, err := ReadDir(tg, job.SourcePath)
 	if err != nil {
 		return fmt.Errorf("read dir: %w", err)
 	}
 	defer func() {
 		var fileErrs []error
-		for _, f := range releaseFiles {
+		for _, f := range tagFiles {
 			fileErrs = append(fileErrs, f.Close())
 		}
 		if err != nil {
@@ -174,44 +130,60 @@ func ProcessJob(
 		err = errors.Join(fileErrs...)
 	}()
 
-	var prevMBID = job.MBID
+	searchFile := tagFiles[0]
+	query := musicbrainz.ReleaseQuery{
+		MBReleaseID:      searchFile.MBReleaseID(),
+		MBArtistID:       first(searchFile.MBArtistID()),
+		MBReleaseGroupID: searchFile.MBReleaseGroupID(),
+		Release:          searchFile.Album(),
+		Artist:           or(searchFile.AlbumArtist(), searchFile.AlbumArtist()),
+		Date:             searchFile.Date(),
+		Format:           searchFile.MediaFormat(),
+		Label:            searchFile.Label(),
+		CatalogueNum:     searchFile.CatalogueNum(),
+		NumTracks:        len(tagFiles),
+	}
 	if jobC.UseMBID != "" {
-		prevMBID = jobC.UseMBID
+		query.MBReleaseID = jobC.UseMBID
 	}
 
-	releaseTags := release.FromTags(releaseFiles)
-	releaseMB, err := SearchReleaseMusicBrainz(ctx, mb, releaseTags, prevMBID)
+	release, err := mb.SearchRelease(ctx, query)
 	if err != nil {
 		return fmt.Errorf("search musicbrainz: %w", err)
 	}
 
-	job.MBID = releaseMB.MBID
-	job.Score, job.Diff = release.DiffReleases(releaseTags, releaseMB)
+	job.MBID = release.ID
+	job.Score, job.Diff = diff.DiffReleases(tagFiles, release)
 
-	job.DestPath, err = DestDir(pathFormat, *releaseMB)
+	job.DestPath, err = DestDir(pathFormat, *release)
 	if err != nil {
 		return fmt.Errorf("gen dest dir: %w", err)
 	}
 
 	for _, v := range searchLinksTemplates {
 		var buff strings.Builder
-		if err := v.Templ.Execute(&buff, releasePathFormatData{R: *releaseTags}); err != nil {
+		if err := v.Templ.Execute(&buff, searchFile); err != nil {
 			log.Printf("error parsing search link template: %v", err)
 			continue
 		}
 		job.SearchLinks = append(job.SearchLinks, JobSearchLink{Name: v.Name, URL: buff.String()})
 	}
 
-	if len(releaseTags.Tracks) != len(releaseMB.Tracks) {
-		return fmt.Errorf("%w: %d/%d", ErrTrackCountMismatch, len(releaseTags.Tracks), len(releaseMB.Tracks))
+	if releaseTracks := musicbrainz.FlatTracks(release.Media); len(tagFiles) != len(releaseTracks) {
+		return fmt.Errorf("%w: %d/%d", ErrTrackCountMismatch, len(tagFiles), len(releaseTracks))
 	}
 	if !jobC.ConfirmAnyway && job.Score < 95 {
 		return ErrNoMatch
 	}
 
-	release.ToTags(releaseMB, releaseFiles)
-	job.Score, job.Diff = release.DiffReleases(releaseMB, releaseMB)
+	// musicbrainz.ToTags(release, tagFiles)
+
+	job.Score, job.Diff = diff.DiffReleases(tagFiles, release)
 	job.SourcePath = job.DestPath
+
+	if err := MoveFiles(pathFormat, release, nil); err != nil {
+		return fmt.Errorf("move files: %w", err)
+	}
 
 	return nil
 }
@@ -230,8 +202,8 @@ var TemplateFuncMap = texttemplate.FuncMap{
 	"url":     func(u string) htmltemplate.URL { return htmltemplate.URL(u) },
 	"query":   htmltemplate.URLQueryEscaper,
 	"nomatch": func(err error) bool { return errors.Is(err, ErrNoMatch) },
-	"title": func(ar []release.Artist) []string {
-		return mapp(ar, func(_ int, v release.Artist) string { return v.Title })
+	"title": func(ar []musicbrainz.ArtistCredit) []string {
+		return mapp(ar, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.Name })
 	},
 	"join": func(delim string, items []string) string { return strings.Join(items, delim) },
 	"year": func(t time.Time) string { return fmt.Sprintf("%d", t.Year()) },
@@ -243,8 +215,8 @@ var PathFormat = texttemplate.
 	Funcs(TemplateFuncMap)
 
 type releasePathFormatData struct {
-	R   release.Release
-	T   release.Track
+	R   musicbrainz.Release
+	T   musicbrainz.Track
 	Ext string
 }
 
@@ -271,4 +243,24 @@ func (sls *SearchLinkTemplates) Set(value string) error {
 	}
 	*sls = append(*sls, SearchLinkTemplate{Name: name, Templ: templ})
 	return nil
+}
+
+func first[T comparable](is []T) T {
+	var z T
+	for _, i := range is {
+		if i != z {
+			return i
+		}
+	}
+	return z
+}
+
+func or[T comparable](items ...T) T {
+	var zero T
+	for _, i := range items {
+		if i != zero {
+			return i
+		}
+	}
+	return zero
 }
