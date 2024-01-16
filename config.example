@@ -1,1 +1,11 @@
-path-format /home/senan/downloads/musicbeets/albums/{{ .R.Artists | title | join "; " }}/({{ .R.OriginalDate | year }}) {{ .R.Title }}/{{ .T.Number | pad0 2 }}.{{ .R.Tracks | len | pad0 2 }} {{ .T.Title }}{{ .Ext }}
+# path-format is rooted in your destination music dir. the template is fed with musicbrainz release data
+# see go.senan.xyz/wrtag/musicbrainz for type definitions
+
+path-format /home/senan/downloads/musicbeets/albums/{{ artistNames .Release.Artists | join "; " }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title }}/{{ pad0 2 .TrackNum }}.{{ flatTracks .Release.Media | len | pad0 2 }} {{ .Track.Title }}{{ .Ext }}
+
+# search links are shortcuts on for the ui to help research data, and populate missing musicbrainz data. the template is fed with tag data
+# see go.senan.xyz/tags/tagcommon for type definitions
+
+search-link kagi https://kagi.com/search?l=4&q={{ printf "%s - %s (%d)" (or .AlbumArtist .Artist) .Album .Date | query }}
+search-link juno https://www.junodownload.com/search/?q%5Ball%5D%5B%5D={{ printf "%s - %s (%d)" (or .AlbumArtist .Artist) .Album .Date.Year | query }}
+search-link a-tisket https://atisket.pulsewidth.org.uk/
