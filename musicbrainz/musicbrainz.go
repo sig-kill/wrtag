@@ -48,7 +48,7 @@ func (c *Client) request(ctx context.Context, r *http.Request, dest any) error {
 	return nil
 }
 
-func (c *Client) GetRelease(ctx context.Context, mbid string) (*ReleaseResponse, error) {
+func (c *Client) GetRelease(ctx context.Context, mbid string) (*Release, error) {
 	fmt.Printf("get release by id %q\n", mbid)
 
 	urlV := url.Values{}
@@ -59,7 +59,7 @@ func (c *Client) GetRelease(ctx context.Context, mbid string) (*ReleaseResponse,
 	url.RawQuery = urlV.Encode()
 	req, _ := http.NewRequest(http.MethodGet, url.String(), nil)
 
-	var sr ReleaseResponse
+	var sr Release
 	if err := c.request(ctx, req, &sr); err != nil {
 		return nil, fmt.Errorf("request release: %w", err)
 	}
@@ -67,7 +67,7 @@ func (c *Client) GetRelease(ctx context.Context, mbid string) (*ReleaseResponse,
 	return &sr, nil
 }
 
-type Query struct {
+type ReleaseQuery struct {
 	MBReleaseID      string
 	MBArtistID       string
 	MBReleaseGroupID string
@@ -81,13 +81,13 @@ type Query struct {
 	NumTracks    int
 }
 
-func (c *Client) SearchRelease(ctx context.Context, q Query) (int, *ReleaseResponse, error) {
+func (c *Client) SearchRelease(ctx context.Context, q ReleaseQuery) (*Release, error) {
 	if q.MBReleaseID != "" {
 		release, err := c.GetRelease(ctx, q.MBReleaseID)
 		if err != nil {
-			return 0, nil, fmt.Errorf("get direct release: %w", err)
+			return nil, fmt.Errorf("get direct release: %w", err)
 		}
-		return 100, release, nil
+		return release, nil
 	}
 
 	// https://beta.musicbrainz.org/doc/MusicBrainz_API/Search#Release
@@ -121,7 +121,7 @@ func (c *Client) SearchRelease(ctx context.Context, q Query) (int, *ReleaseRespo
 		params = append(params, field("tracks", q.NumTracks))
 	}
 	if len(params) == 0 {
-		return 0, nil, ErrNoResults
+		return nil, ErrNoResults
 	}
 
 	queryStr := strings.Join(params, " ")
@@ -136,39 +136,42 @@ func (c *Client) SearchRelease(ctx context.Context, q Query) (int, *ReleaseRespo
 	url.RawQuery = urlV.Encode()
 	req, _ := http.NewRequest(http.MethodGet, url.String(), nil)
 
-	var sr SearchResponse
+	var sr struct {
+		Releases []struct {
+			ID    string `json:"id"`
+			Score int    `json:"score"`
+		} `json:"releases"`
+	}
 	if err := c.request(ctx, req, &sr); err != nil {
-		return 0, nil, fmt.Errorf("request release: %w", err)
+		return nil, fmt.Errorf("request release: %w", err)
 	}
 	if len(sr.Releases) == 0 || sr.Releases[0].ID == "" {
-		return 0, nil, ErrNoResults
+		return nil, ErrNoResults
 	}
 	releaseKey := sr.Releases[0]
 
 	release, err := c.GetRelease(ctx, releaseKey.ID)
 	if err != nil {
-		return 0, nil, fmt.Errorf("get release by mbid %s: %w", releaseKey.ID, err)
+		return nil, fmt.Errorf("get release by mbid %s: %w", releaseKey.ID, err)
 	}
 
-	return releaseKey.Score, release, nil
+	return release, nil
 }
 
-func field(k string, v any) string {
-	vstr := fmt.Sprint(v)
-	vstr = escapeLucene.Replace(vstr)
-	return fmt.Sprintf("%s:(%v)", k, vstr)
+func CreditString(credits []ArtistCredit) string {
+	var sb strings.Builder
+	for _, mba := range credits {
+		fmt.Fprintf(&sb, "%s%s", mba.Name, mba.JoinPhrase)
+	}
+	return sb.String()
 }
 
-func joinPath(base string, p ...string) string {
-	r, _ := url.JoinPath(base, p...)
-	return r
-}
-
-type SearchResponse struct {
-	Releases []struct {
-		ID    string `json:"id"`
-		Score int    `json:"score"`
-	} `json:"releases"`
+func FlatTracks(media []Media) []Track {
+	var tracks []Track
+	for _, media := range media {
+		tracks = append(tracks, media.Tracks...)
+	}
+	return tracks
 }
 
 type ArtistCredit struct {
@@ -194,15 +197,25 @@ type Track struct {
 		ID               string         `json:"id"`
 		Length           int            `json:"length"`
 		Title            string         `json:"title"`
-		ArtistCredit     []ArtistCredit `json:"artist-credit"`
+		Artists          []ArtistCredit `json:"artist-credit"`
 	} `json:"recording"`
-	Number       string         `json:"number"`
-	Position     int            `json:"position"`
-	Title        string         `json:"title"`
-	ArtistCredit []ArtistCredit `json:"artist-credit"`
+	Number   string         `json:"number"`
+	Position int            `json:"position"`
+	Title    string         `json:"title"`
+	Artists  []ArtistCredit `json:"artist-credit"`
 }
 
-type ReleaseResponse struct {
+type Media struct {
+	TrackOffset int     `json:"track-offset"`
+	TrackCount  int     `json:"track-count"`
+	Tracks      []Track `json:"tracks"`
+	Format      string  `json:"format"`
+	FormatID    string  `json:"format-id"`
+	Title       string  `json:"title"`
+	Position    int     `json:"position"`
+}
+
+type Release struct {
 	Title              string `json:"title"`
 	ID                 string `json:"id"`
 	TextRepresentation struct {
@@ -222,19 +235,11 @@ type ReleaseResponse struct {
 		Back     bool `json:"back"`
 		Count    int  `json:"count"`
 	} `json:"cover-art-archive"`
-	ArtistCredit []ArtistCredit `json:"artist-credit"`
-	Date         string         `json:"date"`
-	Quality      string         `json:"quality"`
-	Media        []struct {
-		TrackOffset int     `json:"track-offset"`
-		TrackCount  int     `json:"track-count"`
-		Tracks      []Track `json:"tracks"`
-		Format      string  `json:"format"`
-		FormatID    string  `json:"format-id"`
-		Title       string  `json:"title"`
-		Position    int     `json:"position"`
-	} `json:"media"`
-	Status        string `json:"status"`
+	Artists       []ArtistCredit `json:"artist-credit"`
+	Date          string         `json:"date"`
+	Quality       string         `json:"quality"`
+	Media         []Media        `json:"media"`
+	Status        string         `json:"status"`
 	ReleaseEvents []struct {
 		Area struct {
 			ID             string   `json:"id"`
@@ -271,4 +276,15 @@ func init() {
 		pairs = append(pairs, c, `\`+c)
 	}
 	escapeLucene = strings.NewReplacer(pairs...)
+}
+
+func field(k string, v any) string {
+	vstr := fmt.Sprint(v)
+	vstr = escapeLucene.Replace(vstr)
+	return fmt.Sprintf("%s:(%v)", k, vstr)
+}
+
+func joinPath(base string, p ...string) string {
+	r, _ := url.JoinPath(base, p...)
+	return r
 }
