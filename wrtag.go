@@ -16,6 +16,7 @@ import (
 
 	"go.senan.xyz/wrtag/diff"
 	"go.senan.xyz/wrtag/musicbrainz"
+	"go.senan.xyz/wrtag/tagmap"
 	"go.senan.xyz/wrtag/tags/tagcommon"
 )
 
@@ -153,7 +154,7 @@ func ProcessJob(
 	}
 
 	job.MBID = release.ID
-	job.Score, job.Diff = diff.DiffReleases(tagFiles, release)
+	job.Score, job.Diff = tagmap.DiffRelease(tagFiles, release)
 
 	job.DestPath, err = DestDir(pathFormat, *release)
 	if err != nil {
@@ -176,7 +177,8 @@ func ProcessJob(
 		return ErrNoMatch
 	}
 
-	// musicbrainz.ToTags(release, tagFiles)
+	// write release to tags. saved by defered Close()
+	tagmap.WriteRelease(release, tagFiles)
 
 	job.Score, job.Diff = diff.DiffReleases(tagFiles, release)
 	job.SourcePath = job.DestPath
