@@ -48,9 +48,9 @@ func ReadDir(tg tagcommon.Reader, dir string) ([]tagcommon.File, error) {
 	return files, nil
 }
 
-func DestDir(pathFormat *texttemplate.Template, releaseMB musicbrainz.Release) (string, error) {
+func DestDir(pathFormat *texttemplate.Template, release musicbrainz.Release) (string, error) {
 	var buff strings.Builder
-	if err := pathFormat.Execute(&buff, PathFormatData{Release: releaseMB}); err != nil {
+	if err := pathFormat.Execute(&buff, PathFormatData{Release: release}); err != nil {
 		return "", fmt.Errorf("create path: %w", err)
 	}
 	path := buff.String()
@@ -58,10 +58,15 @@ func DestDir(pathFormat *texttemplate.Template, releaseMB musicbrainz.Release) (
 	return dir, nil
 }
 
-func MoveFiles(pathFormat *texttemplate.Template, releaseMB *musicbrainz.Release, paths []string) error {
-	for i, t := range musicbrainz.FlatTracks(releaseMB.Media) {
-		path := paths[i]
-		data := PathFormatData{Release: *releaseMB, Track: t, TrackNum: i + 1, Ext: filepath.Ext(path)}
+func MoveFiles(pathFormat *texttemplate.Template, release *musicbrainz.Release, paths []string) error {
+	releaseTracks := musicbrainz.FlatTracks(release.Media)
+	if len(releaseTracks) != len(paths) {
+		return ErrTrackCountMismatch
+	}
+
+	for i := range releaseTracks {
+		releaseTrack, path := releaseTracks[i], paths[i]
+		data := PathFormatData{Release: *release, Track: releaseTrack, TrackNum: i + 1, Ext: filepath.Ext(path)}
 
 		var buff strings.Builder
 		if err := pathFormat.Execute(&buff, data); err != nil {
@@ -77,9 +82,9 @@ type SearchLinkTemplate struct {
 }
 
 type JobConfig struct {
-	Path          string
-	UseMBID       string
-	ConfirmAnyway bool
+	Path    string
+	UseMBID string
+	Confirm bool
 }
 
 // TODO: split with web Requirements
@@ -108,6 +113,8 @@ func ProcessJob(
 ) (err error) {
 	job.mu.Lock()
 	defer job.mu.Unlock()
+
+	log.Printf("received job %+v", jobC)
 
 	job.Loading = true
 	job.Score = 0
@@ -177,7 +184,7 @@ func ProcessJob(
 	if releaseTracks := musicbrainz.FlatTracks(release.Media); len(tagFiles) != len(releaseTracks) {
 		return fmt.Errorf("%w: %d/%d", ErrTrackCountMismatch, len(tagFiles), len(releaseTracks))
 	}
-	if !jobC.ConfirmAnyway && job.Score < 95 {
+	if !jobC.Confirm && job.Score < 95 {
 		return ErrNoMatch
 	}
 

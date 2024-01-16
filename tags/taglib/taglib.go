@@ -85,8 +85,8 @@ func (f *File) WriteArtist(v string)    { f.raw["artist"] = []string{v} }
 func (f *File) WriteArtists(v []string) { f.raw["artists"] = v }
 func (f *File) WriteGenre(v string)     { f.raw["genre"] = []string{v} }
 func (f *File) WriteGenres(v []string)  { f.raw["genres"] = v }
-func (f *File) WriteTrackNumber(v int)  { f.raw["track"] = []string{fmt.Sprintf("%d", v)} }
-func (f *File) WriteDiscNumber(v int)   { f.raw["discnumber"] = []string{fmt.Sprintf("%d", v)} }
+func (f *File) WriteTrackNumber(v int)  { f.raw["track"] = []string{intStr(v)} }
+func (f *File) WriteDiscNumber(v int)   { f.raw["discnumber"] = []string{intStr(v)} }
 
 func (f *File) WriteMBRecordingID(v string) { f.raw["musicbrainz_trackid"] = []string{v} }
 func (f *File) WriteMBArtistID(v []string)  { f.raw["musicbrainz_artistid"] = v }
@@ -130,6 +130,13 @@ func first[T comparable](is []T) T {
 		}
 	}
 	return z
+}
+
+func intStr(v int) string {
+	if v == 0 {
+		return ""
+	}
+	return strconv.Itoa(v)
 }
 
 func find(m map[string][]string, keys ...string) []string {

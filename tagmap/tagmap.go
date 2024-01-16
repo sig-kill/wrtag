@@ -83,7 +83,7 @@ func WriteRelease(release *musicbrainz.Release, files []tagcommon.File) {
 		f.WriteCatalogueNum(first(release.LabelInfo).CatalogNumber)
 
 		f.WriteMBReleaseID(release.ID)
-		f.WriteMBReleaseGroupID("")
+		f.WriteMBReleaseGroupID(release.ReleaseGroup.ID)
 		f.WriteMBAlbumArtistID(mapp(release.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID }))
 
 		f.WriteTitle(releaseTracks[i].Title)
