@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/araddon/dateparse"
 	"golang.org/x/time/rate"
 )
 
@@ -43,7 +44,7 @@ func (c *Client) request(ctx context.Context, r *http.Request, dest any) error {
 		return fmt.Errorf("search returned non 2xx: %d", resp.StatusCode)
 	}
 	if err := json.NewDecoder(resp.Body).Decode(dest); err != nil {
-		return fmt.Errorf("decode response")
+		return fmt.Errorf("decode response: %w", err)
 	}
 	return nil
 }
@@ -53,7 +54,7 @@ func (c *Client) GetRelease(ctx context.Context, mbid string) (*Release, error) 
 
 	urlV := url.Values{}
 	urlV.Set("fmt", "json")
-	urlV.Set("inc", "recordings+artist-credits+labels")
+	urlV.Set("inc", "recordings+artist-credits+labels+release-groups")
 
 	url, _ := url.Parse(joinPath(base, "release", mbid))
 	url.RawQuery = urlV.Encode()
@@ -74,7 +75,7 @@ type ReleaseQuery struct {
 
 	Release      string
 	Artist       string
-	Date         string
+	Date         time.Time
 	Format       string
 	Label        string
 	CatalogueNum string
@@ -105,8 +106,8 @@ func (c *Client) SearchRelease(ctx context.Context, q ReleaseQuery) (*Release, e
 	if q.Artist != "" {
 		params = append(params, field("artist", strings.ToLower(q.Artist)))
 	}
-	if q.Date != "" {
-		params = append(params, field("date", q.Date))
+	if !q.Date.IsZero() {
+		params = append(params, field("date", q.Date.Format(time.DateOnly)))
 	}
 	if q.Format != "" {
 		params = append(params, field("format", strings.ToLower(q.Format)))
@@ -235,11 +236,21 @@ type Release struct {
 		Back     bool `json:"back"`
 		Count    int  `json:"count"`
 	} `json:"cover-art-archive"`
-	Artists       []ArtistCredit `json:"artist-credit"`
-	Date          string         `json:"date"`
-	Quality       string         `json:"quality"`
-	Media         []Media        `json:"media"`
-	Status        string         `json:"status"`
+	Artists      []ArtistCredit `json:"artist-credit"`
+	Date         AnyTime        `json:"date"`
+	Quality      string         `json:"quality"`
+	Media        []Media        `json:"media"`
+	Status       string         `json:"status"`
+	ReleaseGroup struct {
+		FirstReleaseDate AnyTime `json:"first-release-date"`
+		PrimaryTypeID    string  `json:"primary-type-id"`
+		Disambiguation   string  `json:"disambiguation"`
+		SecondaryTypeIDs []any   `json:"secondary-type-ids"`
+		PrimaryType      string  `json:"primary-type"`
+		ID               string  `json:"id"`
+		SecondaryTypes   []any   `json:"secondary-types"`
+		Title            string  `json:"title"`
+	} `json:"release-group"`
 	ReleaseEvents []struct {
 		Area struct {
 			ID             string   `json:"id"`
@@ -250,7 +261,7 @@ type Release struct {
 			Disambiguation string   `json:"disambiguation"`
 			Type           any      `json:"type"`
 		} `json:"area"`
-		Date string `json:"date"`
+		Date AnyTime `json:"date"`
 	} `json:"release-events"`
 	PackagingID string `json:"packaging-id"`
 	LabelInfo   []struct {
@@ -265,6 +276,23 @@ type Release struct {
 		} `json:"label"`
 		CatalogNumber string `json:"catalog-number"`
 	} `json:"label-info"`
+}
+
+type AnyTime struct {
+	time.Time
+}
+
+func (at *AnyTime) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+	var err error
+	at.Time, err = dateparse.ParseAny(str)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // https://lucene.apache.org/core/7_7_2/queryparser/org/apache/lucene/queryparser/classic/package-summary.html#Escaping_Special_Characters

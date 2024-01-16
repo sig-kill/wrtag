@@ -6,7 +6,6 @@ import (
 	"crypto/subtle"
 	"embed"
 	"encoding/base64"
-	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -14,6 +13,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	texttemplate "text/template"
 
@@ -27,8 +27,7 @@ import (
 
 //go:embed *.html *.ico
 var ui embed.FS
-
-var templ = template.Must(
+var uiTempl = template.Must(
 	template.
 		New("template").
 		Funcs(wrtag.TemplateFuncMap).
@@ -40,7 +39,7 @@ func main() {
 	confPathFormat := ffs.StringLong("path-format", "", "path format")
 	confListenAddr := ffs.StringLong("listen-addr", "", "listen addr")
 
-	var confSearchLinkTemplates wrtag.SearchLinkTemplates
+	var confSearchLinkTemplates searchLinkTemplates
 	ffs.ValueLong("search-link", &confSearchLinkTemplates, "search link")
 
 	confAPIKey := ffs.StringLong("api-key", "", "api-key")
@@ -55,17 +54,31 @@ func main() {
 		ff.WithConfigFileParser(ff.PlainParser),
 	}
 	if err := ff.Parse(ffs, os.Args[1:], ffopt...); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		log.Fatal("parse err")
 	}
 	if *confAPIKey == "" {
-		fmt.Fprintln(os.Stderr, "need api key")
-		os.Exit(1)
+		log.Fatal("need api key")
+	}
+
+	var searchLinkTemplates []wrtag.SearchLinkTemplate
+	for _, c := range confSearchLinkTemplates {
+		templ, err := texttemplate.New("template").Funcs(wrtag.TemplateFuncMap).Parse(c.Template)
+		if err != nil {
+			log.Fatalf("error parsing search template: %v", err)
+		}
+		searchLinkTemplates = append(searchLinkTemplates, wrtag.SearchLinkTemplate{
+			Name:  c.Name,
+			Templ: templ,
+		})
+	}
+
+	pathFormat, err := wrtag.PathFormatTemplate(*confPathFormat)
+	if err != nil {
+		log.Fatalf("error parsing path format template: %v", err)
 	}
 
 	tg := &taglib.TagLib{}
 	mb := musicbrainz.NewClient()
-	pathFormat := texttemplate.Must(wrtag.PathFormat.Parse(*confPathFormat))
 
 	jobs := map[string]*wrtag.Job{}
 	jobQueue := make(chan wrtag.JobConfig)
@@ -82,7 +95,7 @@ func main() {
 		defer jmu.RUnlock()
 
 		var buff bytes.Buffer
-		if err := templ.ExecuteTemplate(&buff, "jobs.html", listJobs(jobs)); err != nil {
+		if err := uiTempl.ExecuteTemplate(&buff, "jobs.html", listJobs(jobs)); err != nil {
 			log.Printf("render job: %v", err)
 			return
 		}
@@ -104,7 +117,7 @@ func main() {
 				jmu.Unlock()
 				notifyClient()
 
-				if err := wrtag.ProcessJob(context.Background(), mb, tg, pathFormat, confSearchLinkTemplates, job, jobC); err != nil {
+				if err := wrtag.ProcessJob(context.Background(), mb, tg, pathFormat, searchLinkTemplates, job, jobC); err != nil {
 					log.Printf("error processing %q: %v", jobC.Path, err)
 				}
 				notifyClient()
@@ -130,7 +143,7 @@ func main() {
 		jobQueue <- wrtag.JobConfig{Path: jobPath, UseMBID: mbid, ConfirmAnyway: confirm}
 
 		jmu.RLock()
-		if err := templ.ExecuteTemplate(w, "release.html", &wrtag.Job{Loading: true}); err != nil {
+		if err := uiTempl.ExecuteTemplate(w, "release.html", &wrtag.Job{Loading: true}); err != nil {
 			log.Printf("err in template: %v", err)
 		}
 		jmu.RUnlock()
@@ -140,7 +153,7 @@ func main() {
 		jmu.RLock()
 		defer jmu.RUnlock()
 
-		if err := templ.ExecuteTemplate(w, "index.html", listJobs(jobs)); err != nil {
+		if err := uiTempl.ExecuteTemplate(w, "index.html", listJobs(jobs)); err != nil {
 			log.Printf("err in template: %v", err)
 		}
 	})
@@ -171,3 +184,24 @@ func listJobs(jobs map[string]*wrtag.Job) []*wrtag.Job {
 
 func encodeJobID(path string) string { return base64.RawURLEncoding.EncodeToString([]byte(path)) }
 func decodeJobID(id string) string   { r, _ := base64.RawURLEncoding.DecodeString(id); return string(r) }
+
+type searchLinkTemplates []searchLinkTemplate
+type searchLinkTemplate struct {
+	Name     string
+	Template string
+}
+
+func (sls searchLinkTemplates) String() string {
+	var names []string
+	for _, sl := range sls {
+		names = append(names, sl.Name)
+	}
+	return strings.Join(names, ", ")
+}
+
+func (sls *searchLinkTemplates) Set(value string) error {
+	name, value, _ := strings.Cut(value, " ")
+	name, value = strings.TrimSpace(name), strings.TrimSpace(value)
+	*sls = append(*sls, searchLinkTemplate{Name: name, Template: value})
+	return nil
+}

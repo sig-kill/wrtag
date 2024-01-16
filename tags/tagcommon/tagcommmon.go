@@ -2,6 +2,7 @@ package tagcommon
 
 import (
 	"errors"
+	"time"
 )
 
 var ErrUnsupported = errors.New("filetype unsupported")
@@ -15,8 +16,8 @@ type File interface {
 	Album() string
 	AlbumArtist() string
 	AlbumArtists() []string
-	Date() string
-	OriginalDate() string
+	Date() time.Time
+	OriginalDate() time.Time
 	MediaFormat() string
 	Label() string
 	CatalogueNum() string

@@ -14,7 +14,6 @@ import (
 	texttemplate "text/template"
 	"time"
 
-	"go.senan.xyz/wrtag/diff"
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/tagmap"
 	"go.senan.xyz/wrtag/tags/tagcommon"
@@ -51,18 +50,18 @@ func ReadDir(tg tagcommon.Reader, dir string) ([]tagcommon.File, error) {
 
 func DestDir(pathFormat *texttemplate.Template, releaseMB musicbrainz.Release) (string, error) {
 	var buff strings.Builder
-	if err := pathFormat.Execute(&buff, releasePathFormatData{R: releaseMB}); err != nil {
+	if err := pathFormat.Execute(&buff, PathFormatData{Release: releaseMB}); err != nil {
 		return "", fmt.Errorf("create path: %w", err)
 	}
 	path := buff.String()
-
-	return filepath.Dir(path), nil
+	dir := filepath.Dir(path)
+	return dir, nil
 }
 
 func MoveFiles(pathFormat *texttemplate.Template, releaseMB *musicbrainz.Release, paths []string) error {
 	for i, t := range musicbrainz.FlatTracks(releaseMB.Media) {
 		path := paths[i]
-		data := releasePathFormatData{R: *releaseMB, T: t, Ext: filepath.Ext(path)}
+		data := PathFormatData{Release: *releaseMB, Track: t, TrackNum: i + 1, Ext: filepath.Ext(path)}
 
 		var buff strings.Builder
 		if err := pathFormat.Execute(&buff, data); err != nil {
@@ -70,6 +69,11 @@ func MoveFiles(pathFormat *texttemplate.Template, releaseMB *musicbrainz.Release
 		}
 	}
 	return nil
+}
+
+type SearchLinkTemplate struct {
+	Name  string
+	Templ *texttemplate.Template
 }
 
 type JobConfig struct {
@@ -90,7 +94,7 @@ type Job struct {
 
 	MBID        string
 	Score       float64
-	Diff        []diff.Diff
+	Diff        []tagmap.Diff
 	SearchLinks []JobSearchLink
 
 	Loading bool
@@ -137,7 +141,7 @@ func ProcessJob(
 		MBArtistID:       first(searchFile.MBArtistID()),
 		MBReleaseGroupID: searchFile.MBReleaseGroupID(),
 		Release:          searchFile.Album(),
-		Artist:           or(searchFile.AlbumArtist(), searchFile.AlbumArtist()),
+		Artist:           or(searchFile.AlbumArtist(), searchFile.Artist()),
 		Date:             searchFile.Date(),
 		Format:           searchFile.MediaFormat(),
 		Label:            searchFile.Label(),
@@ -154,7 +158,7 @@ func ProcessJob(
 	}
 
 	job.MBID = release.ID
-	job.Score, job.Diff = tagmap.DiffRelease(tagFiles, release)
+	job.Score, job.Diff = tagmap.DiffRelease(release, tagFiles)
 
 	job.DestPath, err = DestDir(pathFormat, *release)
 	if err != nil {
@@ -177,10 +181,10 @@ func ProcessJob(
 		return ErrNoMatch
 	}
 
-	// write release to tags. saved by defered Close()
+	// write release to tags. files are saved by defered Close()
 	tagmap.WriteRelease(release, tagFiles)
 
-	job.Score, job.Diff = diff.DiffReleases(tagFiles, release)
+	job.Score, job.Diff = tagmap.DiffRelease(release, tagFiles)
 	job.SourcePath = job.DestPath
 
 	if err := MoveFiles(pathFormat, release, nil); err != nil {
@@ -190,61 +194,39 @@ func ProcessJob(
 	return nil
 }
 
-func mapp[F, T any](s []F, f func(int, F) T) []T {
-	res := make([]T, len(s))
-	for i, v := range s {
-		res[i] = f(i, v)
-	}
-	return res
-}
-
 var TemplateFuncMap = texttemplate.FuncMap{
-	"now":     func() int64 { return time.Now().UnixMilli() },
-	"file":    func(p string) string { ur, _ := url.Parse("file://"); ur.Path = p; return ur.String() },
-	"url":     func(u string) htmltemplate.URL { return htmltemplate.URL(u) },
-	"query":   htmltemplate.URLQueryEscaper,
+	"now":   func() int64 { return time.Now().UnixMilli() },
+	"file":  func(p string) string { ur, _ := url.Parse("file://"); ur.Path = p; return ur.String() },
+	"url":   func(u string) htmltemplate.URL { return htmltemplate.URL(u) },
+	"query": htmltemplate.URLQueryEscaper,
+	"join":  func(delim string, items []string) string { return strings.Join(items, delim) },
+	"pad0":  func(amount, n int) string { return fmt.Sprintf("%0*d", amount, n) },
+	"or":    or[string],
+
 	"nomatch": func(err error) bool { return errors.Is(err, ErrNoMatch) },
-	"title": func(ar []musicbrainz.ArtistCredit) []string {
+
+	"flatTracks":   musicbrainz.FlatTracks,
+	"artistCredit": musicbrainz.CreditString,
+	"artistNames": func(ar []musicbrainz.ArtistCredit) []string {
 		return mapp(ar, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.Name })
 	},
-	"join": func(delim string, items []string) string { return strings.Join(items, delim) },
-	"year": func(t time.Time) string { return fmt.Sprintf("%d", t.Year()) },
-	"pad0": func(amount, n int) string { return fmt.Sprintf("%0*d", amount, n) },
+	"artistMBIDs": func(ar []musicbrainz.ArtistCredit) []string {
+		return mapp(ar, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID })
+	},
 }
 
-var PathFormat = texttemplate.
-	New("template").
-	Funcs(TemplateFuncMap)
-
-type releasePathFormatData struct {
-	R   musicbrainz.Release
-	T   musicbrainz.Track
-	Ext string
+func PathFormatTemplate(pathFormat string) (*texttemplate.Template, error) {
+	return texttemplate.
+		New("template").
+		Funcs(TemplateFuncMap).
+		Parse(pathFormat)
 }
 
-type SearchLinkTemplates []SearchLinkTemplate
-type SearchLinkTemplate struct {
-	Name  string
-	Templ *texttemplate.Template
-}
-
-func (sls SearchLinkTemplates) String() string {
-	var names []string
-	for _, sl := range sls {
-		names = append(names, sl.Name)
-	}
-	return strings.Join(names, ", ")
-}
-
-func (sls *SearchLinkTemplates) Set(value string) error {
-	name, value, _ := strings.Cut(value, " ")
-	name, value = strings.TrimSpace(name), strings.TrimSpace(value)
-	templ, err := texttemplate.New("").Funcs(TemplateFuncMap).Parse(value)
-	if err != nil {
-		return fmt.Errorf("parse template: %w", err)
-	}
-	*sls = append(*sls, SearchLinkTemplate{Name: name, Templ: templ})
-	return nil
+type PathFormatData struct {
+	Release  musicbrainz.Release
+	Track    musicbrainz.Track
+	TrackNum int
+	Ext      string
 }
 
 func first[T comparable](is []T) T {
@@ -265,4 +247,12 @@ func or[T comparable](items ...T) T {
 		}
 	}
 	return zero
+}
+
+func mapp[F, T any](s []F, f func(int, F) T) []T {
+	res := make([]T, len(s))
+	for i, v := range s {
+		res[i] = f(i, v)
+	}
+	return res
 }

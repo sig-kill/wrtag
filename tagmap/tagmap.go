@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/sergi/go-diff/diffmatchpatch"
 
@@ -17,7 +18,7 @@ type Diff struct {
 	Changes       []diffmatchpatch.Diff
 }
 
-func DiffRelease(files []tagcommon.File, release *musicbrainz.Release) (float64, []Diff) {
+func DiffRelease(release *musicbrainz.Release, files []tagcommon.File) (float64, []Diff) {
 	dmp := diffmatchpatch.New()
 
 	var charsTotal int
@@ -75,8 +76,8 @@ func WriteRelease(release *musicbrainz.Release, files []tagcommon.File) {
 		f.WriteAlbum(release.Title)
 		f.WriteAlbumArtist(musicbrainz.CreditString(release.Artists))
 		f.WriteAlbumArtists(mapp(release.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.Name }))
-		f.WriteDate(release.Date)
-		f.WriteOriginalDate("") // TODO
+		f.WriteDate(release.Date.Format(time.DateOnly))
+		f.WriteOriginalDate(release.ReleaseGroup.FirstReleaseDate.Format(time.DateOnly))
 		f.WriteMediaFormat(release.Media[0].Format)
 		f.WriteLabel(first(release.LabelInfo).Label.Name)
 		f.WriteCatalogueNum(first(release.LabelInfo).CatalogNumber)

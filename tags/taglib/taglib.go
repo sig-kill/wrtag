@@ -6,7 +6,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/araddon/dateparse"
 	"github.com/sentriz/audiotags"
 	"go.senan.xyz/wrtag/tags/tagcommon"
 )
@@ -41,14 +43,14 @@ type File struct {
 
 // https://picard-docs.musicbrainz.org/downloads/MusicBrainz_Picard_Tag_Map.html
 
-func (f *File) Album() string          { return first(find(f.raw, "album")) }
-func (f *File) AlbumArtist() string    { return first(find(f.raw, "albumartist", "album artist")) }
-func (f *File) AlbumArtists() []string { return find(f.raw, "albumartists", "album_artists") }
-func (f *File) Date() string           { return first(find(f.raw, "date", "year")) }
-func (f *File) OriginalDate() string   { return first(find(f.raw, "originaldate", "date", "year")) }
-func (f *File) MediaFormat() string    { return first(find(f.raw, "media")) }
-func (f *File) Label() string          { return first(find(f.raw, "label")) }
-func (f *File) CatalogueNum() string   { return first(find(f.raw, "catalognumber")) }
+func (f *File) Album() string           { return first(find(f.raw, "album")) }
+func (f *File) AlbumArtist() string     { return first(find(f.raw, "albumartist", "album artist")) }
+func (f *File) AlbumArtists() []string  { return find(f.raw, "albumartists", "album_artists") }
+func (f *File) Date() time.Time         { return anyTime(first(find(f.raw, "date", "year"))) }
+func (f *File) OriginalDate() time.Time { return anyTime(first(find(f.raw, "originaldate"))) }
+func (f *File) MediaFormat() string     { return first(find(f.raw, "media")) }
+func (f *File) Label() string           { return first(find(f.raw, "label")) }
+func (f *File) CatalogueNum() string    { return first(find(f.raw, "catalognumber")) }
 
 func (f *File) MBReleaseID() string       { return first(find(f.raw, "musicbrainz_albumid")) }
 func (f *File) MBReleaseGroupID() string  { return first(find(f.raw, "musicbrainz_releasegroupid")) }
@@ -153,4 +155,9 @@ func intSep(sep, in string) int {
 	start, _, _ := strings.Cut(in, sep)
 	out, _ := strconv.Atoi(start)
 	return out
+}
+
+func anyTime(str string) time.Time {
+	t, _ := dateparse.ParseAny(str)
+	return t
 }
