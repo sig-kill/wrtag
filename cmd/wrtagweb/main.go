@@ -140,7 +140,7 @@ func main() {
 		confirm, _ := strconv.ParseBool(r.FormValue("confirm"))
 		mbid := r.FormValue("mbid")
 
-		jobQueue <- wrtag.JobConfig{Path: jobPath, UseMBID: mbid, ConfirmAnyway: confirm}
+		jobQueue <- wrtag.JobConfig{Path: jobPath, UseMBID: mbid, Confirm: confirm}
 
 		jmu.RLock()
 		if err := uiTempl.ExecuteTemplate(w, "release.html", &wrtag.Job{Loading: true}); err != nil {
