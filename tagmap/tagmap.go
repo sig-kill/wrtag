@@ -69,7 +69,7 @@ func DiffRelease(release *musicbrainz.Release, files []tagcommon.File) (float64,
 func WriteRelease(release *musicbrainz.Release, files []tagcommon.File) {
 	releaseTracks := musicbrainz.FlatTracks(release.Media)
 	if len(releaseTracks) != len(files) {
-		panic("provoded tracks and release track count mismatch")
+		panic("WriteRelease: len(releaseTracks) != len(files)")
 	}
 
 	for i, f := range files {
