@@ -1,4 +1,4 @@
-<form id="{{ .ID }}" hx-post="/job/{{ .ID }}" hx-swap="outerHTML" class="bg-gray-100 p-3 flex flex-col items-start gap-2 shadow-sm">
+<form id="{{ .ID }}" hx-post="/job/{{ .ID }}" hx-swap="outerHTML" hx-target="this" class="bg-gray-100 p-3 flex flex-col items-start gap-2 shadow-sm">
   <p>path <a class="italic" href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></p>
   {{ if .MBID }}
     <p class="font-bold">{{ printf "%.2f%%" .Score }} match with <a href="https://musicbrainz.org/release/{{ .MBID }}" target="_blank">https://musicbrainz.org/release/{{ .MBID }}</a></p>
@@ -9,8 +9,7 @@
   {{ if eq .Status "complete" }}
     <p>sucessfully moved to <a href="{{ .DestPath | file | url }}">{{ .DestPath }}</a> <button>[reimport]</button></p>
   {{ else if eq .Status "no-match" }}
-    <input type="text" name="confirm" value="1" class="hidden" />
-    <p>low/no match <button>[use anyway]</button></p>
+    <p>low/no match <button hx-post="/job/{{ .ID }}?confirm=1">[use anyway]</button></p>
   {{ end }}
   <p>custom mbid/url <input type="text" name="mbid" class="px-2 w-[320px]" placeholder="74a7e992-4366-427a-91ff-f3cf6aa7524d" value="{{ .MBID }}"> <button>[search]</button></p>
 </form>

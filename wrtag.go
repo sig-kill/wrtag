@@ -225,20 +225,6 @@ var TemplateFuncMap = texttemplate.FuncMap{
 	},
 }
 
-func PathFormatTemplate(pathFormat string) (*texttemplate.Template, error) {
-	return texttemplate.
-		New("template").
-		Funcs(TemplateFuncMap).
-		Parse(pathFormat)
-}
-
-type PathFormatData struct {
-	Release  musicbrainz.Release
-	Track    musicbrainz.Track
-	TrackNum int
-	Ext      string
-}
-
 func first[T comparable](is []T) T {
 	var z T
 	for _, i := range is {
