@@ -1,28 +1,16 @@
-<div id="{{ .ID }}" class="bg-gray-100 p-3 flex flex-col items-start gap-2 shadow-sm">
+<form id="{{ .ID }}" hx-post="/job/{{ .ID }}" hx-swap="outerHTML" class="bg-gray-100 p-3 flex flex-col items-start gap-2 shadow-sm">
   <p>path <a class="italic" href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></p>
   {{ if .MBID }}
     <p class="font-bold">{{ printf "%.2f%%" .Score }} match with <a href="https://musicbrainz.org/release/{{ .MBID }}" target="_blank">https://musicbrainz.org/release/{{ .MBID }}</a></p>
     {{ template "diff.html" .Diff }}
   {{ end }}
-  <hr class="h-px bg-gray-300 border-0 w-full" />
-  <form class="contents" hx-post="/job/{{ .ID }}" hx-target="#{{ .ID }}" hx-swap="outerHTML">
-    {{ if .Loading  }}
-      <p class="text-grey-600">loading ...</p>
-    {{ else if .Error }}
-      {{ if nomatch .Error }}
-        <input type="text" name="confirm" value="1" class="hidden" />
-        <p><span class="text-red-500">{{ .Error }}</span> <button>[use anyway]</button></p>
-      {{ else }}
-        <p class="text-red-500">error: {{ .Error }}</p>
-      {{ end }}
-    <p>custom mbid/url <input type="text" name="mbid" class="px-2 w-[320px]" placeholder="74a7e992-4366-427a-91ff-f3cf6aa7524d" value="{{ .MBID }}"> <button>[search]</button></p>
-      {{ if .SearchLinks }}
-        <p>search links <span class="inline-flex gap-2">{{ range .SearchLinks }}<a target="_blank" href="{{ .URL | url }}">{{ .Name }}</a>{{ end }}</span></p>
-      {{ end }}
-    {{ else if .DestPath }}
-      <p>sucessfully moved to <a href="{{ .DestPath | file | url }}">{{ .DestPath }}</a> <button >[reimport]</button></p>
-    {{ else  }}
-      <p>in queue</p>
-    {{ end }}
-  </form>
-</div>
+  {{ if .Info }}<p class="text-red-500">{{ .Info }}</p>{{ end }}
+  {{ if .SearchLinks }}<p>search links <span class="inline-flex gap-2">{{ range .SearchLinks }}<a target="_blank" href="{{ .URL | url }}">{{ .Name }}</a>{{ end }}</span></p>{{ end }}
+  {{ if eq .Status "complete" }}
+    <p>sucessfully moved to <a href="{{ .DestPath | file | url }}">{{ .DestPath }}</a> <button>[reimport]</button></p>
+  {{ else if eq .Status "no-match" }}
+    <input type="text" name="confirm" value="1" class="hidden" />
+    <p>low/no match <button>[use anyway]</button></p>
+  {{ end }}
+  <p>custom mbid/url <input type="text" name="mbid" class="px-2 w-[320px]" placeholder="74a7e992-4366-427a-91ff-f3cf6aa7524d" value="{{ .MBID }}"> <button>[search]</button></p>
+</form>
