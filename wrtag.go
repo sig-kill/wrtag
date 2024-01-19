@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 	texttemplate "text/template"
 	"time"
 
@@ -20,7 +19,6 @@ import (
 )
 
 var (
-	ErrNoMatch            = errors.New("no match or score too low")
 	ErrTrackCountMismatch = errors.New("track count mismatch")
 )
 
@@ -61,7 +59,7 @@ func DestDir(pathFormat *texttemplate.Template, release musicbrainz.Release) (st
 func MoveFiles(pathFormat *texttemplate.Template, release *musicbrainz.Release, paths []string) error {
 	releaseTracks := musicbrainz.FlatTracks(release.Media)
 	if len(releaseTracks) != len(paths) {
-		return ErrTrackCountMismatch
+		return fmt.Errorf("%d/%d: %w", len(releaseTracks), len(paths), ErrTrackCountMismatch)
 	}
 
 	for i := range releaseTracks {
@@ -91,40 +89,44 @@ type JobConfig struct {
 type JobSearchLink struct {
 	Name, URL string
 }
+
+type JobStatus string
+
+const (
+	StatusIncomplete JobStatus = ""
+	StatusComplete   JobStatus = "complete"
+	StatusNoMatch    JobStatus = "no-match"
+	StatusError      JobStatus = "error"
+)
+
 type Job struct {
-	mu sync.Mutex
-
-	ID                   string
+	ID                   uint64
+	Status               JobStatus
+	Info                 string
 	SourcePath, DestPath string
-
-	MBID        string
-	Score       float64
-	Diff        []tagmap.Diff
-	SearchLinks []JobSearchLink
-
-	Loading bool
-	Error   error
+	Score                float64
+	MBID                 string
+	Diff                 []tagmap.Diff
+	SearchLinks          []JobSearchLink
 }
 
 func ProcessJob(
 	ctx context.Context, mb *musicbrainz.Client, tg tagcommon.Reader,
 	pathFormat *texttemplate.Template, searchLinksTemplates []SearchLinkTemplate,
-	job *Job, jobC JobConfig,
+	job *Job,
+	useMBID string, confirm bool,
 ) (err error) {
-	job.mu.Lock()
-	defer job.mu.Unlock()
-
-	log.Printf("received job %+v", jobC)
-
-	job.Loading = true
 	job.Score = 0
+	job.MBID = ""
 	job.Diff = nil
 	job.SearchLinks = nil
-	job.Error = nil
 
+	job.Info = ""
 	defer func() {
-		job.Loading = false
-		job.Error = err
+		if err != nil {
+			job.Status = StatusError
+			job.Info = err.Error()
+		}
 	}()
 
 	tagFiles, err := ReadDir(tg, job.SourcePath)
@@ -155,8 +157,17 @@ func ProcessJob(
 		CatalogueNum:     searchFile.CatalogueNum(),
 		NumTracks:        len(tagFiles),
 	}
-	if jobC.UseMBID != "" {
-		query.MBReleaseID = jobC.UseMBID
+	if useMBID != "" {
+		query.MBReleaseID = useMBID
+	}
+
+	for _, v := range searchLinksTemplates {
+		var buff strings.Builder
+		if err := v.Templ.Execute(&buff, searchFile); err != nil {
+			log.Printf("error parsing search link template: %v", err)
+			continue
+		}
+		job.SearchLinks = append(job.SearchLinks, JobSearchLink{Name: v.Name, URL: buff.String()})
 	}
 
 	release, err := mb.SearchRelease(ctx, query)
@@ -172,20 +183,12 @@ func ProcessJob(
 		return fmt.Errorf("gen dest dir: %w", err)
 	}
 
-	for _, v := range searchLinksTemplates {
-		var buff strings.Builder
-		if err := v.Templ.Execute(&buff, searchFile); err != nil {
-			log.Printf("error parsing search link template: %v", err)
-			continue
-		}
-		job.SearchLinks = append(job.SearchLinks, JobSearchLink{Name: v.Name, URL: buff.String()})
-	}
-
 	if releaseTracks := musicbrainz.FlatTracks(release.Media); len(tagFiles) != len(releaseTracks) {
 		return fmt.Errorf("%w: %d/%d", ErrTrackCountMismatch, len(tagFiles), len(releaseTracks))
 	}
-	if !jobC.Confirm && job.Score < 95 {
-		return ErrNoMatch
+	if !confirm && job.Score < 95 {
+		job.Status = StatusNoMatch
+		return nil
 	}
 
 	// write release to tags. files are saved by defered Close()
@@ -193,10 +196,12 @@ func ProcessJob(
 
 	job.Score, job.Diff = tagmap.DiffRelease(release, tagFiles)
 	job.SourcePath = job.DestPath
+	job.Status = StatusComplete
+	job.SearchLinks = nil
 
-	if err := MoveFiles(pathFormat, release, nil); err != nil {
-		return fmt.Errorf("move files: %w", err)
-	}
+	// if err := MoveFiles(pathFormat, release, nil); err != nil {
+	// 	return fmt.Errorf("move files: %w", err)
+	// }
 
 	return nil
 }
@@ -209,8 +214,6 @@ var TemplateFuncMap = texttemplate.FuncMap{
 	"join":  func(delim string, items []string) string { return strings.Join(items, delim) },
 	"pad0":  func(amount, n int) string { return fmt.Sprintf("%0*d", amount, n) },
 	"or":    or[string],
-
-	"nomatch": func(err error) bool { return errors.Is(err, ErrNoMatch) },
 
 	"flatTracks":   musicbrainz.FlatTracks,
 	"artistCredit": musicbrainz.CreditString,
