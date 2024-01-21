@@ -131,7 +131,7 @@ func ProcessJob(
 
 	tagFiles, err := ReadDir(tg, job.SourcePath)
 	if err != nil {
-		return fmt.Errorf("read dir: %w", err)
+		return fmt.Errorf("read dir %q: %w", job.SourcePath, err)
 	}
 	defer func() {
 		var fileErrs []error

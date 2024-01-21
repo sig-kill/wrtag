@@ -12,6 +12,10 @@
         button { @apply font-normal text-blue-700; }
         input { @apply h-3.5 outline outline-1 outline-gray-200 rounded-sm; }
       }
+
+      @layer utilities {
+        .htmx-request { @apply pointer-events-none opacity-50; }
+      }
     </style>
   </head>
   <body class="font-mono antialiased leading-none text-sm text-gray-800 flex flex-col items-start gap-3 m-0 p-3">
