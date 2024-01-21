@@ -162,13 +162,13 @@ func main() {
 	mux.HandleFunc("POST /job/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(muxpatterns.PathValue(r, "id"))
 		confirm, _ := strconv.ParseBool(r.FormValue("confirm"))
-		mbid := filepath.Base(r.FormValue("mbid"))
+		useMBID := filepath.Base(r.FormValue("mbid"))
 		job, err := odb.get(uint64(id))
 		if err != nil {
 			http.Error(w, "error getting job", http.StatusInternalServerError)
 			return
 		}
-		if err := wrtag.ProcessJob(r.Context(), mb, tg, pathFormat, searchLinkTemplates, job, mbid, confirm); err != nil {
+		if err := wrtag.ProcessJob(r.Context(), mb, tg, pathFormat, searchLinkTemplates, job, useMBID, confirm); err != nil {
 			log.Printf("error processing job %d: %v", id, err)
 			http.Error(w, "error in job", http.StatusInternalServerError)
 			return
@@ -180,7 +180,7 @@ func main() {
 		if err := uiTempl.ExecuteTemplate(w, "release.html", struct {
 			*wrtag.Job
 			UseMBID string
-		}{job, mbid}); err != nil {
+		}{job, useMBID}); err != nil {
 			log.Printf("err in template: %v", err)
 			return
 		}
