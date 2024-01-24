@@ -5,8 +5,8 @@ import (
 	"context"
 	"crypto/subtle"
 	"embed"
-	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
@@ -20,9 +20,11 @@ import (
 	"github.com/jba/muxpatterns"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/r3labs/sse/v2"
-	"go.etcd.io/bbolt"
+	"github.com/timshannon/bolthold"
 	"go.senan.xyz/wrtag"
 	"go.senan.xyz/wrtag/musicbrainz"
+	"go.senan.xyz/wrtag/tagmap"
+	"go.senan.xyz/wrtag/tags/tagcommon"
 	"go.senan.xyz/wrtag/tags/taglib"
 )
 
@@ -81,64 +83,51 @@ func main() {
 	tg := &taglib.TagLib{}
 	mb := musicbrainz.NewClient()
 
-	db, err := bbolt.Open("my.db", 0600, nil)
+	db, err := bolthold.Open("wrtag.db", 0600, nil)
 	if err != nil {
 		log.Fatalf("error parsing path format template: %v", err)
 	}
 	defer db.Close()
-
-	odb, err := newObjectDB([]byte("b"), db)
-	if err != nil {
-		log.Panicf("error creating object db: %v", err)
-	}
 
 	jobQueue := make(chan uint64)
 
 	sseServ := sse.New()
 	defer sseServ.Close()
 
-	const jobsStream = "jobs"
-	sseServ.CreateStream(jobsStream)
+	jobStream := sseServ.CreateStream("jobs")
 
-	notifyClient := func() {
-		jobs, err := odb.list()
-		if err != nil {
-			log.Printf("error listings jobs: %v", err)
-			return
-		}
+	pushJob := func(job *Job) error {
 		var buff bytes.Buffer
-		if err := uiTempl.ExecuteTemplate(&buff, "jobs.html", jobs); err != nil {
-			log.Printf("render job: %v", err)
-			return
+		if err := uiTempl.ExecuteTemplate(&buff, "job.html", job); err != nil {
+			return fmt.Errorf("render jobs template: %w", err)
 		}
-		data := bytes.ReplaceAll(buff.Bytes(),
-			[]byte("\n"), []byte(""),
-		)
-		sseServ.Publish(jobsStream, &sse.Event{Data: data})
+		data := bytes.ReplaceAll(buff.Bytes(), []byte("\n"), []byte{})
+		sseServ.Publish(jobStream.ID, &sse.Event{Data: data})
+		return nil
 	}
 
 	for i := 0; i < 5; i++ {
 		go func() {
 			for id := range jobQueue {
 				err := func() (err error) {
-					job, err := odb.get(id)
-					if err != nil {
+					var job Job
+					if err := db.Get(id, &job); err != nil {
 						return fmt.Errorf("get job: %w", err)
 					}
 
-					notifyClient()
+					_ = pushJob(&job)
 					defer func() {
-						_ = odb.save(job)
-						notifyClient()
+						_ = db.Update(id, &job)
+						_ = pushJob(&job)
 					}()
 
-					if err := wrtag.ProcessJob(context.Background(), mb, tg, pathFormat, searchLinkTemplates, job, "", false); err != nil {
+					if err := processJob(context.Background(), mb, tg, pathFormat, searchLinkTemplates, &job, "", false); err != nil {
 						return fmt.Errorf("process job: %w", err)
 					}
 					return nil
 				}()
 				if err != nil {
-					log.Printf("job %d: %v", id, err)
+					log.Printf("error in job %d: %v", id, err)
 				}
 			}
 		}()
@@ -149,10 +138,8 @@ func main() {
 
 	mux.HandleFunc("POST /copy", func(w http.ResponseWriter, r *http.Request) {
 		path := r.FormValue("path")
-		job := wrtag.Job{
-			SourcePath: path,
-		}
-		if err := odb.save(&job); err != nil {
+		job := Job{SourcePath: path}
+		if err := db.Insert(bolthold.NextSequence(), &job); err != nil {
 			http.Error(w, "error saving job", http.StatusInternalServerError)
 			return
 		}
@@ -163,33 +150,34 @@ func main() {
 		id, _ := strconv.Atoi(muxpatterns.PathValue(r, "id"))
 		confirm, _ := strconv.ParseBool(r.FormValue("confirm"))
 		useMBID := filepath.Base(r.FormValue("mbid"))
-		job, err := odb.get(uint64(id))
-		if err != nil {
+
+		var job Job
+		if err := db.Get(id, &job); err != nil {
 			http.Error(w, "error getting job", http.StatusInternalServerError)
 			return
 		}
-		if err := wrtag.ProcessJob(r.Context(), mb, tg, pathFormat, searchLinkTemplates, job, useMBID, confirm); err != nil {
+		if err := processJob(r.Context(), mb, tg, pathFormat, searchLinkTemplates, &job, useMBID, confirm); err != nil {
 			log.Printf("error processing job %d: %v", id, err)
 			http.Error(w, "error in job", http.StatusInternalServerError)
 			return
 		}
-		if err := odb.save(job); err != nil {
+		if err := db.Update(id, &job); err != nil {
 			http.Error(w, "save job", http.StatusInternalServerError)
 			return
 		}
 		if err := uiTempl.ExecuteTemplate(w, "release.html", struct {
-			*wrtag.Job
+			*Job
 			UseMBID string
-		}{job, useMBID}); err != nil {
+		}{&job, useMBID}); err != nil {
 			log.Printf("err in template: %v", err)
 			return
 		}
 	})
 
 	mux.HandleFunc("GET /dump", func(w http.ResponseWriter, r *http.Request) {
-		jobs, err := odb.list()
-		if err != nil {
-			http.Error(w, "error listing jobs", http.StatusInternalServerError)
+		var jobs []*Job
+		if err := db.Find(&jobs, nil); err != nil {
+			http.Error(w, fmt.Sprintf("error listing jobs: %v", err), http.StatusInternalServerError)
 			return
 		}
 		if err := json.NewEncoder(w).Encode(jobs); err != nil {
@@ -199,9 +187,9 @@ func main() {
 	})
 
 	mux.HandleFunc("/{$}", func(w http.ResponseWriter, r *http.Request) {
-		jobs, err := odb.list()
-		if err != nil {
-			http.Error(w, "error listing jobs", http.StatusInternalServerError)
+		var jobs []*Job
+		if err := db.Find(&jobs, nil); err != nil {
+			http.Error(w, fmt.Sprintf("error listing jobs: %v", err), http.StatusInternalServerError)
 			return
 		}
 		if err := uiTempl.ExecuteTemplate(w, "index.html", jobs); err != nil {
@@ -214,8 +202,8 @@ func main() {
 
 	log.Printf("starting on %s", *confListenAddr)
 	log.Panicln(http.ListenAndServe(*confListenAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("WWW-Authenticate", "Basic")
 		if _, key, _ := r.BasicAuth(); subtle.ConstantTimeCompare([]byte(key), []byte(*confAPIKey)) != 1 {
-			w.Header().Set("WWW-Authenticate", "Basic")
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -244,67 +232,137 @@ func (sls *searchLinkTemplates) Set(value string) error {
 	return nil
 }
 
-type objectDB struct {
-	bucket []byte
-	bolt   *bbolt.DB
+type JobStatus string
+
+const (
+	StatusIncomplete JobStatus = ""
+	StatusComplete   JobStatus = "complete"
+	StatusNoMatch    JobStatus = "no-match"
+	StatusError      JobStatus = "error"
+)
+
+type Job struct {
+	ID                   uint64 `boltholdKey:"ID"`
+	Status               JobStatus
+	Info                 string
+	SourcePath, DestPath string
+	Score                float64
+	MBID                 string
+	Diff                 []tagmap.Diff
+	SearchLinks          []wrtag.JobSearchLink
 }
 
-func newObjectDB(bucket []byte, bolt *bbolt.DB) (objectDB, error) {
-	err := bolt.Update(func(tx *bbolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(bucket)
-		return err
-	})
+func processJob(
+	ctx context.Context, mb *musicbrainz.Client, tg tagcommon.Reader,
+	pathFormat *texttemplate.Template, searchLinksTemplates []wrtag.SearchLinkTemplate,
+	job *Job,
+	useMBID string, confirm bool,
+) (err error) {
+	job.Score = 0
+	job.MBID = ""
+	job.Diff = nil
+	job.SearchLinks = nil
+
+	job.Info = ""
+	defer func() {
+		if err != nil {
+			job.Status = StatusError
+			job.Info = err.Error()
+		}
+	}()
+
+	tagFiles, err := wrtag.ReadDir(tg, job.SourcePath)
 	if err != nil {
-		return objectDB{}, err
+		return fmt.Errorf("read dir %q: %w", job.SourcePath, err)
 	}
-	return objectDB{bucket, bolt}, nil
-}
-
-func (o *objectDB) get(id uint64) (*wrtag.Job, error) {
-	var j wrtag.Job
-	return &j, o.bolt.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket(o.bucket)
-		data := b.Get(itob(id))
-		return json.NewDecoder(bytes.NewReader(data)).Decode(&j)
-	})
-}
-
-func (o *objectDB) save(j *wrtag.Job) error {
-	return o.bolt.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket(o.bucket)
-		if j.ID == 0 {
-			var err error
-			j.ID, err = b.NextSequence()
-			if err != nil {
-				return err
-			}
+	defer func() {
+		var fileErrs []error
+		for _, f := range tagFiles {
+			fileErrs = append(fileErrs, f.Close())
 		}
-		var buff bytes.Buffer
-		_ = json.NewEncoder(&buff).Encode(j)
-		return b.Put(itob(j.ID), buff.Bytes())
-	})
-}
-
-func (o *objectDB) list() ([]*wrtag.Job, error) {
-	var r []*wrtag.Job
-	return r, o.bolt.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket(o.bucket)
-		c := b.Cursor()
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			var j wrtag.Job
-			_ = json.NewDecoder(bytes.NewReader(v)).Decode(&j)
-			r = append(r, &j)
+		if err != nil {
+			return
 		}
+		err = errors.Join(fileErrs...)
+	}()
+
+	searchFile := tagFiles[0]
+	query := musicbrainz.ReleaseQuery{
+		MBReleaseID:      searchFile.MBReleaseID(),
+		MBArtistID:       first(searchFile.MBArtistID()),
+		MBReleaseGroupID: searchFile.MBReleaseGroupID(),
+		Release:          searchFile.Album(),
+		Artist:           or(searchFile.AlbumArtist(), searchFile.Artist()),
+		Date:             searchFile.Date(),
+		Format:           searchFile.MediaFormat(),
+		Label:            searchFile.Label(),
+		CatalogueNum:     searchFile.CatalogueNum(),
+		NumTracks:        len(tagFiles),
+	}
+	if useMBID != "" {
+		query.MBReleaseID = useMBID
+	}
+
+	for _, v := range searchLinksTemplates {
+		var buff strings.Builder
+		if err := v.Templ.Execute(&buff, searchFile); err != nil {
+			log.Printf("error parsing search link template: %v", err)
+			continue
+		}
+		job.SearchLinks = append(job.SearchLinks, wrtag.JobSearchLink{Name: v.Name, URL: buff.String()})
+	}
+
+	release, err := mb.SearchRelease(ctx, query)
+	if err != nil {
+		return fmt.Errorf("search musicbrainz: %w", err)
+	}
+
+	job.MBID = release.ID
+	job.Score, job.Diff = tagmap.DiffRelease(release, tagFiles)
+
+	job.DestPath, err = wrtag.DestDir(pathFormat, *release)
+	if err != nil {
+		return fmt.Errorf("gen dest dir: %w", err)
+	}
+
+	if releaseTracks := musicbrainz.FlatTracks(release.Media); len(tagFiles) != len(releaseTracks) {
+		return fmt.Errorf("%w: %d/%d", wrtag.ErrTrackCountMismatch, len(tagFiles), len(releaseTracks))
+	}
+	if !confirm && job.Score < 95 {
+		job.Status = StatusNoMatch
 		return nil
-	})
+	}
+
+	// write release to tags. files are saved by defered Close()
+	tagmap.WriteRelease(release, tagFiles)
+
+	job.Score, job.Diff = tagmap.DiffRelease(release, tagFiles)
+	job.SourcePath = job.DestPath
+	job.Status = StatusComplete
+
+	// if err := MoveFiles(pathFormat, release, nil); err != nil {
+	// 	return fmt.Errorf("move files: %w", err)
+	// }
+
+	return nil
 }
 
-func itob(v uint64) []byte {
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, v)
-	return b
+func first[T comparable](is []T) T {
+	var z T
+	for _, i := range is {
+		if i != z {
+			return i
+		}
+	}
+	return z
 }
 
-func btoi(v []byte) uint64 {
-	return binary.BigEndian.Uint64(v)
+func or[T comparable](items ...T) T {
+	var zero T
+	for _, i := range items {
+		if i != zero {
+			return i
+		}
+	}
+	return zero
 }
