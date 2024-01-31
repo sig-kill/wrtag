@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	texttemplate "text/template"
+	"time"
 
 	"github.com/jba/muxpatterns"
 	"github.com/peterbourgon/ff/v4"
@@ -45,7 +46,8 @@ func main() {
 	var confSearchLinkTemplates searchLinkTemplates
 	ffs.ValueLong("search-link", &confSearchLinkTemplates, "search link")
 
-	confAPIKey := ffs.StringLong("api-key", "", "api-key")
+	confAPIKey := ffs.StringLong("api-key", "", "api key")
+	confDBPath := ffs.StringLong("db-path", "wrtag.db", "db path")
 
 	userConfig, _ := os.UserConfigDir()
 	configPath := filepath.Join(userConfig, "wrtag", "config")
@@ -83,13 +85,11 @@ func main() {
 	tg := &taglib.TagLib{}
 	mb := musicbrainz.NewClient()
 
-	db, err := bolthold.Open("wrtag.db", 0600, nil)
+	db, err := bolthold.Open(*confDBPath, 0600, nil)
 	if err != nil {
 		log.Fatalf("error parsing path format template: %v", err)
 	}
 	defer db.Close()
-
-	jobQueue := make(chan uint64)
 
 	sseServ := sse.New()
 	defer sseServ.Close()
@@ -98,7 +98,7 @@ func main() {
 
 	pushJob := func(job *Job) error {
 		var buff bytes.Buffer
-		if err := uiTempl.ExecuteTemplate(&buff, "job.html", job); err != nil {
+		if err := uiTempl.ExecuteTemplate(&buff, "release.html", job); err != nil {
 			return fmt.Errorf("render jobs template: %w", err)
 		}
 		data := bytes.ReplaceAll(buff.Bytes(), []byte("\n"), []byte{})
@@ -106,32 +106,37 @@ func main() {
 		return nil
 	}
 
-	for i := 0; i < 5; i++ {
-		go func() {
-			for id := range jobQueue {
-				err := func() (err error) {
-					var job Job
-					if err := db.Get(id, &job); err != nil {
-						return fmt.Errorf("get job: %w", err)
-					}
+	jobTick := func() error {
+		var job Job
+		switch err := db.FindOne(&job, bolthold.Where("Status").Eq(StatusIncomplete)); {
+		case errors.Is(err, bolthold.ErrNotFound):
+			return nil
+		case err != nil:
+			return fmt.Errorf("find next job: %w", err)
+		}
 
-					_ = pushJob(&job)
-					defer func() {
-						_ = db.Update(id, &job)
-						_ = pushJob(&job)
-					}()
-
-					if err := processJob(context.Background(), mb, tg, pathFormat, searchLinkTemplates, &job, "", false); err != nil {
-						return fmt.Errorf("process job: %w", err)
-					}
-					return nil
-				}()
-				if err != nil {
-					log.Printf("error in job %d: %v", id, err)
-				}
-			}
+		if err := pushJob(&job); err != nil {
+			log.Printf("push job: %v", err)
+		}
+		defer func() {
+			_ = db.Update(job.ID, &job)
+			_ = pushJob(&job)
 		}()
+
+		if err := processJob(context.Background(), mb, tg, pathFormat, searchLinkTemplates, &job, "", false); err != nil {
+			return fmt.Errorf("process job: %w", err)
+		}
+		return nil
 	}
+
+	go func() {
+		for {
+			if err := jobTick(); err != nil {
+				log.Printf("error in job: %v", err)
+			}
+			time.Sleep(2 * time.Second)
+		}
+	}()
 
 	mux := muxpatterns.NewServeMux()
 	mux.Handle("GET /events", sseServ)
@@ -143,7 +148,6 @@ func main() {
 			http.Error(w, "error saving job", http.StatusInternalServerError)
 			return
 		}
-		jobQueue <- job.ID
 	})
 
 	mux.HandleFunc("POST /job/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -242,8 +246,8 @@ const (
 )
 
 type Job struct {
-	ID                   uint64 `boltholdKey:"ID"`
-	Status               JobStatus
+	ID                   uint64    `boltholdKey:"ID"`
+	Status               JobStatus `boltholdIndex:"Status"`
 	Info                 string
 	SourcePath, DestPath string
 	Score                float64

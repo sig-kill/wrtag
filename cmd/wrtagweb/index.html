@@ -21,7 +21,8 @@
   <body class="font-mono antialiased leading-none text-sm text-gray-800 flex flex-col items-start gap-3 m-0 p-3">
     <h1 class="text-lg">wrtag</h1>
     <div hx-ext="sse" sse-connect="/events?stream=jobs" sse-swap="message" hx-swap="innerHTML" class="contents">
-      {{ template "jobs.html" . }}
+      {{ if eq (len .) 0 }}<p class="text-gray-600">no jobs yet ...</p>{{ end }}
+      {{ range . }}{{ template "release.html" . }}{{ end }}
     </div>
   </body>
 </html>
