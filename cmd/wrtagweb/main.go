@@ -7,11 +7,12 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
-	"html/template"
+	htmltemplate "html/template"
 	"log"
 	"net/http"
-	"os"
+	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -19,71 +20,42 @@ import (
 	"time"
 
 	"github.com/jba/muxpatterns"
-	"github.com/peterbourgon/ff/v4"
 	"github.com/r3labs/sse/v2"
 	"github.com/timshannon/bolthold"
 	"go.senan.xyz/wrtag"
+	"go.senan.xyz/wrtag/cmd/internal/config"
 	"go.senan.xyz/wrtag/musicbrainz"
+	"go.senan.xyz/wrtag/pathformat"
+	"go.senan.xyz/wrtag/researchlink"
 	"go.senan.xyz/wrtag/tagmap"
 	"go.senan.xyz/wrtag/tags/tagcommon"
 	"go.senan.xyz/wrtag/tags/taglib"
 )
 
-//go:embed *.html *.ico
-var ui embed.FS
-var uiTempl = template.Must(
-	template.
-		New("template").
-		Funcs(wrtag.TemplateFuncMap).
-		ParseFS(ui, "*.html"),
-)
-
 func main() {
-	ffs := ff.NewFlagSet("wrtag")
-	confPathFormat := ffs.StringLong("path-format", "", "path format")
-	confListenAddr := ffs.StringLong("listen-addr", "", "listen addr")
+	confListenAddr := flag.String("listen-addr", "", "listen addr")
+	confAPIKey := flag.String("api-key", "", "api key")
+	confDBPath := flag.String("db-path", "wrtag.db", "db path")
+	config.Parse()
 
-	var confSearchLinkTemplates searchLinkTemplates
-	ffs.ValueLong("search-link", &confSearchLinkTemplates, "search link")
-
-	confAPIKey := ffs.StringLong("api-key", "", "api key")
-	confDBPath := ffs.StringLong("db-path", "wrtag.db", "db path")
-
-	userConfig, _ := os.UserConfigDir()
-	configPath := filepath.Join(userConfig, "wrtag", "config")
-	_ = ffs.StringLong("config", configPath, "config file (optional)")
-
-	ffopt := []ff.Option{
-		ff.WithEnvVarPrefix("WRTAG"),
-		ff.WithConfigFileFlag("config"),
-		ff.WithConfigFileParser(ff.PlainParser),
-	}
-	if err := ff.Parse(ffs, os.Args[1:], ffopt...); err != nil {
-		log.Fatal("parse err")
-	}
 	if *confAPIKey == "" {
 		log.Fatal("need api key")
 	}
 
-	var searchLinkTemplates []wrtag.SearchLinkTemplate
-	for _, c := range confSearchLinkTemplates {
-		templ, err := texttemplate.New("template").Funcs(wrtag.TemplateFuncMap).Parse(c.Template)
-		if err != nil {
-			log.Fatalf("error parsing search template: %v", err)
-		}
-		searchLinkTemplates = append(searchLinkTemplates, wrtag.SearchLinkTemplate{
-			Name:  c.Name,
-			Templ: templ,
-		})
-	}
-
-	pathFormat, err := wrtag.PathFormatTemplate(*confPathFormat)
+	pathFormat, err := pathformat.New(config.PathFormat)
 	if err != nil {
-		log.Fatalf("error parsing path format template: %v", err)
+		log.Fatalf("gen path format: %v", err)
 	}
 
-	tg := &taglib.TagLib{}
-	mb := musicbrainz.NewClient()
+	var tg = &taglib.TagLib{}
+	var mb = musicbrainz.NewClient()
+
+	var researchLinkQuerier = &researchlink.Querier{}
+	for _, r := range config.ResearchLinks {
+		if err := researchLinkQuerier.AddSource(r.Name, r.Template); err != nil {
+			log.Fatalf("add researchlink querier source: %v", err)
+		}
+	}
 
 	db, err := bolthold.Open(*confDBPath, 0600, nil)
 	if err != nil {
@@ -123,7 +95,7 @@ func main() {
 			_ = pushJob(&job)
 		}()
 
-		if err := processJob(context.Background(), mb, tg, pathFormat, searchLinkTemplates, &job, "", false); err != nil {
+		if err := processJob(context.Background(), mb, tg, pathFormat, researchLinkQuerier, &job, "", false); err != nil {
 			return fmt.Errorf("process job: %w", err)
 		}
 		return nil
@@ -160,7 +132,7 @@ func main() {
 			http.Error(w, "error getting job", http.StatusInternalServerError)
 			return
 		}
-		if err := processJob(r.Context(), mb, tg, pathFormat, searchLinkTemplates, &job, useMBID, confirm); err != nil {
+		if err := processJob(r.Context(), mb, tg, pathFormat, researchLinkQuerier, &job, useMBID, confirm); err != nil {
 			log.Printf("error processing job %d: %v", id, err)
 			http.Error(w, "error in job", http.StatusInternalServerError)
 			return
@@ -215,27 +187,6 @@ func main() {
 	})))
 }
 
-type searchLinkTemplates []searchLinkTemplate
-type searchLinkTemplate struct {
-	Name     string
-	Template string
-}
-
-func (sls searchLinkTemplates) String() string {
-	var names []string
-	for _, sl := range sls {
-		names = append(names, sl.Name)
-	}
-	return strings.Join(names, ", ")
-}
-
-func (sls *searchLinkTemplates) Set(value string) error {
-	name, value, _ := strings.Cut(value, " ")
-	name, value = strings.TrimSpace(name), strings.TrimSpace(value)
-	*sls = append(*sls, searchLinkTemplate{Name: name, Template: value})
-	return nil
-}
-
 type JobStatus string
 
 const (
@@ -253,19 +204,19 @@ type Job struct {
 	Score                float64
 	MBID                 string
 	Diff                 []tagmap.Diff
-	SearchLinks          []wrtag.JobSearchLink
+	ResearchLinks        []researchlink.SearchResult
 }
 
 func processJob(
 	ctx context.Context, mb *musicbrainz.Client, tg tagcommon.Reader,
-	pathFormat *texttemplate.Template, searchLinksTemplates []wrtag.SearchLinkTemplate,
+	pathFormat *texttemplate.Template, researchLinkQuerier *researchlink.Querier,
 	job *Job,
 	useMBID string, confirm bool,
 ) (err error) {
 	job.Score = 0
 	job.MBID = ""
 	job.Diff = nil
-	job.SearchLinks = nil
+	job.ResearchLinks = nil
 
 	job.Info = ""
 	defer func() {
@@ -307,13 +258,9 @@ func processJob(
 		query.MBReleaseID = useMBID
 	}
 
-	for _, v := range searchLinksTemplates {
-		var buff strings.Builder
-		if err := v.Templ.Execute(&buff, searchFile); err != nil {
-			log.Printf("error parsing search link template: %v", err)
-			continue
-		}
-		job.SearchLinks = append(job.SearchLinks, wrtag.JobSearchLink{Name: v.Name, URL: buff.String()})
+	job.ResearchLinks, err = researchLinkQuerier.Search(searchFile)
+	if err != nil {
+		return fmt.Errorf("research querier search: %w", err)
 	}
 
 	release, err := mb.SearchRelease(ctx, query)
@@ -344,11 +291,29 @@ func processJob(
 	job.SourcePath = job.DestPath
 	job.Status = StatusComplete
 
-	// if err := MoveFiles(pathFormat, release, nil); err != nil {
-	// 	return fmt.Errorf("move files: %w", err)
-	// }
+	if err := wrtag.MoveFiles(pathFormat, release, nil); err != nil {
+		return fmt.Errorf("move files: %w", err)
+	}
 
 	return nil
+}
+
+//go:embed *.html *.ico
+var ui embed.FS
+var uiTempl = htmltemplate.Must(
+	htmltemplate.
+		New("template").
+		Funcs(funcMap).
+		ParseFS(ui, "*.html"),
+)
+
+var funcMap = htmltemplate.FuncMap{
+	"now":   func() int64 { return time.Now().UnixMilli() },
+	"file":  func(p string) string { ur, _ := url.Parse("file://"); ur.Path = p; return ur.String() },
+	"url":   func(u string) htmltemplate.URL { return htmltemplate.URL(u) },
+	"query": htmltemplate.URLQueryEscaper,
+	"join":  func(delim string, items []string) string { return strings.Join(items, delim) },
+	"pad0":  func(amount, n int) string { return fmt.Sprintf("%0*d", amount, n) },
 }
 
 func first[T comparable](is []T) T {

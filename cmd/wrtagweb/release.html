@@ -5,7 +5,7 @@
     {{ template "diff.html" .Diff }}
   {{ end }}
   {{ if .Info }}<p class="text-red-500">{{ .Info }}</p>{{ end }}
-  {{ if .SearchLinks }}<p>search links <span class="inline-flex gap-2">{{ range .SearchLinks }}<a target="_blank" href="{{ .URL | url }}">{{ .Name }}</a>{{ end }}</span></p>{{ end }}
+  {{ if .ResearchLinks }}<p>research links <span class="inline-flex gap-2">{{ range .ResearchLinks }}<a target="_blank" href="{{ .URL | url }}">{{ .Name }}</a>{{ end }}</span></p>{{ end }}
   {{ if eq .Status "complete" }}
     <p>sucessfully moved to <a href="{{ .DestPath | file | url }}">{{ .DestPath }}</a> <button>[reimport]</button></p>
   {{ else if eq .Status "no-match" }}
