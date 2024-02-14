@@ -23,7 +23,7 @@ import (
 	"github.com/r3labs/sse/v2"
 	"github.com/timshannon/bolthold"
 	"go.senan.xyz/wrtag"
-	"go.senan.xyz/wrtag/cmd/internal/config"
+	"go.senan.xyz/wrtag/cmd/internal/conf"
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/pathformat"
 	"go.senan.xyz/wrtag/researchlink"
@@ -36,13 +36,13 @@ func main() {
 	confListenAddr := flag.String("listen-addr", "", "listen addr")
 	confAPIKey := flag.String("api-key", "", "api key")
 	confDBPath := flag.String("db-path", "wrtag.db", "db path")
-	config.Parse()
+	conf.Parse()
 
 	if *confAPIKey == "" {
 		log.Fatal("need api key")
 	}
 
-	pathFormat, err := pathformat.New(config.PathFormat)
+	pathFormat, err := pathformat.New(conf.PathFormat)
 	if err != nil {
 		log.Fatalf("gen path format: %v", err)
 	}
@@ -51,7 +51,7 @@ func main() {
 	var mb = musicbrainz.NewClient()
 
 	var researchLinkQuerier = &researchlink.Querier{}
-	for _, r := range config.ResearchLinks {
+	for _, r := range conf.ResearchLinks {
 		if err := researchLinkQuerier.AddSource(r.Name, r.Template); err != nil {
 			log.Fatalf("add researchlink querier source: %v", err)
 		}
@@ -128,16 +128,15 @@ func main() {
 		useMBID := filepath.Base(r.FormValue("mbid"))
 
 		var job Job
-		if err := db.Get(id, &job); err != nil {
+		if err := db.Get(uint64(id), &job); err != nil {
 			http.Error(w, "error getting job", http.StatusInternalServerError)
 			return
 		}
 		if err := processJob(r.Context(), mb, tg, pathFormat, researchLinkQuerier, &job, useMBID, confirm); err != nil {
-			log.Printf("error processing job %d: %v", id, err)
 			http.Error(w, "error in job", http.StatusInternalServerError)
 			return
 		}
-		if err := db.Update(id, &job); err != nil {
+		if err := db.Update(uint64(id), &job); err != nil {
 			http.Error(w, "save job", http.StatusInternalServerError)
 			return
 		}
@@ -308,12 +307,11 @@ var uiTempl = htmltemplate.Must(
 )
 
 var funcMap = htmltemplate.FuncMap{
-	"now":   func() int64 { return time.Now().UnixMilli() },
-	"file":  func(p string) string { ur, _ := url.Parse("file://"); ur.Path = p; return ur.String() },
-	"url":   func(u string) htmltemplate.URL { return htmltemplate.URL(u) },
-	"query": htmltemplate.URLQueryEscaper,
-	"join":  func(delim string, items []string) string { return strings.Join(items, delim) },
-	"pad0":  func(amount, n int) string { return fmt.Sprintf("%0*d", amount, n) },
+	"now":  func() int64 { return time.Now().UnixMilli() },
+	"file": func(p string) string { ur, _ := url.Parse("file://"); ur.Path = p; return ur.String() },
+	"url":  func(u string) htmltemplate.URL { return htmltemplate.URL(u) },
+	"join": func(delim string, items []string) string { return strings.Join(items, delim) },
+	"pad0": func(amount, n int) string { return fmt.Sprintf("%0*d", amount, n) },
 }
 
 func first[T comparable](is []T) T {

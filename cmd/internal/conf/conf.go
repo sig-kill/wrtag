@@ -1,4 +1,4 @@
-package config
+package conf
 
 import (
 	"flag"
@@ -18,7 +18,7 @@ var (
 )
 
 func Parse() {
-	flag.String("config", configPath, "path config file")
+	flag.String("config-path", configPath, "path config file")
 	flag.StringVar(&PathFormat, "path-format", "", "path format")
 	flag.Var(&ResearchLinks, "research-link", "research link")
 

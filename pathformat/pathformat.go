@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 	texttemplate "text/template"
-	"time"
 
 	"go.senan.xyz/wrtag/musicbrainz"
 )
@@ -19,14 +18,7 @@ type Data struct {
 func New(pfStr string) (*texttemplate.Template, error) {
 	return texttemplate.
 		New("template").
-		Funcs(texttemplate.FuncMap{
-			"title": func(ar []musicbrainz.ArtistCredit) []string {
-				return mapp(ar, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.Name })
-			},
-			"join": func(delim string, items []string) string { return strings.Join(items, delim) },
-			"year": func(t time.Time) string { return fmt.Sprintf("%d", t.Year()) },
-			"pad0": func(amount, n int) string { return fmt.Sprintf("%0*d", amount, n) },
-		}).
+		Funcs(funcMap).
 		Parse(pfStr)
 }
 

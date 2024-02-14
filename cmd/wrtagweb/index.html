@@ -10,15 +10,14 @@
       @layer base {
         a { @apply font-normal text-blue-600; }
         button { @apply font-normal text-blue-700; }
-        input { @apply h-3.5 outline outline-1 outline-gray-200 rounded-sm; }
+        input { @apply h-3.5 outline outline-1 outline-gray-100 rounded-sm; }
       }
-
       @layer utilities {
         .htmx-request { @apply pointer-events-none opacity-50; }
       }
     </style>
   </head>
-  <body class="font-mono antialiased leading-none text-sm text-gray-800 flex flex-col items-start gap-3 m-0 p-3">
+  <body class="font-mono antialiased leading-tight text-sm text-gray-800 flex flex-col items-start gap-3 m-0 p-3">
     <h1 class="text-lg">wrtag</h1>
     <div hx-ext="sse" sse-connect="/events?stream=jobs" sse-swap="message" hx-swap="innerHTML" class="contents">
       {{ if eq (len .) 0 }}<p class="text-gray-600">no jobs yet ...</p>{{ end }}

@@ -1,14 +1,14 @@
 package main
 
 import (
-	"go.senan.xyz/wrtag/cmd/internal/config"
+	"go.senan.xyz/wrtag/cmd/internal/conf"
 
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/tags/taglib"
 )
 
 func main() {
-	config.Parse()
+	conf.Parse()
 
 	mb := musicbrainz.NewClient()
 	tg := taglib.TagLib{}
