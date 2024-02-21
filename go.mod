@@ -9,7 +9,7 @@ require (
 	github.com/sentriz/audiotags v0.0.0-20240202193907-618ae39d7743
 	github.com/sergi/go-diff v1.3.1
 	github.com/timshannon/bolthold v0.0.0-20231129192944-dca5178aa629
-	go.senan.xyz/flagconf v0.0.0-20240221161927-6640ce2e42fd
+	go.senan.xyz/flagconf v0.0.0-20240221164201-61bd2478e9ea
 	golang.org/x/time v0.5.0
 )
 
