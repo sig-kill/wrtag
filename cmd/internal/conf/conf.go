@@ -2,12 +2,11 @@ package conf
 
 import (
 	"flag"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/peterbourgon/ff"
+	"go.senan.xyz/flagconf"
 )
 
 const name = "wrtag"
@@ -18,23 +17,20 @@ var (
 )
 
 func Parse() {
-	flag.String("config-path", configPath, "path config file")
+	flag.CommandLine.Init("wrtag", flag.ExitOnError)
 	flag.StringVar(&PathFormat, "path-format", "", "path format")
 	flag.Var(&ResearchLinks, "research-link", "research link")
 
-	if err := ff.Parse(flag.CommandLine, os.Args[1:],
-		ff.WithAllowMissingConfigFile(true),
-		ff.WithEnvVarPrefix(strings.ToUpper(name)),
-		ff.WithConfigFileFlag("config-path"),
-		ff.WithConfigFileParser(ff.PlainParser),
-	); err != nil {
-		log.Fatalf("error parsing args: %v\n", err)
-	}
+	configPath := flag.String("config-path", defaultConfigPath, "path config file")
+
+	flag.Parse()
+	flagconf.ParseEnv()
+	flagconf.ParseConfig(*configPath)
 }
 
 var (
-	userConfig, _ = os.UserConfigDir()
-	configPath    = filepath.Join(userConfig, name, "config")
+	userConfig, _     = os.UserConfigDir()
+	defaultConfigPath = filepath.Join(userConfig, name, "config")
 )
 
 type ResearchLinkConf []ResearchLinkTemplate
