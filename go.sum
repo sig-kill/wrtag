@@ -35,8 +35,8 @@ github.com/timshannon/bolthold v0.0.0-20231129192944-dca5178aa629/go.mod h1:PCFY
 go.etcd.io/bbolt v1.3.8 h1:xs88BrvEv273UsB79e0hcVrlUWmS0a8upikMFhSyAtA=
 go.etcd.io/bbolt v1.3.8/go.mod h1:N9Mkw9X8x5fupy0IKsmuqVtoGDyxsaDlbk4Rd05IAQw=
 go.etcd.io/gofail v0.1.0/go.mod h1:VZBCXYGZhHAinaBiiqYvuDynvahNsAyLFwB3kEHKz1M=
-go.senan.xyz/flagconf v0.0.0-20240221161927-6640ce2e42fd h1:kS0FsCtqcVeTcUE8qSzM11qheuZYGX1kImHLuBIa0IE=
-go.senan.xyz/flagconf v0.0.0-20240221161927-6640ce2e42fd/go.mod h1:B285qDMTH54V1G1OApPj0JhnQGpJXuFsN7XEFHGMQ1U=
+go.senan.xyz/flagconf v0.0.0-20240221164201-61bd2478e9ea h1:IG0Gx50pwAnbbpEke01cFNOx/pyRB0NszaAzmWNrRT0=
+go.senan.xyz/flagconf v0.0.0-20240221164201-61bd2478e9ea/go.mod h1:B285qDMTH54V1G1OApPj0JhnQGpJXuFsN7XEFHGMQ1U=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/exp v0.0.0-20240213143201-ec583247a57a h1:HinSgX1tJRX3KsL//Gxynpw5CTOAIPhgL4W8PNiIpVE=
 golang.org/x/exp v0.0.0-20240213143201-ec583247a57a/go.mod h1:CxmFvTBINI24O/j8iY7H1xHzx2i4OsyguNBmN/uPtqc=
