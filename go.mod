@@ -9,13 +9,13 @@ require (
 	github.com/sentriz/audiotags v0.0.0-20240202193907-618ae39d7743
 	github.com/sergi/go-diff v1.3.1
 	github.com/timshannon/bolthold v0.0.0-20231129192944-dca5178aa629
-	go.senan.xyz/flagconf v0.0.0-20240221164201-61bd2478e9ea
+	go.senan.xyz/flagconf v0.1.0
 	golang.org/x/time v0.5.0
 )
 
 require (
 	go.etcd.io/bbolt v1.3.8 // indirect
-	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a // indirect
+	golang.org/x/exp v0.0.0-20240222230149-e579c86f598f // indirect
 	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/sys v0.17.0 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
