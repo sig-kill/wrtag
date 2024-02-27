@@ -23,5 +23,11 @@
       {{ if eq (len .) 0 }}<p class="text-gray-600">no jobs yet ...</p>{{ end }}
       {{ range . }}{{ template "release.html" . }}{{ end }}
     </div>
+    {{ block "error" . }}
+    // why no work error?
+      <div id="errors" hx-swap-oob="true" class="fixed bottom-2 right-2">
+        hello {{ . }}
+      </div>
+    {{ end }}
   </body>
 </html>
