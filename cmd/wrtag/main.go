@@ -36,11 +36,22 @@ func main() {
 		log.Fatalf("gen path format: %v", err)
 	}
 
-	if flag.NArg() != 1 {
-		log.Fatalf("need a path")
+	var op wrtag.Operation
+	switch command := flag.Arg(0); command {
+	case "move":
+		op = wrtag.Move
+	case "copy":
+		op = wrtag.Copy
+	default:
+		log.Fatalf("unknown command %q", command)
 	}
 
-	if err := processJob(context.Background(), mb, tg, pathFormat, flag.Arg(0), *yes); err != nil {
+	dir := flag.Arg(1)
+	if dir == "" {
+		log.Fatalf("need a dir")
+	}
+
+	if err := processJob(context.Background(), mb, tg, pathFormat, op, dir, *yes); err != nil {
 		log.Fatalf("error processing dir: %v", err)
 	}
 }
@@ -52,7 +63,7 @@ type musicbrainzClient interface {
 func processJob(
 	ctx context.Context, mb musicbrainzClient, tg tagcommon.Reader,
 	pathFormat *texttemplate.Template,
-	dir string,
+	op wrtag.Operation, dir string,
 	yes bool,
 ) (err error) {
 	cover, paths, tagFiles, err := wrtag.ReadDir(tg, dir)
@@ -109,7 +120,7 @@ func processJob(
 		return err
 	}
 
-	if err := wrtag.MoveFiles(pathFormat, release, paths, cover); err != nil {
+	if err := wrtag.MoveFiles(pathFormat, release, op, paths, cover); err != nil {
 		return fmt.Errorf("move files: %w", err)
 	}
 	return nil

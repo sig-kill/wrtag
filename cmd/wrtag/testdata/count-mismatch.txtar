@@ -2,7 +2,7 @@ exec gen-files */*.flac
 
 env WRTAG_PATH_FORMAT=/
 
-! exec wrtag example
+! exec wrtag move example
 
 -- example/01.flac --
 WriteAlbum       "kat moda ep"

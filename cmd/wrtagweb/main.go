@@ -19,7 +19,6 @@ import (
 	texttemplate "text/template"
 	"time"
 
-	"github.com/jba/muxpatterns"
 	"github.com/r3labs/sse/v2"
 	"github.com/timshannon/bolthold"
 	"go.senan.xyz/wrtag"
@@ -118,12 +117,26 @@ func main() {
 		}
 	}
 
-	mux := muxpatterns.NewServeMux()
+	mux := http.NewServeMux()
 	mux.Handle("GET /events", sseServ)
 
-	mux.HandleFunc("POST /copy", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /op/{operation}", func(w http.ResponseWriter, r *http.Request) {
+		var operation Operation
+		switch op := r.PathValue("operation"); op {
+		case "copy":
+			operation = OperationCopy
+		case "move":
+			operation = OperationMove
+		default:
+			respErr(w, http.StatusInternalServerError, "invalid operation %q", op)
+			return
+		}
 		path := r.FormValue("path")
-		job := Job{SourcePath: path}
+		if path == "" {
+			respErr(w, http.StatusInternalServerError, "no path provided")
+			return
+		}
+		job := Job{SourcePath: path, Operation: operation}
 		if err := db.Insert(bolthold.NextSequence(), &job); err != nil {
 			respErr(w, http.StatusInternalServerError, "error saving job")
 			return
@@ -200,9 +213,28 @@ const (
 	StatusError      JobStatus = "error"
 )
 
+type Operation uint
+
+const (
+	OperationCopy Operation = iota
+	OperationMove
+)
+
+func wrtagOperation(op Operation) wrtag.Operation {
+	switch op {
+	case OperationCopy:
+		return wrtag.Copy
+	case OperationMove:
+		return wrtag.Move
+	default:
+		panic(fmt.Errorf("unknown operation: %q", op))
+	}
+}
+
 type Job struct {
 	ID                   uint64    `boltholdKey:"ID"`
 	Status               JobStatus `boltholdIndex:"Status"`
+	Operation            Operation
 	Info                 string
 	SourcePath, DestPath string
 	Score                float64
@@ -295,7 +327,7 @@ func processJob(
 	job.SourcePath = job.DestPath
 	job.Status = StatusComplete
 
-	if err := wrtag.MoveFiles(pathFormat, release, paths, cover); err != nil {
+	if err := wrtag.MoveFiles(pathFormat, release, wrtagOperation(job.Operation), paths, cover); err != nil {
 		return fmt.Errorf("move files: %w", err)
 	}
 
