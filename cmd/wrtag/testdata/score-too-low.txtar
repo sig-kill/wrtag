@@ -1,5 +1,7 @@
 exec gen-files */*.flac
 
+env WRTAG_PATH_FORMAT=/
+
 ! exec wrtag example
 stderr 'score too low'
 

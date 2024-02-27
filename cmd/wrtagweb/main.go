@@ -230,7 +230,7 @@ func processJob(
 		}
 	}()
 
-	tagFiles, err := wrtag.ReadDir(tg, job.SourcePath)
+	paths, tagFiles, err := wrtag.ReadDir(tg, job.SourcePath)
 	if err != nil {
 		return fmt.Errorf("read dir %q: %w", job.SourcePath, err)
 	}
@@ -295,7 +295,7 @@ func processJob(
 	job.SourcePath = job.DestPath
 	job.Status = StatusComplete
 
-	if err := wrtag.MoveFiles(pathFormat, release, nil); err != nil {
+	if err := wrtag.MoveFiles(pathFormat, release, job.SourcePath, paths); err != nil {
 		return fmt.Errorf("move files: %w", err)
 	}
 

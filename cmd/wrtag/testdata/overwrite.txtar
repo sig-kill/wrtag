@@ -1,9 +1,18 @@
 exec gen-files */*.flac
 
-! exec wrtag kat_moda
+env WRTAG_PATH_FORMAT='albums/{{ artistNames .Release.Artists | join "; " }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title }}/{{ pad0 2 .TrackNum }}.{{ flatTracks .Release.Media | len | pad0 2 }} {{ .Track.Title }}{{ .Ext }}"'
+
+# we exit if score too low
+! exec wrtag kat_moda/
+stderr 'matched \d\d.\d\d% with'
 stderr 'score too low'
 
-exec wrtag -yes kat_moda
+# but can overwrite with -yes
+exec wrtag -yes kat_moda/
+
+# make sure dest dir looks ok according to format
+exec find albums/
+cmp stdout exp
 
 -- kat_moda/01.flac --
 WriteMBReleaseID  "e47d04a4-7460-427d-a731-cc82386d85f1"
@@ -19,3 +28,11 @@ WriteTitle       "the bells"
 
 -- kat_moda/03.flac --
 WriteTitle       "the bells fesitival mix"
+
+-- exp --
+albums/
+albums/Jeff Mills
+albums/Jeff Mills/(1997) Kat Moda
+albums/Jeff Mills/(1997) Kat Moda/01.03 Alarms.flac"
+albums/Jeff Mills/(1997) Kat Moda/02.03 The Bells.flac"
+albums/Jeff Mills/(1997) Kat Moda/03.03 The Bells (Festival mix).flac"

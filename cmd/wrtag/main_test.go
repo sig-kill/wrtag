@@ -9,10 +9,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -34,6 +36,7 @@ func TestMain(m *testing.M) {
 	os.Exit(testscript.RunMain(m, map[string]func() int{
 		"wrtag":     func() int { main(); return 0 },
 		"gen-files": func() int { mainGenAudioFiles(); return 0 },
+		"find":      func() int { mainFind(); return 0 },
 	}))
 }
 
@@ -116,6 +119,20 @@ func genAudioFile(tg tagcommon.Reader, path string) error {
 	}
 
 	return errors.Join(jsonErrors...)
+}
+
+func mainFind() {
+	flag.Parse()
+
+	paths := flag.Args()
+	sort.Strings(paths)
+
+	for _, p := range paths {
+		filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error {
+			fmt.Println(path)
+			return nil
+		})
+	}
 }
 
 func mustDecode[T any](data []byte) *T {
