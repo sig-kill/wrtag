@@ -230,7 +230,7 @@ func processJob(
 		}
 	}()
 
-	paths, tagFiles, err := wrtag.ReadDir(tg, job.SourcePath)
+	cover, paths, tagFiles, err := wrtag.ReadDir(tg, job.SourcePath)
 	if err != nil {
 		return fmt.Errorf("read dir %q: %w", job.SourcePath, err)
 	}
@@ -275,7 +275,7 @@ func processJob(
 	job.MBID = release.ID
 	job.Score, job.Diff = tagmap.DiffRelease(release, tagFiles)
 
-	job.DestPath, err = wrtag.DestDir(pathFormat, *release)
+	job.DestPath, err = wrtag.DestDir(pathFormat, release)
 	if err != nil {
 		return fmt.Errorf("gen dest dir: %w", err)
 	}
@@ -295,7 +295,7 @@ func processJob(
 	job.SourcePath = job.DestPath
 	job.Status = StatusComplete
 
-	if err := wrtag.MoveFiles(pathFormat, release, job.SourcePath, paths); err != nil {
+	if err := wrtag.MoveFiles(pathFormat, release, paths, cover); err != nil {
 		return fmt.Errorf("move files: %w", err)
 	}
 

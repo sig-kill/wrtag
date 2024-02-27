@@ -18,35 +18,42 @@ var (
 	ErrTrackCountMismatch = errors.New("track count mismatch")
 )
 
-func ReadDir(tg tagcommon.Reader, path string) ([]string, []tagcommon.File, error) {
+func ReadDir(tg tagcommon.Reader, path string) (string, []string, []tagcommon.File, error) {
 	allPaths, err := filepath.Glob(filepath.Join(path, "*"))
 	if err != nil {
-		return nil, nil, fmt.Errorf("glob dir: %w", err)
+		return "", nil, nil, fmt.Errorf("glob dir: %w", err)
 	}
 	sort.Strings(allPaths)
 
+	var cover string
 	var paths []string
 	var files []tagcommon.File
 	for _, path := range allPaths {
+		switch filepath.Ext(path) {
+		case ".jpg", ".jpeg", ".png", "bmp", "gif":
+			cover = path
+			continue
+		}
+
 		if tg.CanRead(path) {
 			file, err := tg.Read(path)
 			if err != nil {
-				return nil, nil, fmt.Errorf("read track: %w", err)
+				return "", nil, nil, fmt.Errorf("read track: %w", err)
 			}
 			paths = append(paths, path)
 			files = append(files, file)
 		}
 	}
 	if len(files) == 0 {
-		return nil, nil, fmt.Errorf("no tracks in dir")
+		return "", nil, nil, fmt.Errorf("no tracks in dir")
 	}
 
-	return paths, files, nil
+	return cover, paths, files, nil
 }
 
-func DestDir(pathFormat *texttemplate.Template, release musicbrainz.Release) (string, error) {
+func DestDir(pathFormat *texttemplate.Template, release *musicbrainz.Release) (string, error) {
 	var buff strings.Builder
-	if err := pathFormat.Execute(&buff, pathformat.Data{Release: release}); err != nil {
+	if err := pathFormat.Execute(&buff, pathformat.Data{Release: *release}); err != nil {
 		return "", fmt.Errorf("create path: %w", err)
 	}
 	path := buff.String()
@@ -54,7 +61,7 @@ func DestDir(pathFormat *texttemplate.Template, release musicbrainz.Release) (st
 	return dir, nil
 }
 
-func MoveFiles(pathFormat *texttemplate.Template, release *musicbrainz.Release, dir string, paths []string) error {
+func MoveFiles(pathFormat *texttemplate.Template, release *musicbrainz.Release, paths []string, cover string) error {
 	releaseTracks := musicbrainz.FlatTracks(release.Media)
 	if len(releaseTracks) != len(paths) {
 		return fmt.Errorf("%d/%d: %w", len(releaseTracks), len(paths), ErrTrackCountMismatch)
@@ -77,5 +84,18 @@ func MoveFiles(pathFormat *texttemplate.Template, release *musicbrainz.Release, 
 			return fmt.Errorf("move file to dest: %w", err)
 		}
 	}
+
+	if cover != "" {
+		destDir, err := DestDir(pathFormat, release)
+		if err != nil {
+			return fmt.Errorf("gen dest dir: %w", err)
+		}
+		coverDest := filepath.Join(destDir, "cover"+filepath.Ext(cover))
+
+		if err := os.Rename(cover, coverDest); err != nil {
+			return fmt.Errorf("move file to dest: %w", err)
+		}
+	}
+
 	return nil
 }

@@ -1,6 +1,6 @@
 exec gen-files */*.flac
 
-env WRTAG_PATH_FORMAT='albums/{{ artistNames .Release.Artists | join "; " }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title }}/{{ pad0 2 .TrackNum }}.{{ flatTracks .Release.Media | len | pad0 2 }} {{ .Track.Title }}{{ .Ext }}"'
+env WRTAG_PATH_FORMAT='albums/{{ artistNames .Release.Artists | join "; " }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title }}/{{ pad0 2 .TrackNum }}.{{ flatTracks .Release.Media | len | pad0 2 }} {{ .Track.Title }}{{ .Ext }}'
 
 # we exit if score too low
 ! exec wrtag kat_moda/
@@ -29,10 +29,13 @@ WriteTitle       "the bells"
 -- kat_moda/03.flac --
 WriteTitle       "the bells fesitival mix"
 
+-- kat_moda/Folder!.png --
+
 -- exp --
 albums/
 albums/Jeff Mills
 albums/Jeff Mills/(1997) Kat Moda
-albums/Jeff Mills/(1997) Kat Moda/01.03 Alarms.flac"
-albums/Jeff Mills/(1997) Kat Moda/02.03 The Bells.flac"
-albums/Jeff Mills/(1997) Kat Moda/03.03 The Bells (Festival mix).flac"
+albums/Jeff Mills/(1997) Kat Moda/01.03 Alarms.flac
+albums/Jeff Mills/(1997) Kat Moda/02.03 The Bells.flac
+albums/Jeff Mills/(1997) Kat Moda/03.03 The Bells (Festival mix).flac
+albums/Jeff Mills/(1997) Kat Moda/cover.png
