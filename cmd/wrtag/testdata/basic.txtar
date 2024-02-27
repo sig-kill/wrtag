@@ -14,6 +14,9 @@ exec wrtag -yes move kat_moda/
 exec find albums/
 cmp stdout exp
 
+# since we did a move, see if src folder was cleaned up
+! exists kat_moda
+
 -- kat_moda/01.flac --
 WriteMBReleaseID  "e47d04a4-7460-427d-a731-cc82386d85f1"
 WriteAlbum        "kat moda ep"
