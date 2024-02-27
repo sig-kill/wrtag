@@ -26,6 +26,15 @@ var dmp = diffmatchpatch.New()
 var mb musicbrainzClient = musicbrainz.NewClient()
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "usage:\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "  $ %s [options] <copy|move>\n", flag.CommandLine.Name())
+		fmt.Fprintf(flag.CommandLine.Output(), "options:\n")
+		flag.VisitAll(func(f *flag.Flag) {
+			fmt.Fprintf(flag.CommandLine.Output(), "  -%s (%s)\n", f.Name, f.Usage)
+		})
+	}
+
 	yes := flag.Bool("yes", false, "use the found release anyway despite a low score")
 	conf.Parse()
 
