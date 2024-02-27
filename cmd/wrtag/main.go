@@ -28,7 +28,7 @@ var mb musicbrainzClient = musicbrainz.NewClient()
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "usage:\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  $ %s [options] <copy|move>\n", flag.CommandLine.Name())
+		fmt.Fprintf(flag.CommandLine.Output(), "  $ %s [options] <copy|move|dry-run>\n", flag.CommandLine.Name())
 		fmt.Fprintf(flag.CommandLine.Output(), "options:\n")
 		flag.VisitAll(func(f *flag.Flag) {
 			fmt.Fprintf(flag.CommandLine.Output(), "  -%s (%s)\n", f.Name, f.Usage)
@@ -48,9 +48,11 @@ func main() {
 	var op wrtag.Operation
 	switch command := flag.Arg(0); command {
 	case "move":
-		op = wrtag.Move
+		op = wrtag.Move{}
 	case "copy":
-		op = wrtag.Copy
+		op = wrtag.Copy{}
+	case "dry-run":
+		op = wrtag.DryRun{}
 	default:
 		log.Fatalf("unknown command %q", command)
 	}
@@ -129,7 +131,7 @@ func processJob(
 		return err
 	}
 
-	if err := wrtag.MoveFiles(pathFormat, release, op, paths, cover); err != nil {
+	if err := wrtag.MoveFiles(pathFormat, release, op, dir, paths, cover); err != nil {
 		return fmt.Errorf("move files: %w", err)
 	}
 	return nil
