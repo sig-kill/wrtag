@@ -3,12 +3,12 @@ exec gen-files */*.flac
 env WRTAG_PATH_FORMAT='albums/{{ artistNames .Release.Artists | join "; " }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title }}/{{ pad0 2 .TrackNum }}.{{ flatTracks .Release.Media | len | pad0 2 }} {{ .Track.Title }}{{ .Ext }}'
 
 # we exit if score too low
-! exec wrtag kat_moda/
+! exec wrtag move kat_moda/
 stderr 'matched \d\d.\d\d% with'
 stderr 'score too low'
 
 # but can overwrite with -yes
-exec wrtag -yes kat_moda/
+exec wrtag -yes move kat_moda/
 
 # make sure dest dir looks ok according to format
 exec find albums/

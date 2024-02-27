@@ -3,6 +3,7 @@ package wrtag
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -17,6 +18,37 @@ import (
 var (
 	ErrTrackCountMismatch = errors.New("track count mismatch")
 )
+
+type Operation func(src, dest string) error
+
+func Move(src, dest string) error {
+	if err := os.Rename(src, dest); err != nil {
+		return fmt.Errorf("rename: %w", err)
+	}
+	return nil
+}
+
+func Copy(src, dest string) error {
+	srcf, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("open src: %w", err)
+	}
+	defer srcf.Close()
+
+	destf, err := os.Create(dest)
+	if err != nil {
+		return fmt.Errorf("open dest: %w", err)
+	}
+	defer destf.Close()
+
+	if _, err := io.Copy(destf, srcf); err != nil {
+		return fmt.Errorf("do copy: %w", err)
+	}
+	return err
+}
+
+var _ Operation = Move
+var _ Operation = Copy
 
 func ReadDir(tg tagcommon.Reader, path string) (string, []string, []tagcommon.File, error) {
 	allPaths, err := filepath.Glob(filepath.Join(path, "*"))
@@ -61,7 +93,7 @@ func DestDir(pathFormat *texttemplate.Template, release *musicbrainz.Release) (s
 	return dir, nil
 }
 
-func MoveFiles(pathFormat *texttemplate.Template, release *musicbrainz.Release, paths []string, cover string) error {
+func MoveFiles(pathFormat *texttemplate.Template, release *musicbrainz.Release, op Operation, paths []string, cover string) error {
 	releaseTracks := musicbrainz.FlatTracks(release.Media)
 	if len(releaseTracks) != len(paths) {
 		return fmt.Errorf("%d/%d: %w", len(releaseTracks), len(paths), ErrTrackCountMismatch)
@@ -80,8 +112,8 @@ func MoveFiles(pathFormat *texttemplate.Template, release *musicbrainz.Release, 
 		if err := os.MkdirAll(filepath.Dir(destPath), os.ModePerm); err != nil {
 			return fmt.Errorf("create dest path: %w", err)
 		}
-		if err := os.Rename(path, destPath); err != nil {
-			return fmt.Errorf("move file to dest: %w", err)
+		if err := op(path, destPath); err != nil {
+			return fmt.Errorf("op to dest %q: %w", destPath, err)
 		}
 	}
 
@@ -92,7 +124,7 @@ func MoveFiles(pathFormat *texttemplate.Template, release *musicbrainz.Release, 
 		}
 		coverDest := filepath.Join(destDir, "cover"+filepath.Ext(cover))
 
-		if err := os.Rename(cover, coverDest); err != nil {
+		if err := op(cover, coverDest); err != nil {
 			return fmt.Errorf("move file to dest: %w", err)
 		}
 	}
