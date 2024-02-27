@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sergi/go-diff/diffmatchpatch"
+	dmp "github.com/sergi/go-diff/diffmatchpatch"
 
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/tags/tagcommon"
@@ -14,20 +14,23 @@ import (
 
 type Diff struct {
 	Field         string
-	Before, After string
-	Changes       []diffmatchpatch.Diff
+	Before, After []dmp.Diff
 }
 
 func DiffRelease(release *musicbrainz.Release, files []tagcommon.File) (float64, []Diff) {
-	dmp := diffmatchpatch.New()
+	dm := dmp.New()
 
 	var charsTotal int
 	var charsDiff int
 	add := func(f, a, b string) Diff {
-		diffs := dmp.DiffMain(a, b, false)
+		diffs := dm.DiffMain(a, b, false)
 		charsTotal += len([]rune(b))
-		charsDiff += dmp.DiffLevenshtein(diffs)
-		return Diff{Field: f, Changes: diffs, Before: a, After: b}
+		charsDiff += dm.DiffLevenshtein(diffs)
+		return Diff{
+			Field:  f,
+			Before: filterDiff(diffs, func(d dmp.Diff) bool { return d.Type <= dmp.DiffEqual }),
+			After:  filterDiff(diffs, func(d dmp.Diff) bool { return d.Type >= dmp.DiffEqual }),
+		}
 	}
 
 	if len(files) == 0 {
@@ -122,4 +125,14 @@ func mapp[F, T any](s []F, f func(int, F) T) []T {
 		res[i] = f(i, v)
 	}
 	return res
+}
+
+func filterDiff(diffs []dmp.Diff, f func(dmp.Diff) bool) []dmp.Diff {
+	var r []dmp.Diff
+	for _, diff := range diffs {
+		if f(diff) {
+			r = append(r, diff)
+		}
+	}
+	return r
 }

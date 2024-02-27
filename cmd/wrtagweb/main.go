@@ -110,6 +110,14 @@ func main() {
 		}
 	}()
 
+	respErr := func(w http.ResponseWriter, code int, f string, a ...any) {
+		w.WriteHeader(code)
+		if err := uiTempl.ExecuteTemplate(w, "error", fmt.Sprintf(f, a...)); err != nil {
+			log.Printf("err in template: %v", err)
+			return
+		}
+	}
+
 	mux := muxpatterns.NewServeMux()
 	mux.Handle("GET /events", sseServ)
 
@@ -117,33 +125,30 @@ func main() {
 		path := r.FormValue("path")
 		job := Job{SourcePath: path}
 		if err := db.Insert(bolthold.NextSequence(), &job); err != nil {
-			http.Error(w, "error saving job", http.StatusInternalServerError)
+			respErr(w, http.StatusInternalServerError, "error saving job")
 			return
 		}
 	})
 
 	mux.HandleFunc("POST /job/{id}", func(w http.ResponseWriter, r *http.Request) {
-		id, _ := strconv.Atoi(muxpatterns.PathValue(r, "id"))
+		id, _ := strconv.Atoi(r.PathValue("id"))
 		confirm, _ := strconv.ParseBool(r.FormValue("confirm"))
 		useMBID := filepath.Base(r.FormValue("mbid"))
 
 		var job Job
 		if err := db.Get(uint64(id), &job); err != nil {
-			http.Error(w, "error getting job", http.StatusInternalServerError)
+			respErr(w, http.StatusInternalServerError, "error getting job")
 			return
 		}
 		if err := processJob(r.Context(), mb, tg, pathFormat, researchLinkQuerier, &job, useMBID, confirm); err != nil {
-			http.Error(w, "error in job", http.StatusInternalServerError)
+			respErr(w, http.StatusInternalServerError, "error in job")
 			return
 		}
 		if err := db.Update(uint64(id), &job); err != nil {
-			http.Error(w, "save job", http.StatusInternalServerError)
+			respErr(w, http.StatusInternalServerError, "save job")
 			return
 		}
-		if err := uiTempl.ExecuteTemplate(w, "release.html", struct {
-			*Job
-			UseMBID string
-		}{&job, useMBID}); err != nil {
+		if err := uiTempl.ExecuteTemplate(w, "release.html", job); err != nil {
 			log.Printf("err in template: %v", err)
 			return
 		}
@@ -152,11 +157,11 @@ func main() {
 	mux.HandleFunc("GET /dump", func(w http.ResponseWriter, r *http.Request) {
 		var jobs []*Job
 		if err := db.Find(&jobs, nil); err != nil {
-			http.Error(w, fmt.Sprintf("error listing jobs: %v", err), http.StatusInternalServerError)
+			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
 			return
 		}
 		if err := json.NewEncoder(w).Encode(jobs); err != nil {
-			http.Error(w, "error encoding jobs", http.StatusInternalServerError)
+			respErr(w, http.StatusInternalServerError, "error encoding jobs")
 			return
 		}
 	})
@@ -164,7 +169,7 @@ func main() {
 	mux.HandleFunc("/{$}", func(w http.ResponseWriter, r *http.Request) {
 		var jobs []*Job
 		if err := db.Find(&jobs, nil); err != nil {
-			http.Error(w, fmt.Sprintf("error listing jobs: %v", err), http.StatusInternalServerError)
+			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
 			return
 		}
 		if err := uiTempl.ExecuteTemplate(w, "index.html", jobs); err != nil {
@@ -179,7 +184,7 @@ func main() {
 	log.Panicln(http.ListenAndServe(*confListenAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("WWW-Authenticate", "Basic")
 		if _, key, _ := r.BasicAuth(); subtle.ConstantTimeCompare([]byte(key), []byte(*confAPIKey)) != 1 {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			http.Error(w, "unauthorised", http.StatusUnauthorized)
 			return
 		}
 		mux.ServeHTTP(w, r)

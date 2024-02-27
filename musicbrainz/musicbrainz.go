@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -50,8 +49,6 @@ func (c *Client) request(ctx context.Context, r *http.Request, dest any) error {
 }
 
 func (c *Client) GetRelease(ctx context.Context, mbid string) (*Release, error) {
-	fmt.Printf("get release by id %q\n", mbid)
-
 	urlV := url.Values{}
 	urlV.Set("fmt", "json")
 	urlV.Set("inc", "recordings+artist-credits+labels+release-groups")
@@ -126,7 +123,6 @@ func (c *Client) SearchRelease(ctx context.Context, q ReleaseQuery) (*Release, e
 	}
 
 	queryStr := strings.Join(params, " ")
-	log.Printf("sending query %s", queryStr)
 
 	urlV := url.Values{}
 	urlV.Set("fmt", "json")
@@ -287,10 +283,13 @@ func (at *AnyTime) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &str); err != nil {
 		return err
 	}
+	if str == "" {
+		return nil
+	}
 	var err error
 	at.Time, err = dateparse.ParseAny(str)
 	if err != nil {
-		return err
+		return fmt.Errorf("parse any: %w", err)
 	}
 	return nil
 }
