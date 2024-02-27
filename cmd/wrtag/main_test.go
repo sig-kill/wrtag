@@ -91,7 +91,9 @@ func genAudioFile(tg tagcommon.Reader, path string) error {
 	if err != nil {
 		return fmt.Errorf("open and trunc file: %w", err)
 	}
-	emptyFile.Write(emptyFlac)
+	if _, err := emptyFile.Write(emptyFlac); err != nil {
+		return fmt.Errorf("write empty file: %w", err)
+	}
 	emptyFile.Close()
 
 	f, err := tg.Read(path)
@@ -128,7 +130,7 @@ func mainFind() {
 	sort.Strings(paths)
 
 	for _, p := range paths {
-		filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error {
+		_ = filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error {
 			fmt.Println(path)
 			return nil
 		})

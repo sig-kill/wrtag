@@ -223,9 +223,9 @@ const (
 func wrtagOperation(op Operation) wrtag.Operation {
 	switch op {
 	case OperationCopy:
-		return wrtag.Copy
+		return wrtag.Copy{}
 	case OperationMove:
-		return wrtag.Move
+		return wrtag.Move{}
 	default:
 		panic(fmt.Errorf("unknown operation: %q", op))
 	}
@@ -327,7 +327,7 @@ func processJob(
 	job.SourcePath = job.DestPath
 	job.Status = StatusComplete
 
-	if err := wrtag.MoveFiles(pathFormat, release, wrtagOperation(job.Operation), paths, cover); err != nil {
+	if err := wrtag.MoveFiles(pathFormat, release, wrtagOperation(job.Operation), job.SourcePath, paths, cover); err != nil {
 		return fmt.Errorf("move files: %w", err)
 	}
 
