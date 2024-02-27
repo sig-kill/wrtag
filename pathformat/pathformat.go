@@ -16,6 +16,9 @@ type Data struct {
 }
 
 func New(pfStr string) (*texttemplate.Template, error) {
+	if pfStr == "" {
+		return nil, fmt.Errorf("empty format")
+	}
 	return texttemplate.
 		New("template").
 		Funcs(funcMap).

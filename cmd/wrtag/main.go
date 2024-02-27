@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -51,12 +52,12 @@ type musicbrainzClient interface {
 func processJob(
 	ctx context.Context, mb musicbrainzClient, tg tagcommon.Reader,
 	pathFormat *texttemplate.Template,
-	path string,
+	dir string,
 	yes bool,
 ) (err error) {
-	tagFiles, err := wrtag.ReadDir(tg, path)
+	paths, tagFiles, err := wrtag.ReadDir(tg, dir)
 	if err != nil {
-		return fmt.Errorf("read dir %q: %w", path, err)
+		return fmt.Errorf("read dir %q: %w", dir, err)
 	}
 
 	searchFile := tagFiles[0]
@@ -100,7 +101,15 @@ func processJob(
 	// write release to tags. files are saved by defered Close()
 	tagmap.WriteRelease(release, tagFiles)
 
-	if err := wrtag.MoveFiles(pathFormat, release, nil); err != nil {
+	var fileErrs []error
+	for _, f := range tagFiles {
+		fileErrs = append(fileErrs, f.Close())
+	}
+	if err := errors.Join(fileErrs...); err != nil {
+		return err
+	}
+
+	if err := wrtag.MoveFiles(pathFormat, release, dir, paths); err != nil {
 		return fmt.Errorf("move files: %w", err)
 	}
 
