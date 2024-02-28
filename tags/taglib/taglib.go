@@ -104,8 +104,7 @@ func (f *File) String() string {
 	return buf.String()
 }
 
-func (f *File) Close() error {
-	// delete unknown keys
+func (f *File) RemoveUnknown() {
 	for k := range f.raw {
 		switch strings.ToLower(k) {
 		// TODO: re use from above somehow
@@ -115,6 +114,9 @@ func (f *File) Close() error {
 			delete(f.raw, k)
 		}
 	}
+}
+
+func (f *File) Close() error {
 	if !f.file.WriteTags(f.raw) {
 		return ErrWrite
 	}
