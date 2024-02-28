@@ -30,6 +30,9 @@ type Operation interface {
 type Move struct{}
 
 func (Move) Move(src, dest string) error {
+	if filepath.Clean(src) == filepath.Clean(dest) {
+		return nil
+	}
 	if err := os.Rename(src, dest); err != nil {
 		return fmt.Errorf("rename: %w", err)
 	}
@@ -53,6 +56,9 @@ func (Move) Clean(src string) error {
 type Copy struct{}
 
 func (Copy) Move(src, dest string) error {
+	if filepath.Clean(src) == filepath.Clean(dest) {
+		return nil
+	}
 	srcf, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("open src: %w", err)
@@ -161,19 +167,22 @@ func MoveFiles(
 		}
 	}
 
+	destDir, err := DestDir(pathFormat, release)
+	if err != nil {
+		return fmt.Errorf("gen dest dir: %w", err)
+	}
+
 	if cover != "" {
-		destDir, err := DestDir(pathFormat, release)
-		if err != nil {
-			return fmt.Errorf("gen dest dir: %w", err)
-		}
 		coverDest := filepath.Join(destDir, "cover"+filepath.Ext(cover))
 		if err := op.Move(cover, coverDest); err != nil {
 			return fmt.Errorf("move file to dest: %w", err)
 		}
 	}
 
-	if err := op.Clean(srcDir); err != nil {
-		return fmt.Errorf("clean src dir: %w", err)
+	if filepath.Clean(srcDir) != filepath.Clean(destDir) {
+		if err := op.Clean(srcDir); err != nil {
+			return fmt.Errorf("clean src dir: %w", err)
+		}
 	}
 
 	return nil
