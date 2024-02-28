@@ -79,6 +79,12 @@ func WriteRelease(release *musicbrainz.Release, files []tagcommon.File) {
 	}
 	labelInfo := musicbrainz.AnyLabelInfo(release)
 
+	var anyGenre string
+	genres := musicbrainz.AllGenres(release)
+	if len(genres) > 0 {
+		anyGenre = genres[0]
+	}
+
 	for i, f := range files {
 		if tg, ok := f.(*taglib.File); ok {
 			tg.RemoveUnknown()
@@ -100,8 +106,8 @@ func WriteRelease(release *musicbrainz.Release, files []tagcommon.File) {
 		f.WriteTitle(releaseTracks[i].Title)
 		f.WriteArtist(musicbrainz.CreditString(releaseTracks[i].Artists))
 		f.WriteArtists(mapp(releaseTracks[i].Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.Name }))
-		f.WriteGenre("")
-		f.WriteGenres(nil)
+		f.WriteGenre(anyGenre)
+		f.WriteGenres(genres)
 		f.WriteTrackNumber(i + 1)
 		f.WriteDiscNumber(1)
 

@@ -1,11 +1,13 @@
 package musicbrainz
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -51,7 +53,7 @@ func (c *Client) request(ctx context.Context, r *http.Request, dest any) error {
 func (c *Client) GetRelease(ctx context.Context, mbid string) (*Release, error) {
 	urlV := url.Values{}
 	urlV.Set("fmt", "json")
-	urlV.Set("inc", "recordings+artist-credits+labels+release-groups")
+	urlV.Set("inc", "recordings+artist-credits+labels+release-groups+genres")
 
 	url, _ := url.Parse(joinPath(base, "release", mbid))
 	url.RawQuery = urlV.Encode()
@@ -159,13 +161,21 @@ type ArtistCredit struct {
 	Name       string `json:"name"`
 	JoinPhrase string `json:"joinphrase"`
 	Artist     struct {
-		ID             string `json:"id"`
-		Name           string `json:"name"`
-		TypeID         string `json:"type-id"`
-		SortName       string `json:"sort-name"`
-		Type           string `json:"type"`
-		Disambiguation string `json:"disambiguation"`
+		ID             string  `json:"id"`
+		Name           string  `json:"name"`
+		TypeID         string  `json:"type-id"`
+		SortName       string  `json:"sort-name"`
+		Type           string  `json:"type"`
+		Genres         []Genre `json:"genres"`
+		Disambiguation string  `json:"disambiguation"`
 	} `json:"artist"`
+}
+
+type Genre struct {
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Disambiguation string `json:"disambiguation"`
+	Count          int    `json:"count"`
 }
 
 type Track struct {
@@ -173,6 +183,7 @@ type Track struct {
 	Length    int    `json:"length"`
 	Recording struct {
 		FirstReleaseDate string         `json:"first-release-date"`
+		Genres           []Genre        `json:"genres"`
 		Video            bool           `json:"video"`
 		Disambiguation   string         `json:"disambiguation"`
 		ID               string         `json:"id"`
@@ -219,12 +230,13 @@ type Release struct {
 		Language string `json:"language"`
 		Script   string `json:"script"`
 	} `json:"text-representation"`
-	StatusID        string `json:"status-id"`
-	Asin            string `json:"asin"`
-	Country         string `json:"country"`
-	Barcode         string `json:"barcode"`
-	Disambiguation  string `json:"disambiguation"`
-	Packaging       string `json:"packaging"`
+	StatusID        string  `json:"status-id"`
+	Asin            string  `json:"asin"`
+	Genres          []Genre `json:"genres"`
+	Country         string  `json:"country"`
+	Barcode         string  `json:"barcode"`
+	Disambiguation  string  `json:"disambiguation"`
+	Packaging       string  `json:"packaging"`
 	CoverArtArchive struct {
 		Artwork  bool `json:"artwork"`
 		Front    bool `json:"front"`
@@ -238,14 +250,16 @@ type Release struct {
 	Media        []Media        `json:"media"`
 	Status       string         `json:"status"`
 	ReleaseGroup struct {
-		FirstReleaseDate AnyTime `json:"first-release-date"`
-		PrimaryTypeID    string  `json:"primary-type-id"`
-		Disambiguation   string  `json:"disambiguation"`
-		SecondaryTypeIDs []any   `json:"secondary-type-ids"`
-		PrimaryType      string  `json:"primary-type"`
-		ID               string  `json:"id"`
-		SecondaryTypes   []any   `json:"secondary-types"`
-		Title            string  `json:"title"`
+		FirstReleaseDate AnyTime        `json:"first-release-date"`
+		Genres           []Genre        `json:"genres"`
+		PrimaryTypeID    string         `json:"primary-type-id"`
+		Disambiguation   string         `json:"disambiguation"`
+		Artists          []ArtistCredit `json:"artist-credit"`
+		SecondaryTypeIDs []any          `json:"secondary-type-ids"`
+		PrimaryType      string         `json:"primary-type"`
+		ID               string         `json:"id"`
+		SecondaryTypes   []any          `json:"secondary-types"`
+		Title            string         `json:"title"`
 	} `json:"release-group"`
 	ReleaseEvents []struct {
 		Area struct {
@@ -277,6 +291,42 @@ func FlatTracks(media []Media) []Track {
 		tracks = append(tracks, media.Tracks...)
 	}
 	return tracks
+}
+
+type GenreInfo struct {
+	Name  string
+	Count uint
+}
+
+func AllGenres(release *Release) []string {
+	var genres []string
+	for _, g := range release.Genres {
+		genres = insertUniq(genres, g.Name)
+	}
+	for _, a := range release.Artists {
+		for _, g := range a.Artist.Genres {
+			genres = insertUniq(genres, g.Name)
+		}
+	}
+	for _, g := range release.ReleaseGroup.Genres {
+		genres = insertUniq(genres, g.Name)
+	}
+	for _, a := range release.ReleaseGroup.Artists {
+		for _, g := range a.Artist.Genres {
+			genres = insertUniq(genres, g.Name)
+		}
+	}
+	for _, t := range FlatTracks(release.Media) {
+		for _, g := range t.Recording.Genres {
+			genres = insertUniq(genres, g.Name)
+		}
+	}
+	for _, l := range release.LabelInfo {
+		for _, g := range l.Label.Genres {
+			genres = insertUniq(genres, g.Name)
+		}
+	}
+	return genres
 }
 
 func AnyLabelInfo(release *Release) LabelInfo {
@@ -327,4 +377,11 @@ func field(k string, v any) string {
 func joinPath(base string, p ...string) string {
 	r, _ := url.JoinPath(base, p...)
 	return r
+}
+
+func insertUniq[T cmp.Ordered](vs []T, v T) []T {
+	if i, ok := slices.BinarySearch(vs, v); !ok {
+		vs = slices.Insert(vs, i, v)
+	}
+	return vs
 }
