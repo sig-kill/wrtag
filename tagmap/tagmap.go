@@ -39,12 +39,14 @@ func DiffRelease(release *musicbrainz.Release, files []tagcommon.File) (float64,
 	}
 	fone := files[0]
 
+	labelInfo := musicbrainz.AnyLabelInfo(release)
+
 	var diffs []Diff
 	diffs = append(diffs,
 		add("release", fone.Album(), release.Title),
 		add("artist", fone.AlbumArtist(), musicbrainz.CreditString(release.Artists)),
-		add("label", fone.Label(), first(release.LabelInfo).Label.Name),
-		add("catalogue num", fone.CatalogueNum(), first(release.LabelInfo).CatalogNumber),
+		add("label", fone.Label(), labelInfo.Label.Name),
+		add("catalogue num", fone.CatalogueNum(), labelInfo.CatalogNumber),
 		add("media format", fone.MediaFormat(), release.Media[0].Format),
 	)
 
@@ -75,6 +77,7 @@ func WriteRelease(release *musicbrainz.Release, files []tagcommon.File) {
 	if len(releaseTracks) != len(files) {
 		panic("tagmap.WriteRelease: len(releaseTracks) != len(files)")
 	}
+	labelInfo := musicbrainz.AnyLabelInfo(release)
 
 	for i, f := range files {
 		if tg, ok := f.(*taglib.File); ok {
@@ -87,8 +90,8 @@ func WriteRelease(release *musicbrainz.Release, files []tagcommon.File) {
 		f.WriteDate(release.Date.Format(time.DateOnly))
 		f.WriteOriginalDate(release.ReleaseGroup.FirstReleaseDate.Format(time.DateOnly))
 		f.WriteMediaFormat(release.Media[0].Format)
-		f.WriteLabel(first(release.LabelInfo).Label.Name)
-		f.WriteCatalogueNum(first(release.LabelInfo).CatalogNumber)
+		f.WriteLabel(labelInfo.Label.Name)
+		f.WriteCatalogueNum(labelInfo.CatalogNumber)
 
 		f.WriteMBReleaseID(release.ID)
 		f.WriteMBReleaseGroupID(release.ReleaseGroup.ID)
@@ -105,16 +108,6 @@ func WriteRelease(release *musicbrainz.Release, files []tagcommon.File) {
 		f.WriteMBRecordingID(releaseTracks[i].Recording.ID)
 		f.WriteMBArtistID(mapp(releaseTracks[i].Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID }))
 	}
-}
-
-func first[T comparable](is []T) T {
-	var z T
-	for _, i := range is {
-		if i != z {
-			return i
-		}
-	}
-	return z
 }
 
 func filter[T comparable](elms ...T) []T {

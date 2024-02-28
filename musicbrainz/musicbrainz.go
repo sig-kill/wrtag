@@ -155,22 +155,6 @@ func (c *Client) SearchRelease(ctx context.Context, q ReleaseQuery) (*Release, e
 	return release, nil
 }
 
-func CreditString(credits []ArtistCredit) string {
-	var sb strings.Builder
-	for _, mba := range credits {
-		fmt.Fprintf(&sb, "%s%s", mba.Name, mba.JoinPhrase)
-	}
-	return sb.String()
-}
-
-func FlatTracks(media []Media) []Track {
-	var tracks []Track
-	for _, media := range media {
-		tracks = append(tracks, media.Tracks...)
-	}
-	return tracks
-}
-
 type ArtistCredit struct {
 	Name       string `json:"name"`
 	JoinPhrase string `json:"joinphrase"`
@@ -210,6 +194,22 @@ type Media struct {
 	FormatID    string  `json:"format-id"`
 	Title       string  `json:"title"`
 	Position    int     `json:"position"`
+}
+
+type LabelInfo struct {
+	Label         Label  `json:"label"`
+	CatalogNumber string `json:"catalog-number"`
+}
+
+type Label struct {
+	LabelCode      any     `json:"label-code"`
+	Type           string  `json:"type"`
+	Disambiguation string  `json:"disambiguation"`
+	SortName       string  `json:"sort-name"`
+	TypeID         string  `json:"type-id"`
+	Genres         []Genre `json:"genres"`
+	ID             string  `json:"id"`
+	Name           string  `json:"name"`
 }
 
 type Release struct {
@@ -259,19 +259,32 @@ type Release struct {
 		} `json:"area"`
 		Date AnyTime `json:"date"`
 	} `json:"release-events"`
-	PackagingID string `json:"packaging-id"`
-	LabelInfo   []struct {
-		Label struct {
-			LabelCode      any    `json:"label-code"`
-			Type           string `json:"type"`
-			Disambiguation string `json:"disambiguation"`
-			SortName       string `json:"sort-name"`
-			TypeID         string `json:"type-id"`
-			ID             string `json:"id"`
-			Name           string `json:"name"`
-		} `json:"label"`
-		CatalogNumber string `json:"catalog-number"`
-	} `json:"label-info"`
+	PackagingID string      `json:"packaging-id"`
+	LabelInfo   []LabelInfo `json:"label-info"`
+}
+
+func CreditString(credits []ArtistCredit) string {
+	var sb strings.Builder
+	for _, mba := range credits {
+		fmt.Fprintf(&sb, "%s%s", mba.Name, mba.JoinPhrase)
+	}
+	return sb.String()
+}
+
+func FlatTracks(media []Media) []Track {
+	var tracks []Track
+	for _, media := range media {
+		tracks = append(tracks, media.Tracks...)
+	}
+	return tracks
+}
+
+func AnyLabelInfo(release *Release) LabelInfo {
+	if len(release.LabelInfo) > 0 {
+		return release.LabelInfo[0]
+	}
+	var labelInfo LabelInfo
+	return labelInfo
 }
 
 type AnyTime struct {
