@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/subtle"
 	"embed"
@@ -26,10 +25,12 @@ import (
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/pathformat"
 	"go.senan.xyz/wrtag/researchlink"
-	"go.senan.xyz/wrtag/tagmap"
 	"go.senan.xyz/wrtag/tags/tagcommon"
 	"go.senan.xyz/wrtag/tags/taglib"
 )
+
+var tg = &taglib.TagLib{}
+var mb = musicbrainz.NewClient()
 
 func main() {
 	confListenAddr := flag.String("listen-addr", "", "listen addr")
@@ -46,9 +47,6 @@ func main() {
 		log.Fatalf("gen path format: %v", err)
 	}
 
-	var tg = &taglib.TagLib{}
-	var mb = musicbrainz.NewClient()
-
 	var researchLinkQuerier = &researchlink.Querier{}
 	for _, r := range conf.ResearchLinks {
 		if err := researchLinkQuerier.AddSource(r.Name, r.Template); err != nil {
@@ -63,44 +61,40 @@ func main() {
 	defer db.Close()
 
 	sseServ := sse.New()
+	sseServ.AutoStream = true
+	sseServ.AutoReplay = false
 	defer sseServ.Close()
 
 	jobStream := sseServ.CreateStream("jobs")
 
-	pushJob := func(job *Job) error {
-		var buff bytes.Buffer
-		if err := uiTempl.ExecuteTemplate(&buff, "release.html", job); err != nil {
-			return fmt.Errorf("render jobs template: %w", err)
-		}
-		data := bytes.ReplaceAll(buff.Bytes(), []byte("\n"), []byte{})
-		sseServ.Publish(jobStream.ID, &sse.Event{Data: data})
-		return nil
-	}
-
-	jobTick := func() error {
-		var job Job
-		switch err := db.FindOne(&job, bolthold.Where("Status").Eq(StatusIncomplete)); {
-		case errors.Is(err, bolthold.ErrNotFound):
-			return nil
-		case err != nil:
-			return fmt.Errorf("find next job: %w", err)
-		}
-
-		if err := pushJob(&job); err != nil {
-			log.Printf("push job: %v", err)
-		}
-		defer func() {
-			_ = db.Update(job.ID, &job)
-			_ = pushJob(&job)
-		}()
-
-		if err := processJob(context.Background(), mb, tg, pathFormat, researchLinkQuerier, &job, "", false); err != nil {
-			return fmt.Errorf("process job: %w", err)
-		}
-		return nil
+	eventAllJobs := "jobs"
+	eventUpdateJob := func(id uint64) string { return fmt.Sprintf("job-%d", id) }
+	emit := func(e string) {
+		sseServ.Publish(jobStream.ID, &sse.Event{Event: []byte(e), Data: []byte{0}})
 	}
 
 	go func() {
+		jobTick := func() error {
+			var job Job
+			switch err := db.FindOne(&job, bolthold.Where("Status").Eq(StatusIncomplete)); {
+			case errors.Is(err, bolthold.ErrNotFound):
+				return nil
+			case err != nil:
+				return fmt.Errorf("find next job: %w", err)
+			}
+
+			emit(eventUpdateJob(job.ID))
+			defer func() {
+				_ = db.Update(job.ID, &job)
+				emit(eventUpdateJob(job.ID))
+			}()
+
+			if err := processJob(context.Background(), mb, tg, pathFormat, researchLinkQuerier, &job, false); err != nil {
+				return fmt.Errorf("process job: %w", err)
+			}
+			return nil
+		}
+
 		for {
 			if err := jobTick(); err != nil {
 				log.Printf("error in job: %v", err)
@@ -120,40 +114,46 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("GET /events", sseServ)
 
-	mux.HandleFunc("POST /op/{operation}", func(w http.ResponseWriter, r *http.Request) {
-		var operation Operation
-		switch op := r.PathValue("operation"); op {
-		case "copy":
-			operation = OperationCopy
-		case "move":
-			operation = OperationMove
-		default:
-			respErr(w, http.StatusInternalServerError, "invalid operation %q", op)
+	mux.HandleFunc("GET /jobs", func(w http.ResponseWriter, r *http.Request) {
+		var jobs []*Job
+		if err := db.Find(&jobs, nil); err != nil {
+			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
 			return
 		}
-		path := r.FormValue("path")
-		if path == "" {
-			respErr(w, http.StatusInternalServerError, "no path provided")
-			return
-		}
-		job := Job{SourcePath: path, Operation: operation}
-		if err := db.Insert(bolthold.NextSequence(), &job); err != nil {
-			respErr(w, http.StatusInternalServerError, "error saving job")
+		if err := uiTempl.ExecuteTemplate(w, "jobs", jobs); err != nil {
+			log.Printf("err in template: %v", err)
 			return
 		}
 	})
 
-	mux.HandleFunc("POST /job/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
+		id, _ := strconv.Atoi(r.PathValue("id"))
+		var job Job
+		if err := db.Get(uint64(id), &job); err != nil {
+			respErr(w, http.StatusInternalServerError, "error getting job")
+			return
+		}
+		if err := uiTempl.ExecuteTemplate(w, "release.html", job); err != nil {
+			log.Printf("err in template: %v", err)
+			return
+		}
+	})
+
+	mux.HandleFunc("POST /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(r.PathValue("id"))
 		confirm, _ := strconv.ParseBool(r.FormValue("confirm"))
-		useMBID := filepath.Base(r.FormValue("mbid"))
+		useMBID := r.FormValue("mbid")
+		if strings.Contains(useMBID, "/") {
+			useMBID = filepath.Base(useMBID) // accept release URL
+		}
 
 		var job Job
 		if err := db.Get(uint64(id), &job); err != nil {
 			respErr(w, http.StatusInternalServerError, "error getting job")
 			return
 		}
-		if err := processJob(r.Context(), mb, tg, pathFormat, researchLinkQuerier, &job, useMBID, confirm); err != nil {
+		job.UseMBID = useMBID
+		if err := processJob(r.Context(), mb, tg, pathFormat, researchLinkQuerier, &job, confirm); err != nil {
 			respErr(w, http.StatusInternalServerError, "error in job")
 			return
 		}
@@ -181,7 +181,7 @@ func main() {
 
 	mux.HandleFunc("/{$}", func(w http.ResponseWriter, r *http.Request) {
 		var jobs []*Job
-		if err := db.Find(&jobs, nil); err != nil {
+		if err := db.Find(&jobs, (&bolthold.Query{}).SortBy("ID").Reverse()); err != nil {
 			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
 			return
 		}
@@ -192,6 +192,31 @@ func main() {
 	})
 
 	mux.Handle("/", http.FileServer(http.FS(ui)))
+
+	// external API
+	mux.HandleFunc("POST /op/{operation}", func(w http.ResponseWriter, r *http.Request) {
+		var operation Operation
+		switch op := r.PathValue("operation"); op {
+		case "copy":
+			operation = OperationCopy
+		case "move":
+			operation = OperationMove
+		default:
+			respErr(w, http.StatusInternalServerError, "invalid operation %q", op)
+			return
+		}
+		path := r.FormValue("path")
+		if path == "" {
+			respErr(w, http.StatusInternalServerError, "no path provided")
+			return
+		}
+		job := Job{SourcePath: path, Operation: operation}
+		if err := db.Insert(bolthold.NextSequence(), &job); err != nil {
+			respErr(w, http.StatusInternalServerError, "error saving job")
+			return
+		}
+		emit(eventAllJobs)
+	})
 
 	log.Printf("starting on %s", *confListenAddr)
 	log.Panicln(http.ListenAndServe(*confListenAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -209,15 +234,19 @@ type JobStatus string
 const (
 	StatusIncomplete JobStatus = ""
 	StatusComplete   JobStatus = "complete"
-	StatusNoMatch    JobStatus = "no-match"
-	StatusError      JobStatus = "error"
 )
 
-type Operation uint
+type JobError string
 
 const (
-	OperationCopy Operation = iota
-	OperationMove
+	ErrNeedsInput JobError = "needs-input"
+)
+
+type Operation string
+
+const (
+	OperationCopy Operation = "copy"
+	OperationMove Operation = "move"
 )
 
 func wrtagOperation(op Operation) wrtag.Operation {
@@ -234,101 +263,40 @@ func wrtagOperation(op Operation) wrtag.Operation {
 type Job struct {
 	ID                   uint64    `boltholdKey:"ID"`
 	Status               JobStatus `boltholdIndex:"Status"`
+	Error                string
 	Operation            Operation
-	Info                 string
+	UseMBID              string
 	SourcePath, DestPath string
-	Score                float64
-	MBID                 string
-	Diff                 []tagmap.Diff
-	ResearchLinks        []researchlink.SearchResult
+	SearchResult         *wrtag.SearchResult
 }
 
 func processJob(
 	ctx context.Context, mb *musicbrainz.Client, tg tagcommon.Reader,
 	pathFormat *texttemplate.Template, researchLinkQuerier *researchlink.Querier,
 	job *Job,
-	useMBID string, confirm bool,
-) (err error) {
-	job.Score = 0
-	job.MBID = ""
-	job.Diff = nil
-	job.ResearchLinks = nil
+	yes bool,
+) error {
+	job.Error = ""
+	job.Status = StatusComplete
 
-	job.Info = ""
-	defer func() {
-		if err != nil {
-			job.Status = StatusError
-			job.Info = err.Error()
-		}
-	}()
-
-	cover, paths, tagFiles, err := wrtag.ReadDir(tg, job.SourcePath)
+	var err error
+	job.SearchResult, err = wrtag.ProcessDir(ctx, mb, tg, pathFormat, researchLinkQuerier, wrtagOperation(job.Operation), job.SourcePath, job.UseMBID, yes)
 	if err != nil {
-		return fmt.Errorf("read dir %q: %w", job.SourcePath, err)
-	}
-	defer func() {
-		var fileErrs []error
-		for _, f := range tagFiles {
-			fileErrs = append(fileErrs, f.Close())
+		if errors.Is(err, wrtag.ErrScoreTooLow) {
+			job.Error = string(ErrNeedsInput)
+			return nil
 		}
-		if err != nil {
-			return
-		}
-		err = errors.Join(fileErrs...)
-	}()
-
-	searchFile := tagFiles[0]
-	query := musicbrainz.ReleaseQuery{
-		MBReleaseID:      searchFile.MBReleaseID(),
-		MBArtistID:       first(searchFile.MBArtistID()),
-		MBReleaseGroupID: searchFile.MBReleaseGroupID(),
-		Release:          searchFile.Album(),
-		Artist:           or(searchFile.AlbumArtist(), searchFile.Artist()),
-		Date:             searchFile.Date(),
-		Format:           searchFile.MediaFormat(),
-		Label:            searchFile.Label(),
-		CatalogueNum:     searchFile.CatalogueNum(),
-		NumTracks:        len(tagFiles),
-	}
-	if useMBID != "" {
-		query.MBReleaseID = useMBID
+		job.Error = err.Error()
+		return nil
 	}
 
-	job.ResearchLinks, err = researchLinkQuerier.Search(searchFile)
-	if err != nil {
-		return fmt.Errorf("research querier search: %w", err)
-	}
-
-	release, err := mb.SearchRelease(ctx, query)
-	if err != nil {
-		return fmt.Errorf("search musicbrainz: %w", err)
-	}
-
-	job.MBID = release.ID
-	job.Score, job.Diff = tagmap.DiffRelease(release, tagFiles)
-
-	job.DestPath, err = wrtag.DestDir(pathFormat, release)
+	job.DestPath, err = wrtag.DestDir(pathFormat, job.SearchResult.Release)
 	if err != nil {
 		return fmt.Errorf("gen dest dir: %w", err)
 	}
 
-	if releaseTracks := musicbrainz.FlatTracks(release.Media); len(tagFiles) != len(releaseTracks) {
-		return fmt.Errorf("%w: %d/%d", wrtag.ErrTrackCountMismatch, len(tagFiles), len(releaseTracks))
-	}
-	if !confirm && job.Score < 95 {
-		job.Status = StatusNoMatch
-		return nil
-	}
-
-	// write release to tags. files are saved by defered Close()
-	tagmap.WriteRelease(release, tagFiles)
-
-	job.Score, job.Diff = tagmap.DiffRelease(release, tagFiles)
-	job.SourcePath = job.DestPath
-	job.Status = StatusComplete
-
-	if err := wrtag.MoveFiles(pathFormat, release, wrtagOperation(job.Operation), job.SourcePath, paths, cover); err != nil {
-		return fmt.Errorf("move files: %w", err)
+	if job.Operation == OperationMove {
+		job.SourcePath = job.DestPath
 	}
 
 	return nil
@@ -349,24 +317,4 @@ var funcMap = htmltemplate.FuncMap{
 	"url":  func(u string) htmltemplate.URL { return htmltemplate.URL(u) },
 	"join": func(delim string, items []string) string { return strings.Join(items, delim) },
 	"pad0": func(amount, n int) string { return fmt.Sprintf("%0*d", amount, n) },
-}
-
-func first[T comparable](is []T) T {
-	var z T
-	for _, i := range is {
-		if i != z {
-			return i
-		}
-	}
-	return z
-}
-
-func or[T comparable](items ...T) T {
-	var zero T
-	for _, i := range items {
-		if i != zero {
-			return i
-		}
-	}
-	return zero
 }

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	texttemplate "text/template"
 
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"go.senan.xyz/table/table"
@@ -15,38 +14,38 @@ import (
 	"go.senan.xyz/wrtag/cmd/internal/conf"
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/pathformat"
-	"go.senan.xyz/wrtag/tagmap"
+	"go.senan.xyz/wrtag/researchlink"
 	"go.senan.xyz/wrtag/tags/tagcommon"
 	"go.senan.xyz/wrtag/tags/taglib"
 )
 
+// replaced while testing
+var mb wrtag.MusicbrainzClient = musicbrainz.NewClient()
+
+var tg tagcommon.Reader = taglib.TagLib{}
 var dmp = diffmatchpatch.New()
 
-// replaced while testing
-var mb musicbrainzClient = musicbrainz.NewClient()
-
 func main() {
-	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage:\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  $ %s [options] <copy|move|dry-run>\n", flag.CommandLine.Name())
-		fmt.Fprintf(flag.CommandLine.Output(), "options:\n")
-		flag.VisitAll(func(f *flag.Flag) {
-			fmt.Fprintf(flag.CommandLine.Output(), "  -%s (%s)\n", f.Name, f.Usage)
-		})
-	}
-
 	yes := flag.Bool("yes", false, "use the found release anyway despite a low score")
+	useMBID := flag.String("mbid", "", "overwrite matched mbid")
 	conf.Parse()
-
-	var tg tagcommon.Reader = taglib.TagLib{}
 
 	pathFormat, err := pathformat.New(conf.PathFormat)
 	if err != nil {
 		log.Fatalf("gen path format: %v", err)
 	}
 
+	var researchLinkQuerier = &researchlink.Querier{}
+	for _, r := range conf.ResearchLinks {
+		if err := researchLinkQuerier.AddSource(r.Name, r.Template); err != nil {
+			log.Fatalf("add researchlink querier source: %v", err)
+		}
+	}
+
+	command, dir := flag.Arg(0), flag.Arg(1)
+
 	var op wrtag.Operation
-	switch command := flag.Arg(0); command {
+	switch command {
 	case "move":
 		op = wrtag.Move{}
 	case "copy":
@@ -56,105 +55,28 @@ func main() {
 	default:
 		log.Fatalf("unknown command %q", command)
 	}
-
-	dir := flag.Arg(1)
 	if dir == "" {
 		log.Fatalf("need a dir")
 	}
 
-	if err := processJob(context.Background(), mb, tg, pathFormat, op, dir, *yes); err != nil {
-		log.Fatalf("error processing dir: %v", err)
-	}
-}
-
-type musicbrainzClient interface {
-	SearchRelease(ctx context.Context, q musicbrainz.ReleaseQuery) (*musicbrainz.Release, error)
-}
-
-func processJob(
-	ctx context.Context, mb musicbrainzClient, tg tagcommon.Reader,
-	pathFormat *texttemplate.Template,
-	op wrtag.Operation, dir string,
-	yes bool,
-) (err error) {
-	cover, paths, tagFiles, err := wrtag.ReadDir(tg, dir)
-	if err != nil {
-		return fmt.Errorf("read dir %q: %w", dir, err)
+	r, err := wrtag.ProcessDir(context.Background(), mb, tg, pathFormat, researchLinkQuerier, op, dir, *useMBID, *yes)
+	if err != nil && !errors.Is(err, wrtag.ErrScoreTooLow) {
+		log.Fatalln(err)
 	}
 
-	searchFile := tagFiles[0]
-	query := musicbrainz.ReleaseQuery{
-		MBReleaseID:      searchFile.MBReleaseID(),
-		MBArtistID:       first(searchFile.MBArtistID()),
-		MBReleaseGroupID: searchFile.MBReleaseGroupID(),
-		Release:          searchFile.Album(),
-		Artist:           or(searchFile.AlbumArtist(), searchFile.Artist()),
-		Date:             searchFile.Date(),
-		Format:           searchFile.MediaFormat(),
-		Label:            searchFile.Label(),
-		CatalogueNum:     searchFile.CatalogueNum(),
-		NumTracks:        len(tagFiles),
-	}
-
-	release, err := mb.SearchRelease(ctx, query)
-	if err != nil {
-		return fmt.Errorf("search musicbrainz: %w", err)
-	}
-
-	score, diff := tagmap.DiffRelease(release, tagFiles)
-	log.Printf("matched %.2f%% with https://musicbrainz.org/release/%s", score, release.ID)
+	log.Printf("matched %.2f%% with https://musicbrainz.org/release/%s", r.Score, r.Release.ID)
 
 	t := table.NewStringWriter()
-	for _, d := range diff {
+	for _, d := range r.Diff {
 		fmt.Fprintf(t, "%s\t%s\t%s\n", d.Field, fmtDiff(d.Before), fmtDiff(d.After))
 	}
 	for _, row := range strings.Split(strings.TrimRight(t.String(), "\n"), "\n") {
 		log.Print(row)
 	}
 
-	if releaseTracks := musicbrainz.FlatTracks(release.Media); len(tagFiles) != len(releaseTracks) {
-		return fmt.Errorf("%w: %d/%d", wrtag.ErrTrackCountMismatch, len(tagFiles), len(releaseTracks))
+	if err != nil {
+		log.Fatalln(err)
 	}
-
-	if !yes && score < 95 {
-		return fmt.Errorf("score too low")
-	}
-
-	// write release to tags. files are saved by defered Close()
-	tagmap.WriteRelease(release, tagFiles)
-
-	var fileErrs []error
-	for _, f := range tagFiles {
-		fileErrs = append(fileErrs, f.Close())
-	}
-	if err := errors.Join(fileErrs...); err != nil {
-		return err
-	}
-
-	if err := wrtag.MoveFiles(pathFormat, release, op, dir, paths, cover); err != nil {
-		return fmt.Errorf("move files: %w", err)
-	}
-	return nil
-}
-
-func first[T comparable](is []T) T {
-	var z T
-	for _, i := range is {
-		if i != z {
-			return i
-		}
-	}
-	return z
-}
-
-func or[T comparable](items ...T) T {
-	var zero T
-	for _, i := range items {
-		if i != zero {
-			return i
-		}
-	}
-	return zero
 }
 
 func fmtDiff(diff []diffmatchpatch.Diff) string {

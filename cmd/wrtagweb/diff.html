@@ -1,17 +1,17 @@
 <table>
 {{ range . }}
-<tr class="{{ if gt (len .Changes) 1 }}bg-gray-200{{ end }}">
+  <tr class="{{ if or (gt (len .Before) 1) (gt (len .After) 1) }}bg-gray-200{{ end }}">
   <td class="px-2 text-gray-500">{{ .Field }}</td>
   <td class="px-2">
-    {{ if eq .Before "" }}<span class="text-gray-400">[empty]</span>{{ end }}
-    {{ range .Changes }}
+    {{ if eq (len .Before) 0 }}<span class="text-gray-400">[empty]</span>{{ end }}
+    {{ range .Before }}
       {{- if (eq .Type 0) }}<span>{{ .Text }}</span>{{ end -}}
       {{- if (eq .Type -1) }}<span class="text-red-500 font-bold">{{ .Text }}</span>{{ end -}}
     {{ end }}
   </td>
   <td class="px-2">
-    {{ if eq .After "" }}<span class="text-gray-400">[empty]</span>{{ end }}
-    {{ range .Changes }}
+    {{ if eq (len .After) 0 }}<span class="text-gray-400">[empty]</span>{{ end }}
+    {{ range .Before }}
       {{- if (eq .Type 0) }}<span>{{ .Text }}</span>{{ end -}}
       {{- if (eq .Type 1) }}<span class="text-green-600 font-bold">{{ .Text }}</span>{{ end -}}
     {{ end }}

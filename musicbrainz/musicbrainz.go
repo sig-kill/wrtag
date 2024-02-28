@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"slices"
@@ -36,6 +37,8 @@ func (c *Client) request(ctx context.Context, r *http.Request, dest any) error {
 		return fmt.Errorf("wait: %w", err)
 	}
 
+	log.Printf("making mb request %s", r.URL)
+
 	resp, err := c.httpClient.Do(r.WithContext(ctx))
 	if err != nil {
 		return fmt.Errorf("search: %w", err)
@@ -57,6 +60,7 @@ func (c *Client) GetRelease(ctx context.Context, mbid string) (*Release, error) 
 
 	url, _ := url.Parse(joinPath(base, "release", mbid))
 	url.RawQuery = urlV.Encode()
+
 	req, _ := http.NewRequest(http.MethodGet, url.String(), nil)
 
 	var sr Release

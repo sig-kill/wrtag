@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/araddon/dateparse"
@@ -18,7 +19,7 @@ var ErrWrite = errors.New("error writing tags")
 type TagLib struct{}
 
 func (TagLib) CanRead(absPath string) bool {
-	switch ext := filepath.Ext(absPath); ext {
+	switch ext := strings.ToLower(filepath.Ext(absPath)); ext {
 	case ".mp3", ".flac", ".aac", ".m4a", ".m4b", ".ogg", ".opus", ".wma", ".wav", ".wv":
 		return true
 	}
@@ -32,13 +33,14 @@ func (TagLib) Read(absPath string) (tagcommon.File, error) {
 	}
 	props := f.ReadAudioProperties()
 	raw := f.ReadTags()
-	return &File{raw, props, f}, nil
+	return &File{raw: raw, props: props, file: f}, nil
 }
 
 type File struct {
-	raw   map[string][]string
-	props *audiotags.AudioProperties
-	file  *audiotags.File
+	raw       map[string][]string
+	props     *audiotags.AudioProperties
+	file      *audiotags.File
+	closeOnce sync.Once
 }
 
 // https://picard-docs.musicbrainz.org/downloads/MusicBrainz_Picard_Tag_Map.html
@@ -117,11 +119,15 @@ func (f *File) RemoveUnknown() {
 }
 
 func (f *File) Close() error {
-	if !f.file.WriteTags(f.raw) {
-		return ErrWrite
-	}
-	f.file.Close()
-	return nil
+	var err error
+	f.closeOnce.Do(func() {
+		if !f.file.WriteTags(f.raw) {
+			err = ErrWrite
+			return
+		}
+		f.file.Close()
+	})
+	return err
 }
 
 func first[T comparable](is []T) T {
