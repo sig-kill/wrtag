@@ -10,6 +10,7 @@ import (
 
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/tags/tagcommon"
+	"go.senan.xyz/wrtag/tags/taglib"
 )
 
 type Diff struct {
@@ -76,6 +77,10 @@ func WriteRelease(release *musicbrainz.Release, files []tagcommon.File) {
 	}
 
 	for i, f := range files {
+		if tg, ok := f.(*taglib.File); ok {
+			tg.RemoveUnknown()
+		}
+
 		f.WriteAlbum(release.Title)
 		f.WriteAlbumArtist(musicbrainz.CreditString(release.Artists))
 		f.WriteAlbumArtists(mapp(release.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.Name }))
@@ -94,7 +99,7 @@ func WriteRelease(release *musicbrainz.Release, files []tagcommon.File) {
 		f.WriteArtists(mapp(releaseTracks[i].Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.Name }))
 		f.WriteGenre("")
 		f.WriteGenres(nil)
-		f.WriteTrackNumber(i)
+		f.WriteTrackNumber(i + 1)
 		f.WriteDiscNumber(1)
 
 		f.WriteMBRecordingID(releaseTracks[i].Recording.ID)
