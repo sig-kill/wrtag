@@ -6,31 +6,30 @@ import (
 	"strings"
 	"time"
 
-	dmp "github.com/sergi/go-diff/diffmatchpatch"
+	"github.com/sergi/go-diff/diffmatchpatch"
 
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/tags/tagcommon"
-	"go.senan.xyz/wrtag/tags/taglib"
 )
+
+var dmp = diffmatchpatch.New()
 
 type Diff struct {
 	Field         string
-	Before, After []dmp.Diff
+	Before, After []diffmatchpatch.Diff
 }
 
 func DiffRelease(release *musicbrainz.Release, files []tagcommon.File) (float64, []Diff) {
-	dm := dmp.New()
-
 	var charsTotal int
 	var charsDiff int
 	add := func(f, a, b string) Diff {
-		diffs := dm.DiffMain(a, b, false)
+		diffs := dmp.DiffMain(a, b, false)
 		charsTotal += len([]rune(b))
-		charsDiff += dm.DiffLevenshtein(diffs)
+		charsDiff += dmp.DiffLevenshtein(diffs)
 		return Diff{
 			Field:  f,
-			Before: filterDiff(diffs, func(d dmp.Diff) bool { return d.Type <= dmp.DiffEqual }),
-			After:  filterDiff(diffs, func(d dmp.Diff) bool { return d.Type >= dmp.DiffEqual }),
+			Before: filterDiff(diffs, func(d diffmatchpatch.Diff) bool { return d.Type <= diffmatchpatch.DiffEqual }),
+			After:  filterDiff(diffs, func(d diffmatchpatch.Diff) bool { return d.Type >= diffmatchpatch.DiffEqual }),
 		}
 	}
 
@@ -72,48 +71,42 @@ func DiffRelease(release *musicbrainz.Release, files []tagcommon.File) (float64,
 	return score, diffs
 }
 
-func WriteRelease(release *musicbrainz.Release, files []tagcommon.File) {
-	releaseTracks := musicbrainz.FlatTracks(release.Media)
-	if len(releaseTracks) != len(files) {
-		panic("tagmap.WriteRelease: len(releaseTracks) != len(files)")
+func WriteFile(
+	release *musicbrainz.Release, labelInfo musicbrainz.LabelInfo, genres []string,
+	releaseTrack *musicbrainz.Track, i int, f tagcommon.File,
+) {
+	if ru, ok := f.(interface{ RemoveUnknown() }); ok {
+		ru.RemoveUnknown()
 	}
-	labelInfo := musicbrainz.AnyLabelInfo(release)
 
 	var anyGenre string
-	genres := musicbrainz.AllGenres(release)
 	if len(genres) > 0 {
 		anyGenre = genres[0]
 	}
 
-	for i, f := range files {
-		if tg, ok := f.(*taglib.File); ok {
-			tg.RemoveUnknown()
-		}
+	f.WriteAlbum(release.Title)
+	f.WriteAlbumArtist(musicbrainz.CreditString(release.Artists))
+	f.WriteAlbumArtists(mapp(release.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.Name }))
+	f.WriteDate(release.Date.Format(time.DateOnly))
+	f.WriteOriginalDate(release.ReleaseGroup.FirstReleaseDate.Format(time.DateOnly))
+	f.WriteMediaFormat(release.Media[0].Format)
+	f.WriteLabel(labelInfo.Label.Name)
+	f.WriteCatalogueNum(labelInfo.CatalogNumber)
 
-		f.WriteAlbum(release.Title)
-		f.WriteAlbumArtist(musicbrainz.CreditString(release.Artists))
-		f.WriteAlbumArtists(mapp(release.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.Name }))
-		f.WriteDate(release.Date.Format(time.DateOnly))
-		f.WriteOriginalDate(release.ReleaseGroup.FirstReleaseDate.Format(time.DateOnly))
-		f.WriteMediaFormat(release.Media[0].Format)
-		f.WriteLabel(labelInfo.Label.Name)
-		f.WriteCatalogueNum(labelInfo.CatalogNumber)
+	f.WriteMBReleaseID(release.ID)
+	f.WriteMBReleaseGroupID(release.ReleaseGroup.ID)
+	f.WriteMBAlbumArtistID(mapp(release.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID }))
 
-		f.WriteMBReleaseID(release.ID)
-		f.WriteMBReleaseGroupID(release.ReleaseGroup.ID)
-		f.WriteMBAlbumArtistID(mapp(release.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID }))
+	f.WriteTitle(releaseTrack.Title)
+	f.WriteArtist(musicbrainz.CreditString(releaseTrack.Artists))
+	f.WriteArtists(mapp(releaseTrack.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.Name }))
+	f.WriteGenre(anyGenre)
+	f.WriteGenres(genres)
+	f.WriteTrackNumber(i + 1)
+	f.WriteDiscNumber(1)
 
-		f.WriteTitle(releaseTracks[i].Title)
-		f.WriteArtist(musicbrainz.CreditString(releaseTracks[i].Artists))
-		f.WriteArtists(mapp(releaseTracks[i].Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.Name }))
-		f.WriteGenre(anyGenre)
-		f.WriteGenres(genres)
-		f.WriteTrackNumber(i + 1)
-		f.WriteDiscNumber(1)
-
-		f.WriteMBRecordingID(releaseTracks[i].Recording.ID)
-		f.WriteMBArtistID(mapp(releaseTracks[i].Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID }))
-	}
+	f.WriteMBRecordingID(releaseTrack.Recording.ID)
+	f.WriteMBArtistID(mapp(releaseTrack.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID }))
 }
 
 func filter[T comparable](elms ...T) []T {
@@ -131,8 +124,8 @@ func mapp[F, T any](s []F, f func(int, F) T) []T {
 	return res
 }
 
-func filterDiff(diffs []dmp.Diff, f func(dmp.Diff) bool) []dmp.Diff {
-	var r []dmp.Diff
+func filterDiff(diffs []diffmatchpatch.Diff, f func(diffmatchpatch.Diff) bool) []diffmatchpatch.Diff {
+	var r []diffmatchpatch.Diff
 	for _, diff := range diffs {
 		if f(diff) {
 			r = append(r, diff)

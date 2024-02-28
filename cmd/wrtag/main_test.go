@@ -17,8 +17,6 @@ import (
 
 	"github.com/rogpeppe/go-internal/testscript"
 	"go.senan.xyz/wrtag/musicbrainz"
-	"go.senan.xyz/wrtag/tags/tagcommon"
-	"go.senan.xyz/wrtag/tags/taglib"
 )
 
 func TestMain(m *testing.M) {
@@ -56,8 +54,6 @@ func (c *mockMB) SearchRelease(ctx context.Context, q musicbrainz.ReleaseQuery) 
 	}
 	return nil, musicbrainz.ErrNoResults
 }
-
-var tg tagcommon.Reader = taglib.TagLib{}
 
 func mainTagWrite() {
 	flag.Parse()
@@ -156,8 +152,13 @@ func mainFind() {
 func mainTouch() {
 	flag.Parse()
 
-	if _, err := os.Create(flag.Arg(0)); err != nil {
-		log.Fatalf("err creating: %v", err)
+	for _, p := range flag.Args() {
+		if err := os.MkdirAll(filepath.Dir(p), os.ModePerm); err != nil {
+			log.Fatalf("mkdirall: %v", err)
+		}
+		if _, err := os.Create(p); err != nil {
+			log.Fatalf("err creating: %v", err)
+		}
 	}
 }
 

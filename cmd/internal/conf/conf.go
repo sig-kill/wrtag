@@ -17,7 +17,7 @@ var (
 )
 
 func Parse() {
-	flag.CommandLine.Init("wrtag", flag.ExitOnError)
+	flag.CommandLine.Init(name, flag.ExitOnError)
 	flag.StringVar(&PathFormat, "path-format", "", "path format")
 	flag.Var(&ResearchLinks, "research-link", "research link")
 
