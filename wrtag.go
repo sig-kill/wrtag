@@ -32,9 +32,7 @@ type Operation interface {
 	CleanDir(src string) error
 }
 
-type Move struct {
-	tg tagcommon.Reader
-}
+type Move struct{}
 
 func (Move) ProcessFile(src, dest string) error {
 	if filepath.Clean(src) == filepath.Clean(dest) {
