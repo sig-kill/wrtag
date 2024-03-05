@@ -1,5 +1,8 @@
 <form hx-post="/jobs/{{ .ID }}" hx-target="this" hx-swap="outerHTML" class="bg-gray-100 p-3 flex flex-col items-start gap-2 shadow-sm">
-  <p>{{ .Operation }} path <a class="italic" href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></p>
+  <div class="flex justify-between w-full">
+    <span>{{ .Operation }} path <a class="italic" href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></span>
+    <button hx-delete="/jobs/{{ .ID }}" hx-swap="none">[x]</button>
+  </div>
   {{ if .SearchResult }}
     <p class="font-bold">{{ printf "%.2f%%" .SearchResult.Score }} match with <a href="https://musicbrainz.org/release/{{ .SearchResult.Release.ID }}" target="_blank">https://musicbrainz.org/release/{{ .SearchResult.Release.ID }}</a></p>
     {{ template "diff.html" .SearchResult.Diff }}

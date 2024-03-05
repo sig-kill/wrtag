@@ -167,6 +167,15 @@ func main() {
 		}
 	})
 
+	mux.HandleFunc("DELETE /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
+		id, _ := strconv.Atoi(r.PathValue("id"))
+		if err := db.Delete(uint64(id), &Job{}); err != nil {
+			respErr(w, http.StatusInternalServerError, "error getting job")
+			return
+		}
+		emit(eventAllJobs)
+	})
+
 	mux.HandleFunc("GET /dump", func(w http.ResponseWriter, r *http.Request) {
 		var jobs []*Job
 		if err := db.Find(&jobs, nil); err != nil {
@@ -225,6 +234,7 @@ func main() {
 			http.Error(w, "unauthorised", http.StatusUnauthorized)
 			return
 		}
+		log.Printf("req for %s", r.URL)
 		mux.ServeHTTP(w, r)
 	})))
 }
