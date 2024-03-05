@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/subtle"
 	"embed"
@@ -9,12 +10,14 @@ import (
 	"flag"
 	"fmt"
 	htmltemplate "html/template"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	texttemplate "text/template"
 	"time"
 
@@ -103,12 +106,24 @@ func main() {
 		}
 	}()
 
-	respErr := func(w http.ResponseWriter, code int, f string, a ...any) {
-		w.WriteHeader(code)
-		if err := uiTempl.ExecuteTemplate(w, "error", fmt.Sprintf(f, a...)); err != nil {
-			log.Printf("err in template: %v", err)
+	var buffPool = sync.Pool{New: func() any { return new(bytes.Buffer) }}
+	respTmpl := func(w http.ResponseWriter, name string, data any) {
+		buff := buffPool.Get().(*bytes.Buffer)
+		defer buffPool.Put(buff)
+		buff.Reset()
+
+		if err := uiTmpl.ExecuteTemplate(w, name, data); err != nil {
+			log.Printf("error in template: %v", err)
 			return
 		}
+		if _, err := io.Copy(w, buff); err != nil {
+			log.Printf("error copying template data: %v", err)
+			return
+		}
+	}
+	respErr := func(w http.ResponseWriter, code int, f string, a ...any) {
+		w.WriteHeader(code)
+		respTmpl(w, "error", fmt.Sprintf(f, a...))
 	}
 
 	mux := http.NewServeMux()
@@ -120,10 +135,7 @@ func main() {
 			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
 			return
 		}
-		if err := uiTempl.ExecuteTemplate(w, "jobs", jobs); err != nil {
-			log.Printf("err in template: %v", err)
-			return
-		}
+		respTmpl(w, "jobs", jobs)
 	})
 
 	mux.HandleFunc("GET /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -133,10 +145,7 @@ func main() {
 			respErr(w, http.StatusInternalServerError, "error getting job")
 			return
 		}
-		if err := uiTempl.ExecuteTemplate(w, "release.html", job); err != nil {
-			log.Printf("err in template: %v", err)
-			return
-		}
+		respTmpl(w, "release.html", job)
 	})
 
 	mux.HandleFunc("POST /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -161,10 +170,7 @@ func main() {
 			respErr(w, http.StatusInternalServerError, "save job")
 			return
 		}
-		if err := uiTempl.ExecuteTemplate(w, "release.html", job); err != nil {
-			log.Printf("err in template: %v", err)
-			return
-		}
+		respTmpl(w, "release.html", job)
 	})
 
 	mux.HandleFunc("DELETE /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -194,10 +200,7 @@ func main() {
 			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
 			return
 		}
-		if err := uiTempl.ExecuteTemplate(w, "index.html", jobs); err != nil {
-			log.Printf("err in template: %v", err)
-			return
-		}
+		respTmpl(w, "index.html", jobs)
 	})
 
 	mux.Handle("/", http.FileServer(http.FS(ui)))
@@ -211,17 +214,17 @@ func main() {
 		case "move":
 			operation = OperationMove
 		default:
-			respErr(w, http.StatusInternalServerError, "invalid operation %q", op)
+			http.Error(w, fmt.Sprintf("invalid operation %q", op), http.StatusBadRequest)
 			return
 		}
 		path := r.FormValue("path")
 		if path == "" {
-			respErr(w, http.StatusInternalServerError, "no path provided")
+			http.Error(w, "no path provided", http.StatusBadRequest)
 			return
 		}
 		job := Job{SourcePath: path, Operation: operation}
 		if err := db.Insert(bolthold.NextSequence(), &job); err != nil {
-			respErr(w, http.StatusInternalServerError, "error saving job")
+			http.Error(w, fmt.Sprintf("error saving job: %v", err), http.StatusInternalServerError)
 			return
 		}
 		emit(eventAllJobs)
@@ -314,7 +317,7 @@ func processJob(
 
 //go:embed *.html *.ico
 var ui embed.FS
-var uiTempl = htmltemplate.Must(
+var uiTmpl = htmltemplate.Must(
 	htmltemplate.
 		New("template").
 		Funcs(funcMap).
