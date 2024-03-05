@@ -1,5 +1,5 @@
 <form hx-post="/jobs/{{ .ID }}" hx-target="this" hx-swap="outerHTML" class="bg-gray-100 p-3 flex flex-col items-start gap-2 shadow-sm">
-  <div class="flex justify-between w-full">
+  <div class="flex justify-between gap-3 w-full">
     <span>{{ .Operation }} path <a class="italic" href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></span>
     <button hx-delete="/jobs/{{ .ID }}" hx-swap="none">[x]</button>
   </div>
