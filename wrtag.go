@@ -27,7 +27,7 @@ var (
 
 const rmAllSizeThreshold uint64 = 20 * 1e6 // 20 MB
 
-type Operation interface {
+type FileSystemOperation interface {
 	ProcessFile(src, dest string) error
 	CleanDir(src string) error
 }
@@ -100,9 +100,9 @@ func (DryRun) CleanDir(src string) error {
 	return nil
 }
 
-var _ Operation = (*Move)(nil)
-var _ Operation = (*Copy)(nil)
-var _ Operation = (*DryRun)(nil)
+var _ FileSystemOperation = (*Move)(nil)
+var _ FileSystemOperation = (*Copy)(nil)
+var _ FileSystemOperation = (*DryRun)(nil)
 
 func ReadDir(tg tagcommon.Reader, path string) (string, []string, []tagcommon.File, error) {
 	allPaths, err := filepath.Glob(filepath.Join(path, "*"))
@@ -152,7 +152,7 @@ type SearchResult struct {
 func ProcessDir(
 	ctx context.Context, mb MusicbrainzClient, tg tagcommon.Reader,
 	pathFormat *texttemplate.Template, researchLinkQuerier *researchlink.Querier,
-	op Operation, srcDir string,
+	op FileSystemOperation, srcDir string,
 	useMBID string, yes bool,
 ) (*SearchResult, error) {
 	cover, paths, tagFiles, err := ReadDir(tg, srcDir)

@@ -18,9 +18,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	texttemplate "text/template"
 	"time"
 
+	"github.com/containrrr/shoutrrr"
 	"github.com/r3labs/sse/v2"
 	"github.com/timshannon/bolthold"
 	"go.senan.xyz/wrtag"
@@ -28,7 +28,6 @@ import (
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/pathformat"
 	"go.senan.xyz/wrtag/researchlink"
-	"go.senan.xyz/wrtag/tags/tagcommon"
 	"go.senan.xyz/wrtag/tags/taglib"
 )
 
@@ -76,6 +75,33 @@ func main() {
 		sseServ.Publish(jobStream.ID, &sse.Event{Event: []byte(e), Data: []byte{0}})
 	}
 
+	processJob := func(ctx context.Context, job *Job, yes bool) error {
+		job.Error = ""
+		job.Status = StatusComplete
+
+		var err error
+		job.SearchResult, err = wrtag.ProcessDir(ctx, mb, tg, pathFormat, researchLinkQuerier, wrtagOperation(job.Operation), job.SourcePath, job.UseMBID, yes)
+		if err != nil {
+			if errors.Is(err, wrtag.ErrScoreTooLow) {
+				job.Error = string(ErrNeedsInput)
+				return nil
+			}
+			job.Error = err.Error()
+			return nil
+		}
+
+		job.DestPath, err = wrtag.DestDir(pathFormat, job.SearchResult.Release)
+		if err != nil {
+			return fmt.Errorf("gen dest dir: %w", err)
+		}
+
+		if job.Operation == OperationMove {
+			job.SourcePath = job.DestPath
+		}
+
+		return nil
+	}
+
 	go func() {
 		jobTick := func() error {
 			var job Job
@@ -92,8 +118,12 @@ func main() {
 				emit(eventUpdateJob(job.ID))
 			}()
 
-			if err := processJob(context.Background(), mb, tg, pathFormat, researchLinkQuerier, &job, false); err != nil {
+			if err := processJob(context.Background(), &job, false); err != nil {
 				return fmt.Errorf("process job: %w", err)
+			}
+
+			for _, uri := range conf.NotificationURIs[conf.EventComplete] {
+				shoutrrr.Send(uri, fmt.Sprintf("%v", job))
 			}
 			return nil
 		}
@@ -162,7 +192,7 @@ func main() {
 			return
 		}
 		job.UseMBID = useMBID
-		if err := processJob(r.Context(), mb, tg, pathFormat, researchLinkQuerier, &job, confirm); err != nil {
+		if err := processJob(r.Context(), &job, confirm); err != nil {
 			respErr(w, http.StatusInternalServerError, "error in job")
 			return
 		}
@@ -262,7 +292,7 @@ const (
 	OperationMove Operation = "move"
 )
 
-func wrtagOperation(op Operation) wrtag.Operation {
+func wrtagOperation(op Operation) wrtag.FileSystemOperation {
 	switch op {
 	case OperationCopy:
 		return wrtag.Copy{}
@@ -283,36 +313,16 @@ type Job struct {
 	SearchResult         *wrtag.SearchResult
 }
 
-func processJob(
-	ctx context.Context, mb *musicbrainz.Client, tg tagcommon.Reader,
-	pathFormat *texttemplate.Template, researchLinkQuerier *researchlink.Querier,
-	job *Job,
-	yes bool,
-) error {
-	job.Error = ""
-	job.Status = StatusComplete
-
-	var err error
-	job.SearchResult, err = wrtag.ProcessDir(ctx, mb, tg, pathFormat, researchLinkQuerier, wrtagOperation(job.Operation), job.SourcePath, job.UseMBID, yes)
-	if err != nil {
-		if errors.Is(err, wrtag.ErrScoreTooLow) {
-			job.Error = string(ErrNeedsInput)
-			return nil
-		}
-		job.Error = err.Error()
-		return nil
+func (j Job) String() string {
+	var parts []string
+	parts = append(parts, string(j.Operation))
+	if j.Error != "" {
+		parts = append(parts, j.Error)
+	} else if j.Status != "" {
+		parts = append(parts, string(j.Status))
 	}
-
-	job.DestPath, err = wrtag.DestDir(pathFormat, job.SearchResult.Release)
-	if err != nil {
-		return fmt.Errorf("gen dest dir: %w", err)
-	}
-
-	if job.Operation == OperationMove {
-		job.SourcePath = job.DestPath
-	}
-
-	return nil
+	parts = append(parts, fmt.Sprintf("%s", j.SourcePath))
+	return strings.Join(parts, " ")
 }
 
 //go:embed *.html *.ico

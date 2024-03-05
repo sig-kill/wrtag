@@ -44,7 +44,7 @@ func main() {
 
 	command, dir := flag.Arg(0), flag.Arg(1)
 
-	var op wrtag.Operation
+	var op wrtag.FileSystemOperation
 	switch command {
 	case "move":
 		op = wrtag.Move{}
