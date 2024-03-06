@@ -15,14 +15,21 @@ type Data struct {
 	Ext      string
 }
 
-func New(pfStr string) (*texttemplate.Template, error) {
-	if pfStr == "" {
-		return nil, fmt.Errorf("empty format")
+type Format struct{ texttemplate.Template }
+
+func (pf *Format) Parse(str string) error {
+	if str == "" {
+		return fmt.Errorf("empty format")
 	}
-	return texttemplate.
+	tmpl, err := texttemplate.
 		New("template").
 		Funcs(funcMap).
-		Parse(pfStr)
+		Parse(str)
+	if err != nil {
+		return fmt.Errorf("parse: %w", err)
+	}
+	*pf = Format{*tmpl}
+	return err
 }
 
 var funcMap = texttemplate.FuncMap{

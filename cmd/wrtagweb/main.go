@@ -20,12 +20,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containrrr/shoutrrr"
 	"github.com/r3labs/sse/v2"
 	"github.com/timshannon/bolthold"
+	"go.senan.xyz/flagconf"
 	"go.senan.xyz/wrtag"
-	"go.senan.xyz/wrtag/cmd/internal/conf"
+	"go.senan.xyz/wrtag/cmd/internal/flagparse"
 	"go.senan.xyz/wrtag/musicbrainz"
+	"go.senan.xyz/wrtag/notifications"
 	"go.senan.xyz/wrtag/pathformat"
 	"go.senan.xyz/wrtag/researchlink"
 	"go.senan.xyz/wrtag/tags/taglib"
@@ -35,25 +36,24 @@ var tg = &taglib.TagLib{}
 var mb = musicbrainz.NewClient()
 
 func main() {
+	var pathFormat pathformat.Format
+	flag.Var(flagparse.PathFormat{&pathFormat}, "path-format", "path-format")
+	var researchLinkQuerier researchlink.Querier
+	flag.Var(flagparse.Querier{&researchLinkQuerier}, "research-link", "research link")
+	var notifs notifications.Notifications
+	flag.Var(flagparse.Notifications{&notifs}, "notification-uri", "shoutrrr notification uri")
+	configPath := flag.String("config-path", flagparse.DefaultConfigPath, "path config file")
+
 	confListenAddr := flag.String("listen-addr", "", "listen addr")
 	confAPIKey := flag.String("api-key", "", "api key")
 	confDBPath := flag.String("db-path", "wrtag.db", "db path")
-	conf.Parse()
+
+	flag.Parse()
+	flagconf.ParseEnv()
+	flagconf.ParseConfig(*configPath)
 
 	if *confAPIKey == "" {
 		log.Fatal("need api key")
-	}
-
-	pathFormat, err := pathformat.New(conf.PathFormat)
-	if err != nil {
-		log.Fatalf("gen path format: %v", err)
-	}
-
-	var researchLinkQuerier = &researchlink.Querier{}
-	for _, r := range conf.ResearchLinks {
-		if err := researchLinkQuerier.AddSource(r.Name, r.Template); err != nil {
-			log.Fatalf("add researchlink querier source: %v", err)
-		}
 	}
 
 	db, err := bolthold.Open(*confDBPath, 0600, nil)
@@ -80,17 +80,18 @@ func main() {
 		job.Status = StatusComplete
 
 		var err error
-		job.SearchResult, err = wrtag.ProcessDir(ctx, mb, tg, pathFormat, researchLinkQuerier, wrtagOperation(job.Operation), job.SourcePath, job.UseMBID, yes)
+		job.SearchResult, err = wrtag.ProcessDir(ctx, mb, tg, &pathFormat, &researchLinkQuerier, wrtagOperation(job.Operation), job.SourcePath, job.UseMBID, yes)
 		if err != nil {
 			if errors.Is(err, wrtag.ErrScoreTooLow) {
-				job.Error = string(ErrNeedsInput)
+				job.Error = string(JobErrorNeedsInput)
+				notifs.Send(notifications.NeedsInput, job.String())
 				return nil
 			}
 			job.Error = err.Error()
 			return nil
 		}
 
-		job.DestPath, err = wrtag.DestDir(pathFormat, job.SearchResult.Release)
+		job.DestPath, err = wrtag.DestDir(&pathFormat, job.SearchResult.Release)
 		if err != nil {
 			return fmt.Errorf("gen dest dir: %w", err)
 		}
@@ -99,6 +100,7 @@ func main() {
 			job.SourcePath = job.DestPath
 		}
 
+		notifs.Send(notifications.Complete, job.String())
 		return nil
 	}
 
@@ -120,10 +122,6 @@ func main() {
 
 			if err := processJob(context.Background(), &job, false); err != nil {
 				return fmt.Errorf("process job: %w", err)
-			}
-
-			for _, uri := range conf.NotificationURIs[conf.EventComplete] {
-				shoutrrr.Send(uri, fmt.Sprintf("%v", job))
 			}
 			return nil
 		}
@@ -282,7 +280,7 @@ const (
 type JobError string
 
 const (
-	ErrNeedsInput JobError = "needs-input"
+	JobErrorNeedsInput JobError = "needs-input"
 )
 
 type Operation string
@@ -321,7 +319,7 @@ func (j Job) String() string {
 	} else if j.Status != "" {
 		parts = append(parts, string(j.Status))
 	}
-	parts = append(parts, fmt.Sprintf("%s", j.SourcePath))
+	parts = append(parts, j.SourcePath)
 	return strings.Join(parts, " ")
 }
 

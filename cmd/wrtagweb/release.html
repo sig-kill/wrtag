@@ -13,7 +13,7 @@
   {{ if eq .Status "" }}
     <p class="text-gray-600">in progress ...</p>
   {{ else if eq .Error "needs-input" }}
-    <p>low/no match <button hx-post="/job/{{ .ID }}?confirm=1">[use anyway]</button></p>
+    <p>low/no match <button hx-post="/jobs/{{ .ID }}?confirm=1">[use anyway]</button></p>
   {{ else if .Error }}
     <p class="text-red-500">{{ .Error }}</p>
     <p>custom mbid/url <input type="text" name="mbid" class="px-2 w-[320px]" placeholder="74a7e992-4366-427a-91ff-f3cf6aa7524d" value="{{ .UseMBID }}"></p>
