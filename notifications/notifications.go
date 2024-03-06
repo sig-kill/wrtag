@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/containrrr/shoutrrr"
+	shoutrrrtypes "github.com/containrrr/shoutrrr/pkg/types"
 )
 
 var ErrUnknownEvent = errors.New("unknown event")
@@ -35,12 +36,21 @@ func (n *Notifications) AddURI(event Event, uri string) error {
 
 // Send a simple string for now, later fancy diffs and things
 func (n *Notifications) Send(event Event, message string) {
-	for _, uri := range n.mappings[event] {
-		log.Printf("sending %s to %s", event, uri)
-		go func() {
-			if err := shoutrrr.Send(uri, message); err != nil {
-				log.Printf("error sending message for %s: %v", event, err)
-			}
-		}()
+	uris := n.mappings[event]
+	if len(uris) == 0 {
+		return
+	}
+
+	sender, err := shoutrrr.CreateSender(uris...)
+	if err != nil {
+		log.Printf("create sender: %v", err)
+		return
+	}
+
+	params := &shoutrrrtypes.Params{}
+	params.SetTitle("wrtag")
+
+	if err := errors.Join(sender.Send(message, params)...); err != nil {
+		log.Printf("error sending notifications: %v", err)
 	}
 }
