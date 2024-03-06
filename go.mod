@@ -15,6 +15,7 @@ require (
 	go.senan.xyz/flagconf v0.1.6
 	go.senan.xyz/table v0.0.0-20240227175247-cf2c834b4c23
 	golang.org/x/time v0.5.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

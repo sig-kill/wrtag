@@ -6,6 +6,9 @@
   {{ if .SearchResult }}
     <p class="font-bold">{{ printf "%.2f%%" .SearchResult.Score }} match with <a href="https://musicbrainz.org/release/{{ .SearchResult.Release.ID }}" target="_blank">https://musicbrainz.org/release/{{ .SearchResult.Release.ID }}</a></p>
     {{ template "diff.html" .SearchResult.Diff }}
+    {{ if .SearchResult.OriginFile }}
+      {{ template "originfile.html" .SearchResult.OriginFile }}
+    {{ end }}
     {{ if .SearchResult.ResearchLinks }}
       <p>research links <span class="inline-flex gap-2">{{ range .SearchResult.ResearchLinks }}<a target="_blank" href="{{ .URL | url }}">{{ .Name }}</a>{{ end }}</span></p>
     {{ end }}

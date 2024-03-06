@@ -1,0 +1,33 @@
+origin file info
+<table>
+  {{ if not (eq .Permalink "") }}
+    <tr>
+      <td class="px-2 text-gray-500">permalink</td>
+      <td class="px-2"><a href="{{ .Permalink }}" rel="noopener noreferrer" target="_blank">{{ .Permalink }}</td>
+    </tr>
+  {{ end }}
+  {{ if not (eq .RecordLabel "") }}
+    <tr>
+      <td class="px-2 text-gray-500">record label</td>
+      <td class="px-2">{{ .RecordLabel }}</td>
+    </tr>
+  {{ end }}
+  {{ if not (eq .CatalogueNumber "") }}
+    <tr>
+      <td class="px-2 text-gray-500">catalogue number</td>
+      <td class="px-2">{{ .CatalogueNumber }}</td>
+    </tr>
+  {{ end }}
+  {{ if not (eq .Media "") }}
+    <tr>
+      <td class="px-2 text-gray-500">media</td>
+      <td class="px-2">{{ .Media }}</td>
+    </tr>
+  {{ end }}
+  {{ if not (eq .EditionYear 0) }}
+    <tr>
+      <td class="px-2 text-gray-500">edition year</td>
+      <td class="px-2">{{ .EditionYear }}</td>
+    </tr>
+  {{ end }}
+</table>

@@ -59,7 +59,7 @@ func main() {
 
 	r, err := wrtag.ProcessDir(context.Background(), mb, tg, &pathFormat, &researchLinkQuerier, op, dir, *useMBID, *yes)
 	if err != nil && !errors.Is(err, wrtag.ErrScoreTooLow) {
-		log.Fatalln(err)
+		log.Fatalf("error processing %q: %v", dir, err)
 	}
 
 	log.Printf("matched %.2f%% with https://musicbrainz.org/release/%s", r.Score, r.Release.ID)
