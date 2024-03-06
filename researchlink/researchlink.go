@@ -17,6 +17,14 @@ type source struct {
 	template *texttemplate.Template
 }
 
+func (q *Querier) String() string {
+	var names []string
+	for _, sl := range q.sources {
+		names = append(names, sl.name)
+	}
+	return strings.Join(names, ", ")
+}
+
 func (q *Querier) AddSource(name, templRaw string) error {
 	templ, err := texttemplate.New("template").Funcs(funcMap).Parse(templRaw)
 	if err != nil {

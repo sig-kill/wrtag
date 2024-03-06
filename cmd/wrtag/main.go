@@ -9,9 +9,11 @@ import (
 	"strings"
 
 	"github.com/sergi/go-diff/diffmatchpatch"
+	"go.senan.xyz/flagconf"
 	"go.senan.xyz/table/table"
+
 	"go.senan.xyz/wrtag"
-	"go.senan.xyz/wrtag/cmd/internal/conf"
+	"go.senan.xyz/wrtag/cmd/internal/flagparse"
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/pathformat"
 	"go.senan.xyz/wrtag/researchlink"
@@ -26,24 +28,20 @@ var tg tagcommon.Reader = taglib.TagLib{}
 var dmp = diffmatchpatch.New()
 
 func main() {
+	var pathFormat pathformat.Format
+	flag.Var(flagparse.PathFormat{&pathFormat}, "path-format", "path format")
+	var researchLinkQuerier researchlink.Querier
+	flag.Var(flagparse.Querier{&researchLinkQuerier}, "research-link", "research link")
+	configPath := flag.String("config-path", flagparse.DefaultConfigPath, "path config file")
+
 	yes := flag.Bool("yes", false, "use the found release anyway despite a low score")
 	useMBID := flag.String("mbid", "", "overwrite matched mbid")
-	conf.Parse()
 
-	pathFormat, err := pathformat.New(conf.PathFormat)
-	if err != nil {
-		log.Fatalf("gen path format: %v", err)
-	}
-
-	var researchLinkQuerier = &researchlink.Querier{}
-	for _, r := range conf.ResearchLinks {
-		if err := researchLinkQuerier.AddSource(r.Name, r.Template); err != nil {
-			log.Fatalf("add researchlink querier source: %v", err)
-		}
-	}
+	flag.Parse()
+	flagconf.ParseEnv()
+	flagconf.ParseConfig(*configPath)
 
 	command, dir := flag.Arg(0), flag.Arg(1)
-
 	var op wrtag.FileSystemOperation
 	switch command {
 	case "move":
@@ -59,7 +57,7 @@ func main() {
 		log.Fatalf("need a dir")
 	}
 
-	r, err := wrtag.ProcessDir(context.Background(), mb, tg, pathFormat, researchLinkQuerier, op, dir, *useMBID, *yes)
+	r, err := wrtag.ProcessDir(context.Background(), mb, tg, &pathFormat, &researchLinkQuerier, op, dir, *useMBID, *yes)
 	if err != nil && !errors.Is(err, wrtag.ErrScoreTooLow) {
 		log.Fatalln(err)
 	}

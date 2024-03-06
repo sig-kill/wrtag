@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	texttemplate "text/template"
 
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/pathformat"
@@ -151,7 +150,7 @@ type SearchResult struct {
 
 func ProcessDir(
 	ctx context.Context, mb MusicbrainzClient, tg tagcommon.Reader,
-	pathFormat *texttemplate.Template, researchLinkQuerier *researchlink.Querier,
+	pathFormat *pathformat.Format, researchLinkQuerier *researchlink.Querier,
 	op FileSystemOperation, srcDir string,
 	useMBID string, yes bool,
 ) (*SearchResult, error) {
@@ -220,12 +219,12 @@ func ProcessDir(
 		if _, ok := op.(DryRun); ok {
 			continue
 		}
-		tf, err := tg.Read(destPath)
+		tagFile, err := tg.Read(destPath)
 		if err != nil {
 			return nil, fmt.Errorf("read tag file: %w", err)
 		}
-		tagmap.WriteFile(release, labelInfo, genres, &releaseTrack, i, tf)
-		if err := tf.Close(); err != nil {
+		tagmap.WriteFile(release, labelInfo, genres, &releaseTrack, i, tagFile)
+		if err := tagFile.Close(); err != nil {
 			return nil, fmt.Errorf("close tag file after write: %w", err)
 		}
 	}
@@ -251,7 +250,7 @@ func ProcessDir(
 	return &SearchResult{Release: release, Score: score, Diff: diff}, nil
 }
 
-func DestDir(pathFormat *texttemplate.Template, release *musicbrainz.Release) (string, error) {
+func DestDir(pathFormat *pathformat.Format, release *musicbrainz.Release) (string, error) {
 	var buff strings.Builder
 	if err := pathFormat.Execute(&buff, pathformat.Data{Release: *release}); err != nil {
 		return "", fmt.Errorf("create path: %w", err)
