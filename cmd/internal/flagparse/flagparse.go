@@ -1,8 +1,8 @@
-// flagparse provides flag.Value wrappers for common types
 package flagparse
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,6 +25,8 @@ type PathFormat struct{ *pathformat.Format }
 func (pf PathFormat) String() string         { return "" }
 func (pf PathFormat) Set(value string) error { return pf.Parse(value) }
 
+var _ flag.Value = PathFormat{}
+
 type Querier struct{ *researchlink.Querier }
 
 func (q Querier) Set(value string) error {
@@ -33,6 +35,8 @@ func (q Querier) Set(value string) error {
 	err := q.AddSource(name, value)
 	return err
 }
+
+var _ flag.Value = Querier{}
 
 type Notifications struct{ *notifications.Notifications }
 
@@ -50,3 +54,5 @@ func (n Notifications) Set(value string) error {
 	}
 	return errors.Join(lineErrs...)
 }
+
+var _ flag.Value = Notifications{}

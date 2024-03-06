@@ -156,7 +156,7 @@ func ProcessDir(
 ) (*SearchResult, error) {
 	cover, paths, tagFiles, err := ReadDir(tg, srcDir)
 	if err != nil {
-		return nil, fmt.Errorf("read dir %q: %w", srcDir, err)
+		return nil, fmt.Errorf("read dir: %w", err)
 	}
 
 	searchFile := tagFiles[0]
