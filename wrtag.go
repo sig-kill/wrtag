@@ -10,8 +10,10 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"go.senan.xyz/wrtag/musicbrainz"
+	"go.senan.xyz/wrtag/originfile"
 	"go.senan.xyz/wrtag/pathformat"
 	"go.senan.xyz/wrtag/researchlink"
 	"go.senan.xyz/wrtag/tagmap"
@@ -146,6 +148,7 @@ type SearchResult struct {
 	Score         float64
 	Diff          []tagmap.Diff
 	ResearchLinks []researchlink.SearchResult
+	OriginFile    *originfile.OriginFile
 }
 
 func ProcessDir(
@@ -160,7 +163,7 @@ func ProcessDir(
 	}
 
 	searchFile := tagFiles[0]
-	q := musicbrainz.ReleaseQuery{
+	query := musicbrainz.ReleaseQuery{
 		MBReleaseID:      searchFile.MBReleaseID(),
 		MBArtistID:       first(searchFile.MBArtistID()),
 		MBReleaseGroupID: searchFile.MBReleaseGroupID(),
@@ -173,10 +176,34 @@ func ProcessDir(
 		NumTracks:        len(tagFiles),
 	}
 	if useMBID != "" {
-		q.MBReleaseID = useMBID
+		query.MBReleaseID = useMBID
 	}
 
-	release, err := mb.SearchRelease(ctx, q)
+	// parse https://github.com/x1ppy/gazelle-origin files, if one exists
+	originFile, err := originfile.Find(srcDir)
+	if err != nil {
+		return nil, fmt.Errorf("find origin file: %w", err)
+	}
+	if originFile != nil {
+		log.Printf("using origin file: %s", originFile)
+
+		if originFile.RecordLabel != "" {
+			query.Label = originFile.RecordLabel
+		}
+		if originFile.CatalogueNumber != "" {
+			query.CatalogueNum = originFile.CatalogueNumber
+		}
+		if originFile.Media != "" {
+			media := originFile.Media
+			media = strings.ReplaceAll(media, "WEB", "Digital Media")
+			query.Format = media
+		}
+		if originFile.EditionYear > 0 {
+			query.Date = time.Date(originFile.EditionYear, 0, 0, 0, 0, 0, 0, time.UTC)
+		}
+	}
+
+	release, err := mb.SearchRelease(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("search musicbrainz: %w", err)
 	}
@@ -188,12 +215,12 @@ func ProcessDir(
 
 	releaseTracks := musicbrainz.FlatTracks(release.Media)
 	if len(tagFiles) != len(releaseTracks) {
-		return &SearchResult{Release: release, ResearchLinks: researchLinks}, fmt.Errorf("%w: %d/%d", ErrTrackCountMismatch, len(tagFiles), len(releaseTracks))
+		return &SearchResult{Release: release, ResearchLinks: researchLinks, OriginFile: originFile}, fmt.Errorf("%w: %d/%d", ErrTrackCountMismatch, len(tagFiles), len(releaseTracks))
 	}
 
 	score, diff := tagmap.DiffRelease(release, tagFiles)
 	if !yes && score < 95 {
-		return &SearchResult{Release: release, Score: score, Diff: diff, ResearchLinks: researchLinks}, ErrScoreTooLow
+		return &SearchResult{Release: release, Score: score, Diff: diff, ResearchLinks: researchLinks, OriginFile: originFile}, ErrScoreTooLow
 	}
 
 	labelInfo := musicbrainz.AnyLabelInfo(release)
@@ -247,7 +274,7 @@ func ProcessDir(
 		}
 	}
 
-	return &SearchResult{Release: release, Score: score, Diff: diff}, nil
+	return &SearchResult{Release: release, Score: score, Diff: diff, OriginFile: originFile}, nil
 }
 
 func DestDir(pathFormat *pathformat.Format, release *musicbrainz.Release) (string, error) {
