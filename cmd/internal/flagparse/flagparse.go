@@ -15,6 +15,10 @@ import (
 
 const name = "wrtag"
 
+func init() {
+	flag.CommandLine.Init(name, flag.ExitOnError)
+}
+
 var (
 	userConfig, _     = os.UserConfigDir()
 	DefaultConfigPath = filepath.Join(userConfig, name, "config")
