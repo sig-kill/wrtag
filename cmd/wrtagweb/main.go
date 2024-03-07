@@ -96,11 +96,12 @@ func main() {
 			return fmt.Errorf("gen dest dir: %w", err)
 		}
 
-		if job.Operation == OperationMove {
-			job.SourcePath = job.DestPath
-		}
-
 		notifs.Send(notifications.Complete, job.String())
+
+		// either if this was a copy or move job, subsequent re-imports should just be a move so we can retag
+		job.Operation = OperationMove
+		job.SourcePath = job.DestPath
+
 		return nil
 	}
 
