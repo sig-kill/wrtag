@@ -1,0 +1,6 @@
+issues:
+  exclude-rules:
+    - text: "struct literal uses unkeyed fields"
+      path: ".*"
+    - text: "Error return value of `flagconf"
+      path: ".*"
