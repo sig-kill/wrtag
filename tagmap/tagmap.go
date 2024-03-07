@@ -17,6 +17,7 @@ var dmp = diffmatchpatch.New()
 type Diff struct {
 	Field         string
 	Before, After []diffmatchpatch.Diff
+	Equal         bool
 }
 
 func DiffRelease(release *musicbrainz.Release, files []tagcommon.File) (float64, []Diff) {
@@ -25,11 +26,15 @@ func DiffRelease(release *musicbrainz.Release, files []tagcommon.File) (float64,
 	add := func(f, a, b string) Diff {
 		diffs := dmp.DiffMain(a, b, false)
 		charsTotal += len([]rune(b))
-		charsDiff += dmp.DiffLevenshtein(diffs)
+
+		charDiff := dmp.DiffLevenshtein(diffs)
+		charsDiff += charDiff
+
 		return Diff{
 			Field:  f,
 			Before: filterDiff(diffs, func(d diffmatchpatch.Diff) bool { return d.Type <= diffmatchpatch.DiffEqual }),
 			After:  filterDiff(diffs, func(d diffmatchpatch.Diff) bool { return d.Type >= diffmatchpatch.DiffEqual }),
+			Equal:  charDiff == 0,
 		}
 	}
 

@@ -1,6 +1,6 @@
 <table>
 {{ range . }}
-  <tr class="{{ if or (gt (len .Before) 1) (gt (len .After) 1) }}bg-gray-200{{ end }}">
+  <tr class="{{ if not .Equal }}bg-gray-200{{ end }}">
     <td class="px-2 text-gray-500">{{ .Field }}</td>
     <td class="px-2">
       {{ if eq (len .Before) 0 }}<span class="text-gray-400">[empty]</span>{{ end }}
