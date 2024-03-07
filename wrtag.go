@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"go.senan.xyz/wrtag/fileutil"
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/originfile"
 	"go.senan.xyz/wrtag/pathformat"
@@ -107,7 +108,7 @@ var _ FileSystemOperation = (*Copy)(nil)
 var _ FileSystemOperation = (*DryRun)(nil)
 
 func ReadDir(tg tagcommon.Reader, path string) (string, []string, []tagcommon.File, error) {
-	allPaths, err := filepath.Glob(filepath.Join(path, "*"))
+	allPaths, err := fileutil.GlobBase(path, "*")
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("glob dir: %w", err)
 	}

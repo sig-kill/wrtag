@@ -3,8 +3,8 @@ package originfile
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
+	"go.senan.xyz/wrtag/fileutil"
 	"gopkg.in/yaml.v2"
 )
 
@@ -13,7 +13,7 @@ import (
 const dirPat = "origin.y*ml"
 
 func Find(dir string) (*OriginFile, error) {
-	matches, err := filepath.Glob(filepath.Join(dir, dirPat))
+	matches, err := fileutil.GlobBase(dir, dirPat)
 	if err != nil {
 		return nil, fmt.Errorf("glob for origin file: %w", err)
 	}
