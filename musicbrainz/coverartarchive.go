@@ -66,7 +66,7 @@ type caaResponse struct {
 		Comment    string   `json:"comment"`
 		Edit       int      `json:"edit"`
 		Front      bool     `json:"front"`
-		ID         int      `json:"id"`
+		ID         any      `json:"id"`
 		Image      string   `json:"image"`
 		Types      []string `json:"types"`
 		Thumbnails struct {
