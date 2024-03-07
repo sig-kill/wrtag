@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -262,9 +263,32 @@ func ProcessDir(
 	}
 
 	if cover != "" {
+		// use local cover
 		coverDest := filepath.Join(destDir, "cover"+filepath.Ext(cover))
 		if err := op.ProcessFile(cover, coverDest); err != nil {
 			return nil, fmt.Errorf("move file to dest: %w", err)
+		}
+	} else {
+		// get mb cover
+		coverURL, err := musicbrainz.GetCoverURL(ctx, release)
+		if err != nil {
+			return nil, fmt.Errorf("request cover url: %w", err)
+		}
+		if coverURL != "" {
+			coverDest := filepath.Join(destDir, "cover"+filepath.Ext(coverURL))
+			coverf, err := os.Create(coverDest)
+			if err != nil {
+				return nil, fmt.Errorf("create cover destination file: %w", err)
+			}
+			resp, err := http.Get(coverURL)
+			if err != nil {
+				return nil, fmt.Errorf("create cover destination file: %w", err)
+			}
+			n, _ := io.Copy(coverf, resp.Body)
+			resp.Body.Close()
+			coverf.Close()
+
+			log.Printf("wrote cover to %s (%d bytes)", coverDest, n)
 		}
 	}
 

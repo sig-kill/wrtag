@@ -16,7 +16,8 @@ import (
 	"golang.org/x/time/rate"
 )
 
-const base = "https://musicbrainz.org/ws/2/"
+const mbBase = "https://musicbrainz.org/ws/2/"
+const caaBase = "https://coverartarchive.org/"
 
 var ErrNoResults = fmt.Errorf("no results")
 
@@ -58,7 +59,7 @@ func (c *Client) GetRelease(ctx context.Context, mbid string) (*Release, error) 
 	urlV.Set("fmt", "json")
 	urlV.Set("inc", "recordings+artist-credits+labels+release-groups+genres")
 
-	url, _ := url.Parse(joinPath(base, "release", mbid))
+	url, _ := url.Parse(joinPath(mbBase, "release", mbid))
 	url.RawQuery = urlV.Encode()
 
 	req, _ := http.NewRequest(http.MethodGet, url.String(), nil)
@@ -135,7 +136,7 @@ func (c *Client) SearchRelease(ctx context.Context, q ReleaseQuery) (*Release, e
 	urlV.Set("limit", "1")
 	urlV.Set("query", queryStr)
 
-	url, _ := url.Parse(joinPath(base, "release"))
+	url, _ := url.Parse(joinPath(mbBase, "release"))
 	url.RawQuery = urlV.Encode()
 	req, _ := http.NewRequest(http.MethodGet, url.String(), nil)
 
