@@ -1,7 +1,7 @@
 # path-format is rooted in your destination music dir. the template is fed with musicbrainz release data
 # see go.senan.xyz/wrtag/musicbrainz for type definitions
 
-#path-format /home/senan/downloads/musicbeets/albums/{{ artistNames .Release.Artists | join "; " }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title }}/{{ pad0 2 .TrackNum }}.{{ flatTracks .Release.Media | len | pad0 2 }} {{ .Track.Title }}{{ .Ext }}
+#path-format /home/senan/downloads/musicbeets/albums/{{ artistNames .Release.Artists | sort | join "; " }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title }}/{{ pad0 2 .TrackNum }}.{{ flatTracks .Release.Media | len | pad0 2 }} {{ .Track.Title }}{{ .Ext }}
 
 # search links are shortcuts on for the ui to help research data, and populate missing musicbrainz data. the template is fed with tag data
 # see go.senan.xyz/tags/tagcommon for type definitions

@@ -2,6 +2,7 @@ package pathformat
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	texttemplate "text/template"
 
@@ -35,6 +36,7 @@ func (pf *Format) Parse(str string) error {
 var funcMap = texttemplate.FuncMap{
 	"join": func(delim string, items []string) string { return strings.Join(items, delim) },
 	"pad0": func(amount, n int) string { return fmt.Sprintf("%0*d", amount, n) },
+	"sort": func(strings []string) []string { sort.Strings(strings); return strings },
 
 	"flatTracks":   musicbrainz.FlatTracks,
 	"artistCredit": musicbrainz.CreditString,

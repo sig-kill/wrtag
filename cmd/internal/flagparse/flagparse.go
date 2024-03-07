@@ -33,6 +33,7 @@ var _ flag.Value = PathFormat{}
 
 type Querier struct{ *researchlink.Querier }
 
+func (p Querier) String() string { return "" }
 func (q Querier) Set(value string) error {
 	name, value, _ := strings.Cut(value, " ")
 	name, value = strings.TrimSpace(name), strings.TrimSpace(value)
