@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"go.senan.xyz/wrtag/fileutil"
@@ -36,14 +37,24 @@ type FileSystemOperation interface {
 	CleanDir(src string) error
 }
 
-type Move struct{}
+type Move struct{ copy Copy }
 
-func (Move) ProcessFile(src, dest string) error {
+func (m Move) ProcessFile(src, dest string) error {
 	if filepath.Clean(src) == filepath.Clean(dest) {
 		return nil
 	}
 
 	if err := os.Rename(src, dest); err != nil {
+		var errNo syscall.Errno
+		if errors.As(err, &errNo) && errNo == 18 /*  invalid cross-device link */ {
+			// we tried to rename across filesystems, copy and delete instead
+			if err := m.copy.ProcessFile(src, dest); err != nil {
+				return fmt.Errorf("copy from move: %w", err)
+			}
+			if err := os.Remove(src); err != nil {
+				return fmt.Errorf("remove from move: %w", err)
+			}
+		}
 		return fmt.Errorf("rename: %w", err)
 	}
 	return nil
