@@ -107,7 +107,7 @@ func mainTagCheck() {
 		result := method.Call(nil)
 		exp, act := dest.Elem().Interface(), result[0].Interface()
 		if !reflect.DeepEqual(exp, act) {
-			log.Fatalf("exp %v got %v", exp, act)
+			log.Fatalf("exp %q got %q", exp, act)
 		}
 
 		f.Close()
