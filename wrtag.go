@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"go.senan.xyz/wrtag/fileutil"
@@ -225,6 +226,18 @@ func ProcessDir(
 		return &SearchResult{Release: release, Score: score, Diff: diff, ResearchLinks: researchLinks, OriginFile: originFile}, ErrScoreTooLow
 	}
 
+	destDir, err := DestDir(pathFormat, release)
+	if err != nil {
+		return nil, fmt.Errorf("gen dest dir: %w", err)
+	}
+
+	// lock both source and destination directories
+	unlock := nLock(
+		dirLocks.Get(srcDir),
+		dirLocks.Get(destDir),
+	)
+	defer unlock()
+
 	labelInfo := musicbrainz.AnyLabelInfo(release)
 	genres := musicbrainz.AnyGenres(release)
 
@@ -255,11 +268,6 @@ func ProcessDir(
 		if err := tagFile.Close(); err != nil {
 			return nil, fmt.Errorf("close tag file after write: %w", err)
 		}
-	}
-
-	destDir, err := DestDir(pathFormat, release)
-	if err != nil {
-		return nil, fmt.Errorf("gen dest dir: %w", err)
 	}
 
 	if cover != "" {
@@ -342,4 +350,27 @@ func or[T comparable](items ...T) T {
 		}
 	}
 	return zero
+}
+
+var dirLocks keyedMutex
+
+type keyedMutex struct {
+	sync.Map
+}
+
+func (km *keyedMutex) Get(key string) *sync.Mutex {
+	value, _ := km.LoadOrStore(key, &sync.Mutex{})
+	mu := value.(*sync.Mutex)
+	return mu
+}
+
+func nLock(locks ...sync.Locker) func() {
+	for _, l := range locks {
+		l.Lock()
+	}
+	return func() {
+		for _, l := range locks {
+			l.Unlock()
+		}
+	}
 }
