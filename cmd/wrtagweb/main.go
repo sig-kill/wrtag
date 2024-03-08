@@ -40,6 +40,9 @@ func main() {
 	flag.Var(flagparse.PathFormat{&pathFormat}, "path-format", "path-format")
 	var researchLinkQuerier researchlink.Querier
 	flag.Var(flagparse.Querier{&researchLinkQuerier}, "research-link", "research link")
+	var keepFiles = map[string]struct{}{}
+	flag.Func("keep-file", "files to keep from source directories",
+		func(s string) error { keepFiles[s] = struct{}{}; return nil })
 	var notifs notifications.Notifications
 	flag.Var(flagparse.Notifications{&notifs}, "notification-uri", "shoutrrr notification uri")
 	configPath := flag.String("config-path", flagparse.DefaultConfigPath, "path config file")
@@ -80,7 +83,7 @@ func main() {
 		job.Status = StatusComplete
 
 		var err error
-		job.SearchResult, err = wrtag.ProcessDir(ctx, mb, tg, &pathFormat, &researchLinkQuerier, wrtagOperation(job.Operation), job.SourcePath, job.UseMBID, yes)
+		job.SearchResult, err = wrtag.ProcessDir(ctx, mb, tg, &pathFormat, &researchLinkQuerier, keepFiles, wrtagOperation(job.Operation), job.SourcePath, job.UseMBID, yes)
 		if err != nil {
 			if errors.Is(err, wrtag.ErrScoreTooLow) {
 				job.Error = string(JobErrorNeedsInput)
