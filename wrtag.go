@@ -230,13 +230,12 @@ func ProcessDir(
 
 	for i := range releaseTracks {
 		releaseTrack, path := releaseTracks[i], paths[i]
-		data := pathformat.Data{Release: *release, Track: releaseTrack, TrackNum: i + 1, Ext: filepath.Ext(path)}
 
-		var destPathBuff strings.Builder
-		if err := pathFormat.Execute(&destPathBuff, data); err != nil {
+		pathFormatData := pathformat.Data{Release: *release, Track: releaseTrack, TrackNum: i + 1, Ext: filepath.Ext(path)}
+		destPath, err := pathFormat.Execute(pathFormatData)
+		if err != nil {
 			return nil, fmt.Errorf("create path: %w", err)
 		}
-		destPath := destPathBuff.String()
 
 		if err := os.MkdirAll(filepath.Dir(destPath), os.ModePerm); err != nil {
 			return nil, fmt.Errorf("create dest path: %w", err)
@@ -303,11 +302,10 @@ func ProcessDir(
 }
 
 func DestDir(pathFormat *pathformat.Format, release *musicbrainz.Release) (string, error) {
-	var buff strings.Builder
-	if err := pathFormat.Execute(&buff, pathformat.Data{Release: *release}); err != nil {
+	path, err := pathFormat.Execute(pathformat.Data{Release: *release})
+	if err != nil {
 		return "", fmt.Errorf("create path: %w", err)
 	}
-	path := buff.String()
 	dir := filepath.Dir(path)
 	return dir, nil
 }
