@@ -1,0 +1,16 @@
+{
+  "name": "wrtag",
+  "description": "wrtag",
+  "short_name": "wrtag",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/dist/icon.png",
+      "sizes": "60x60",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "display": "standalone",
+  "background_color": "#f3f4f6"
+}
