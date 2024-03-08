@@ -119,7 +119,7 @@ func ReadDir(tg tagcommon.Reader, path string) (string, []string, []tagcommon.Fi
 	var files []tagcommon.File
 	for _, path := range allPaths {
 		switch strings.ToLower(filepath.Ext(path)) {
-		case ".jpg", ".jpeg", ".png", "bmp", "gif":
+		case ".jpg", ".jpeg", ".png", ".bmp", ".gif":
 			cover = path
 			continue
 		}
