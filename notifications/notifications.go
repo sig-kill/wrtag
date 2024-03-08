@@ -34,7 +34,8 @@ func (n *Notifications) AddURI(event Event, uri string) error {
 	return fmt.Errorf("%w: %q", ErrUnknownEvent, event)
 }
 
-// Send a simple string for now, later fancy diffs and things
+// Send a simple string for now, maybe later message could instead be be a type which
+// implements a notifications.Bodyer or something so that notifiers can send rich notifications.
 func (n *Notifications) Send(event Event, message string) {
 	uris := n.mappings[event]
 	if len(uris) == 0 {
