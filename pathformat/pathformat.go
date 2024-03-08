@@ -6,6 +6,7 @@ import (
 	"strings"
 	texttemplate "text/template"
 
+	"go.senan.xyz/wrtag/fileutil"
 	"go.senan.xyz/wrtag/musicbrainz"
 )
 
@@ -33,10 +34,20 @@ func (pf *Format) Parse(str string) error {
 	return err
 }
 
+func (pf *Format) Execute(data Data) (string, error) {
+	var buff strings.Builder
+	if err := pf.Template.Execute(&buff, data); err != nil {
+		return "", fmt.Errorf("create path: %w", err)
+	}
+	destPath := buff.String()
+	return destPath, nil
+}
+
 var funcMap = texttemplate.FuncMap{
-	"join": func(delim string, items []string) string { return strings.Join(items, delim) },
-	"pad0": func(amount, n int) string { return fmt.Sprintf("%0*d", amount, n) },
-	"sort": func(strings []string) []string { sort.Strings(strings); return strings },
+	"join":     func(delim string, items []string) string { return strings.Join(items, delim) },
+	"pad0":     func(amount, n int) string { return fmt.Sprintf("%0*d", amount, n) },
+	"sort":     func(strings []string) []string { sort.Strings(strings); return strings },
+	"safepath": func(p string) string { return fileutil.SafePath(p) },
 
 	"flatTracks":   musicbrainz.FlatTracks,
 	"artistCredit": musicbrainz.CreditString,

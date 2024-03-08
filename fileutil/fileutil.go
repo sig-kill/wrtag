@@ -23,3 +23,14 @@ func GlobEscape(path string) string {
 func GlobBase(dir, pattern string) ([]string, error) {
 	return filepath.Glob(filepath.Join(GlobEscape(dir), pattern))
 }
+
+var safePathReplacer = strings.NewReplacer(
+	"\x00", "",
+	string(filepath.Separator), " ",
+)
+
+func SafePath(path string) string {
+	path = safePathReplacer.Replace(path)
+	path = strings.Join(strings.Fields(path), " ")
+	return path
+}
