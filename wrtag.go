@@ -226,7 +226,7 @@ func ProcessDir(
 	}
 
 	labelInfo := musicbrainz.AnyLabelInfo(release)
-	genres := musicbrainz.AllGenres(release)
+	genres := musicbrainz.AnyGenres(release)
 
 	for i := range releaseTracks {
 		releaseTrack, path := releaseTracks[i], paths[i]

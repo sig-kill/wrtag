@@ -303,7 +303,7 @@ type GenreInfo struct {
 	Count uint
 }
 
-func AllGenres(release *Release) []string {
+func AnyGenres(release *Release) []string {
 	var genres []string
 	for _, g := range release.Genres {
 		genres = insertUniq(genres, g.Name)
