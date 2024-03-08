@@ -308,23 +308,29 @@ func AllGenres(release *Release) []string {
 	for _, g := range release.Genres {
 		genres = insertUniq(genres, g.Name)
 	}
+	for _, g := range release.ReleaseGroup.Genres {
+		genres = insertUniq(genres, g.Name)
+	}
+	for _, t := range FlatTracks(release.Media) {
+		for _, g := range t.Recording.Genres {
+			genres = insertUniq(genres, g.Name)
+		}
+	}
+	if len(genres) > 0 {
+		return genres
+	}
 	for _, a := range release.Artists {
 		for _, g := range a.Artist.Genres {
 			genres = insertUniq(genres, g.Name)
 		}
-	}
-	for _, g := range release.ReleaseGroup.Genres {
-		genres = insertUniq(genres, g.Name)
 	}
 	for _, a := range release.ReleaseGroup.Artists {
 		for _, g := range a.Artist.Genres {
 			genres = insertUniq(genres, g.Name)
 		}
 	}
-	for _, t := range FlatTracks(release.Media) {
-		for _, g := range t.Recording.Genres {
-			genres = insertUniq(genres, g.Name)
-		}
+	if len(genres) > 0 {
+		return genres
 	}
 	for _, l := range release.LabelInfo {
 		for _, g := range l.Label.Genres {
