@@ -160,7 +160,7 @@ func main() {
 
 	mux.HandleFunc("GET /jobs", func(w http.ResponseWriter, r *http.Request) {
 		var jobs []*Job
-		if err := db.Find(&jobs, nil); err != nil {
+		if err := db.Find(&jobs, (&bolthold.Query{}).SortBy("ID").Reverse()); err != nil {
 			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
 			return
 		}
