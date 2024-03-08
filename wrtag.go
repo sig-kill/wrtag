@@ -156,7 +156,7 @@ type SearchResult struct {
 
 func ProcessDir(
 	ctx context.Context, mb MusicbrainzClient, tg tagcommon.Reader,
-	pathFormat *pathformat.Format, researchLinkQuerier *researchlink.Querier,
+	pathFormat *pathformat.Format, researchLinkQuerier *researchlink.Querier, keepFiles map[string]struct{},
 	op FileSystemOperation, srcDir string,
 	useMBID string, yes bool,
 ) (*SearchResult, error) {
@@ -297,6 +297,12 @@ func ProcessDir(
 			coverf.Close()
 
 			log.Printf("wrote cover to %s (%d bytes)", coverDest, n)
+		}
+	}
+
+	for kf := range keepFiles {
+		if err := op.ProcessFile(filepath.Join(srcDir, kf), filepath.Join(destDir, kf)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("process keep file %q: %w", kf, err)
 		}
 	}
 

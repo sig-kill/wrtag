@@ -17,3 +17,8 @@
 
 #notification-uri complete,needs-input smtp://username:password@host:port/?from=from@example.com&to=recipient@example.com
 #notification-uri complete             generic+https://my.subsonic.com/rest/startScan.view?c=wrtag&v=1.16&u=user&p=password
+
+# set a list of files to keep when moving or copying
+
+#keep-file origin.yaml
+#keep-file log.cue
