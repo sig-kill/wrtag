@@ -171,6 +171,8 @@ func ProcessDir(
 	op FileSystemOperation, srcDir string,
 	useMBID string, yes bool,
 ) (*SearchResult, error) {
+	srcDir = filepath.Clean(srcDir)
+
 	cover, paths, tagFiles, err := ReadDir(tg, srcDir)
 	if err != nil {
 		return nil, fmt.Errorf("read dir: %w", err)
@@ -241,13 +243,13 @@ func ProcessDir(
 	if err != nil {
 		return nil, fmt.Errorf("gen dest dir: %w", err)
 	}
+	destDir = filepath.Clean(destDir)
 
 	// lock both source and destination directories
-	unlock := nLock(
-		dirLocks.Get(srcDir),
-		dirLocks.Get(destDir),
-	)
-	defer unlock()
+	defer dirLocks.Lock(srcDir)()
+	if srcDir != destDir {
+		defer dirLocks.Lock(destDir)()
+	}
 
 	labelInfo := musicbrainz.AnyLabelInfo(release)
 	genres := musicbrainz.AnyGenres(release)
@@ -375,10 +377,11 @@ type keyedMutex struct {
 	sync.Map
 }
 
-func (km *keyedMutex) Get(key string) *sync.Mutex {
+func (km *keyedMutex) Lock(key string) func() {
 	value, _ := km.LoadOrStore(key, &sync.Mutex{})
 	mu := value.(*sync.Mutex)
-	return mu
+	mu.Lock()
+	return func() { mu.Unlock() }
 }
 
 func nLock(locks ...sync.Locker) func() {
