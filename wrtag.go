@@ -223,9 +223,12 @@ func ProcessDir(
 		return nil, fmt.Errorf("search musicbrainz: %w", err)
 	}
 
-	researchLinks, err := researchLinkQuerier.Search(searchFile)
-	if err != nil {
-		return nil, fmt.Errorf("research querier search: %w", err)
+	var researchLinks []researchlink.SearchResult
+	if researchLinkQuerier != nil {
+		researchLinks, err = researchLinkQuerier.Search(searchFile)
+		if err != nil {
+			return nil, fmt.Errorf("research querier search: %w", err)
+		}
 	}
 
 	releaseTracks := musicbrainz.FlatTracks(release.Media)
