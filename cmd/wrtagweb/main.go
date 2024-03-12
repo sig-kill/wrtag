@@ -59,7 +59,7 @@ func main() {
 		log.Fatal("need api key")
 	}
 
-	db, err := bolthold.Open(*confDBPath, 0600, nil)
+	db, err := bolthold.Open(*confDBPath, 0o600, nil)
 	if err != nil {
 		log.Fatalf("error parsing path format template: %v", err)
 	}
