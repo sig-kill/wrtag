@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"slices"
@@ -36,6 +37,8 @@ func (c *Client) request(ctx context.Context, r *http.Request, dest any) error {
 	if err := c.limiter.Wait(ctx); err != nil {
 		return fmt.Errorf("wait: %w", err)
 	}
+
+	log.Printf("making mb request %s", r.URL)
 
 	resp, err := c.httpClient.Do(r.WithContext(ctx))
 	if err != nil {

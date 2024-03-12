@@ -201,6 +201,7 @@ func ProcessDir(
 		return nil, fmt.Errorf("find origin file: %w", err)
 	}
 	if originFile != nil {
+		log.Printf("using origin file: %s", originFile)
 
 		if originFile.RecordLabel != "" {
 			query.Label = originFile.RecordLabel
@@ -307,10 +308,11 @@ func ProcessDir(
 			if err != nil {
 				return nil, fmt.Errorf("create cover destination file: %w", err)
 			}
-			_, _ = io.Copy(coverf, resp.Body)
+			n, _ := io.Copy(coverf, resp.Body)
 			resp.Body.Close()
 			coverf.Close()
 
+			log.Printf("wrote cover to %s (%d bytes)", coverDest, n)
 		}
 	}
 

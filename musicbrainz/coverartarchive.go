@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 )
 
 var caaClient = http.Client{}
 
 func caaRequest(ctx context.Context, r *http.Request, dest any) error {
+	log.Printf("making caa request %s", r.URL)
+
 	r = r.WithContext(ctx)
 	resp, err := caaClient.Do(r)
 	if err != nil {
