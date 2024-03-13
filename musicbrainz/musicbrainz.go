@@ -165,15 +165,17 @@ func (c *Client) SearchRelease(ctx context.Context, q ReleaseQuery) (*Release, e
 type ArtistCredit struct {
 	Name       string `json:"name"`
 	JoinPhrase string `json:"joinphrase"`
-	Artist     struct {
-		ID             string  `json:"id"`
-		Name           string  `json:"name"`
-		TypeID         string  `json:"type-id"`
-		SortName       string  `json:"sort-name"`
-		Type           string  `json:"type"`
-		Genres         []Genre `json:"genres"`
-		Disambiguation string  `json:"disambiguation"`
-	} `json:"artist"`
+	Artist     Artist `json:"artist"`
+}
+
+type Artist struct {
+	ID             string  `json:"id"`
+	Name           string  `json:"name"`
+	TypeID         string  `json:"type-id"`
+	SortName       string  `json:"sort-name"`
+	Type           string  `json:"type"`
+	Genres         []Genre `json:"genres"`
+	Disambiguation string  `json:"disambiguation"`
 }
 
 type Genre struct {

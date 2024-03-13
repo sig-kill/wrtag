@@ -4,7 +4,7 @@ exec tag-write kat_moda/03.flac Title '"trk 3"'
 
 exec tag-write kat_moda/*.flac MBReleaseID '"e47d04a4-7460-427d-a731-cc82386d85f1"'
 
-env WRTAG_PATH_FORMAT='albums/{{ .Track.Title }}{{ .Ext }}'
+env WRTAG_PATH_FORMAT='albums/{{ .Release.Title }}/{{ .Track.Title }}{{ .Ext }}'
 
 exec wrtag -yes move kat_moda/
 stderr 'using origin file: Jeff Mills - Kat Moda EP \(2009\) \[Purpose Maker #PMD-002\]'
