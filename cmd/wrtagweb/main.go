@@ -163,7 +163,7 @@ func main() {
 
 	mux.HandleFunc("GET /jobs", func(w http.ResponseWriter, r *http.Request) {
 		var jobs []*Job
-		if err := db.Find(&jobs, (&bolthold.Query{}).SortBy("ID").Reverse()); err != nil {
+		if err := db.Find(&jobs, (&bolthold.Query{}).SortBy("Time").Reverse()); err != nil {
 			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
 			return
 		}
@@ -228,7 +228,7 @@ func main() {
 
 	mux.HandleFunc("/{$}", func(w http.ResponseWriter, r *http.Request) {
 		var jobs []*Job
-		if err := db.Find(&jobs, (&bolthold.Query{}).SortBy("ID").Reverse()); err != nil {
+		if err := db.Find(&jobs, (&bolthold.Query{}).SortBy("Time").Reverse()); err != nil {
 			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
 			return
 		}
@@ -254,7 +254,7 @@ func main() {
 			http.Error(w, "no path provided", http.StatusBadRequest)
 			return
 		}
-		job := Job{SourcePath: path, Operation: operation}
+		job := Job{SourcePath: path, Operation: operation, Time: time.Now()}
 		if err := db.Insert(bolthold.NextSequence(), &job); err != nil {
 			http.Error(w, fmt.Sprintf("error saving job: %v", err), http.StatusInternalServerError)
 			return
@@ -307,6 +307,7 @@ func wrtagOperation(op Operation) wrtag.FileSystemOperation {
 
 type Job struct {
 	ID                   uint64    `boltholdKey:"ID"`
+	Time                 time.Time `boltholdIndex:"Time"` // https://github.com/timshannon/bolthold/issues/139
 	Status               JobStatus `boltholdIndex:"Status"`
 	Error                string
 	Operation            Operation
