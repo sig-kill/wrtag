@@ -332,7 +332,8 @@ func ProcessDir(
 }
 
 func DestDir(pathFormat *pathformat.Format, release *musicbrainz.Release) (string, error) {
-	path, err := pathFormat.Execute(pathformat.Data{Release: *release})
+	dummyTrack := musicbrainz.Track{Title: "track"}
+	path, err := pathFormat.Execute(pathformat.Data{Release: *release, Track: dummyTrack, TrackNum: 1, Ext: ".eg"})
 	if err != nil {
 		return "", fmt.Errorf("create path: %w", err)
 	}
