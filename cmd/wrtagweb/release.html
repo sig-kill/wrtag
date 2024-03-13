@@ -1,33 +1,45 @@
-<form hx-post="/jobs/{{ .ID }}" hx-target="this" hx-indicator="this" hx-swap="outerHTML" class="bg-gray-100 p-3 flex flex-col items-start gap-2 shadow-sm">
-  <div class="flex justify-between gap-3 w-full">
-    <span>{{ .Operation }} path <a class="italic" href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></span>
-    <button hx-delete="/jobs/{{ .ID }}" hx-swap="none">[x]</button>
-  </div>
-  {{ if .SearchResult }}
-    <p class="font-bold">{{ printf "%.2f%%" .SearchResult.Score }} match with <a href="https://musicbrainz.org/release/{{ .SearchResult.Release.ID }}" target="_blank">https://musicbrainz.org/release/{{ .SearchResult.Release.ID }}</a></p>
-    {{ if .SearchResult.Diff }}
-      {{ template "diff.html" .SearchResult.Diff }}
-    {{ end }}
-    {{ if .SearchResult.OriginFile }}
-      {{ template "originfile.html" .SearchResult.OriginFile }}
-    {{ end }}
-    {{ if .SearchResult.ResearchLinks }}
-      <p>research links <span class="inline-flex gap-2">{{ range .SearchResult.ResearchLinks }}<a target="_blank" href="{{ .URL | url }}">{{ .Name }}</a>{{ end }}</span></p>
-    {{ end }}
+{{ define "status-colour" }}
+  {{ if eq .Status "" }}bg-orange-200
+  {{ else if .Error }}bg-red-200
+  {{ else }}bg-gray-100
   {{ end }}
-  {{ if eq .Status "" }}
-    <p class="text-gray-600">in progress ...</p>
-  {{ else if eq .Error "needs-input" }}
-    <p><span class="text-red-500">low/no match</span> <button hx-post="/jobs/{{ .ID }}?confirm=1">[use anyway]</button></p>
-    <p>custom mbid/url <input type="text" name="mbid" class="px-2 w-[320px]" placeholder="74a7e992-4366-427a-91ff-f3cf6aa7524d" value="{{ .UseMBID }}"></p>
-    <button>[retry]</button>
-  {{ else if .Error }}
-    <p class="text-red-500">{{ .Error }}</p>
-    <p>custom mbid/url <input type="text" name="mbid" class="px-2 w-[320px]" placeholder="74a7e992-4366-427a-91ff-f3cf6aa7524d" value="{{ .UseMBID }}"></p>
-    <button>[retry]</button>
-  {{ else }}
-    <p>sucessfully moved to <a href="{{ .DestPath | file | url }}">{{ .DestPath }}</a>
-    <p>custom mbid/url <input type="text" name="mbid" class="px-2 w-[320px]" placeholder="74a7e992-4366-427a-91ff-f3cf6aa7524d" value="{{ .UseMBID }}"></p>
-    <button>[reimport]</button>
-  {{ end }}
+{{ end }}
+
+<form id="{{ .ID }}" hx-post="/jobs/{{ .ID }}" hx-target="this" hx-indicator="this" hx-swap="outerHTML" class="{{ template "status-colour" . }} shadow-sm">
+  <details>
+    <summary class="p-3 cursor-pointer">
+      <span>{{ .Operation }} path <a class="italic" href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></span>
+      <button hx-delete="/jobs/{{ .ID }}" hx-swap="none" class="float-right ml-3 pt-[2px]">[x]</button>
+    </summary>
+
+    <div class="flex flex-col items-start gap-2 bg-gray-100 p-3">
+      {{ if .SearchResult }}
+        <p class="font-bold">{{ printf "%.2f%%" .SearchResult.Score }} match with <a href="https://musicbrainz.org/release/{{ .SearchResult.Release.ID }}" target="_blank">https://musicbrainz.org/release/{{ .SearchResult.Release.ID }}</a></p>
+        {{ if .SearchResult.Diff }}
+          {{ template "diff.html" .SearchResult.Diff }}
+        {{ end }}
+        {{ if .SearchResult.OriginFile }}
+          {{ template "originfile.html" .SearchResult.OriginFile }}
+        {{ end }}
+        {{ if .SearchResult.ResearchLinks }}
+          <p>research links <span class="inline-flex gap-2">{{ range .SearchResult.ResearchLinks }}<a target="_blank" href="{{ .URL | url }}">{{ .Name }}</a>{{ end }}</span></p>
+        {{ end }}
+      {{ end }}
+      {{ if eq .Status "" }}
+        <p class="text-gray-600">in progress ...</p>
+      {{ else if eq .Error "needs-input" }}
+        <p><span class="text-red-500">low/no match</span> <button hx-post="/jobs/{{ .ID }}?confirm=1">[use anyway]</button></p>
+        <p>custom mbid/url <input type="text" name="mbid" class="px-2 w-[320px]" placeholder="74a7e992-4366-427a-91ff-f3cf6aa7524d" value="{{ .UseMBID }}"></p>
+        <button>[retry]</button>
+      {{ else if .Error }}
+        <p class="text-red-500">{{ .Error }}</p>
+        <p>custom mbid/url <input type="text" name="mbid" class="px-2 w-[320px]" placeholder="74a7e992-4366-427a-91ff-f3cf6aa7524d" value="{{ .UseMBID }}"></p>
+        <button>[retry]</button>
+      {{ else }}
+        <p>sucessfully moved to <a href="{{ .DestPath | file | url }}">{{ .DestPath }}</a>
+        <p>custom mbid/url <input type="text" name="mbid" class="px-2 w-[320px]" placeholder="74a7e992-4366-427a-91ff-f3cf6aa7524d" value="{{ .UseMBID }}"></p>
+        <button>[reimport]</button>
+      {{ end }}
+    </div>
+  </details>
 </form>
