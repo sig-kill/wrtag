@@ -162,8 +162,17 @@ func main() {
 	mux.Handle("GET /events", sseServ)
 
 	mux.HandleFunc("GET /jobs", func(w http.ResponseWriter, r *http.Request) {
+		q := &bolthold.Query{}
+		if search := r.URL.Query().Get("search"); search != "" {
+			q = q.And("SourcePath").MatchFunc(func(path string) (bool, error) {
+				return strings.Contains(path, search), nil
+			})
+		}
+		q = q.SortBy("Time")
+		q = q.Reverse()
+
 		var jobs []*Job
-		if err := db.Find(&jobs, (&bolthold.Query{}).SortBy("Time").Reverse()); err != nil {
+		if err := db.Find(&jobs, q); err != nil {
 			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
 			return
 		}
