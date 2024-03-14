@@ -5,11 +5,11 @@
   {{ end }}
 {{ end }}
 
-<form id="{{ .ID }}" hx-post="/jobs/{{ .ID }}" hx-target="this" hx-indicator="this" hx-swap="outerHTML" class="{{ template "status-colour" . }} shadow-sm">
-  <details>
+<form id="job-{{ .ID }}" hx-post="/jobs/{{ .ID }}" hx-target="this" hx-indicator="this" hx-swap="outerHTML" class="{{ template "status-colour" . }} shadow-sm">
+  <details id="job-{{ .ID }}-details">
     <summary class="p-3 cursor-pointer">
       <span>{{ .Operation }} path <a class="italic" href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></span>
-      <button hx-delete="/jobs/{{ .ID }}" hx-swap="none" class="float-right ml-3 pt-[2px]">[x]</button>
+      <button hx-delete="/jobs/{{ .ID }}" hx-swap="none" class="float-right ml-3">[x]</button>
     </summary>
 
     <div class="flex flex-col items-start gap-2 bg-gray-100 p-3">
