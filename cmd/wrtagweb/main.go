@@ -177,7 +177,7 @@ func main() {
 		q := &bolthold.Query{}
 		if search := r.URL.Query().Get("search"); search != "" {
 			q = q.And("SourcePath").MatchFunc(func(path string) (bool, error) {
-				return strings.Contains(path, search), nil
+				return strings.Contains(strings.ToLower(path), strings.ToLower(search)), nil
 			})
 		}
 		q = q.SortBy("Time")
