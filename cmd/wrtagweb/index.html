@@ -23,13 +23,21 @@
           if (evt.detail.xhr.status)
             evt.detail.shouldSwap = true;
         });
+        document.body.addEventListener('htmx:afterSwap', (evt) => {
+          const open = new Set();
+          for (const el of evt.detail.target.querySelectorAll("details"))
+            if (el.getAttribute("open") !== null)
+              open.add(el.id)
+          for (const id of open)
+            evt.detail.elt.querySelector(`#${id}`)?.setAttribute("open", "")
+        });
       });
     </script>
   </head>
   <body hx-ext="sse" sse-connect="/events?stream=jobs" class="font-mono antialiased leading-tight text-sm text-gray-800 flex flex-col items-start gap-3 m-0 p-3">
     <h1 class="text-lg">wrtag</h1>
     {{ block "jobs" . }}
-    <div hx-get="/jobs" hx-trigger="sse:jobs" class="contents">
+    <div hx-get="/jobs" hx-trigger="sse:jobs" hx-swap="outerHTML" class="contents">
       {{ if eq (len .) 0 }}<p class="text-gray-600">no jobs yet ...</p>{{ end }}
       {{ range . }}
         <div hx-get="/jobs/{{ .ID }}" hx-trigger="sse:job-{{ .ID }}">
