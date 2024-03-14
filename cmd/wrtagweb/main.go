@@ -158,10 +158,22 @@ func main() {
 		respTmpl(w, "error", fmt.Sprintf(f, a...))
 	}
 
+	mw := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("WWW-Authenticate", "Basic")
+			if _, key, _ := r.BasicAuth(); subtle.ConstantTimeCompare([]byte(key), []byte(*confAPIKey)) != 1 {
+				http.Error(w, "unauthorised", http.StatusUnauthorized)
+				return
+			}
+			log.Printf("req for %s", r.URL)
+			next.ServeHTTP(w, r)
+		})
+	}
+
 	mux := http.NewServeMux()
 	mux.Handle("GET /events", sseServ)
 
-	mux.HandleFunc("GET /jobs", func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("GET /jobs", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := &bolthold.Query{}
 		if search := r.URL.Query().Get("search"); search != "" {
 			q = q.And("SourcePath").MatchFunc(func(path string) (bool, error) {
@@ -177,9 +189,9 @@ func main() {
 			return
 		}
 		respTmpl(w, "jobs", jobs)
-	})
+	})))
 
-	mux.HandleFunc("GET /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("GET /jobs/{id}", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(r.PathValue("id"))
 		var job Job
 		if err := db.Get(uint64(id), &job); err != nil {
@@ -187,9 +199,9 @@ func main() {
 			return
 		}
 		respTmpl(w, "release.html", job)
-	})
+	})))
 
-	mux.HandleFunc("POST /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("POST /jobs/{id}", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(r.PathValue("id"))
 		confirm, _ := strconv.ParseBool(r.FormValue("confirm"))
 		useMBID := r.FormValue("mbid")
@@ -212,18 +224,18 @@ func main() {
 			return
 		}
 		respTmpl(w, "release.html", job)
-	})
+	})))
 
-	mux.HandleFunc("DELETE /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("DELETE /jobs/{id}", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(r.PathValue("id"))
 		if err := db.Delete(uint64(id), &Job{}); err != nil {
 			respErr(w, http.StatusInternalServerError, "error getting job")
 			return
 		}
 		emit(eventAllJobs)
-	})
+	})))
 
-	mux.HandleFunc("GET /dump", func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("GET /dump", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var jobs []*Job
 		if err := db.Find(&jobs, nil); err != nil {
 			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
@@ -233,16 +245,16 @@ func main() {
 			respErr(w, http.StatusInternalServerError, "error encoding jobs")
 			return
 		}
-	})
+	})))
 
-	mux.HandleFunc("/{$}", func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("/{$}", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var jobs []*Job
 		if err := db.Find(&jobs, (&bolthold.Query{}).SortBy("Time").Reverse()); err != nil {
 			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
 			return
 		}
 		respTmpl(w, "index.html", jobs)
-	})
+	})))
 
 	mux.Handle("/", http.FileServer(http.FS(ui)))
 
@@ -272,15 +284,7 @@ func main() {
 	})
 
 	log.Printf("starting on %s", *confListenAddr)
-	log.Panicln(http.ListenAndServe(*confListenAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("WWW-Authenticate", "Basic")
-		if _, key, _ := r.BasicAuth(); subtle.ConstantTimeCompare([]byte(key), []byte(*confAPIKey)) != 1 {
-			http.Error(w, "unauthorised", http.StatusUnauthorized)
-			return
-		}
-		log.Printf("req for %s", r.URL)
-		mux.ServeHTTP(w, r)
-	})))
+	log.Panicln(http.ListenAndServe(*confListenAddr, mux))
 }
 
 type JobStatus string
