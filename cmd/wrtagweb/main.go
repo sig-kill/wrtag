@@ -341,7 +341,7 @@ func (j Job) String() string {
 	return strings.Join(parts, " ")
 }
 
-//go:embed *.html *.ico *.json dist/*
+//go:embed *.html *.ico dist/*
 var ui embed.FS
 var uiTmpl = htmltemplate.Must(
 	htmltemplate.
