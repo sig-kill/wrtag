@@ -9,7 +9,7 @@
   <details id="job-{{ .ID }}-details">
     <summary class="p-3 cursor-pointer">
       <span>{{ .Operation }} path <a class="italic" href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></span>
-      <button hx-delete="/jobs/{{ .ID }}" hx-swap="none" class="float-right ml-3">[x]</button>
+      <button hx-delete="/jobs/{{ .ID }}" hx-swap="none" class="ml-3">[x]</button>
     </summary>
 
     <div class="flex flex-col items-start gap-2 bg-gray-100 p-3">
