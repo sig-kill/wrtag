@@ -28,5 +28,6 @@ func TestPathFormat(t *testing.T) {
 	assert.ErrorIs(t, pf.Parse(`/albums/test/{{ .Track.ID }}/`), pathformat.ErrBadData)                                                         //
 
 	// good
-	assert.NoError(t, pf.Parse(`/albums/{{ artistCredit .Release.Artists }}/{{ .Release.Title }}/{{ .TrackNum }}`))
+	assert.NoError(t, pf.Parse(`/albums/test/{{ artistCredit .Release.Artists }}/{{ .Release.Title }}/{{ .TrackNum }}`))
+	assert.Equal(t, "/albums/test", pf.Root())
 }

@@ -23,7 +23,10 @@ type Data struct {
 	Ext      string
 }
 
-type Format struct{ tt texttemplate.Template }
+type Format struct {
+	tt   texttemplate.Template
+	root string
+}
 
 func (pf *Format) Parse(str string) error {
 	str = strings.TrimSpace(str)
@@ -40,11 +43,17 @@ func (pf *Format) Parse(str string) error {
 	if err != nil {
 		return fmt.Errorf("%w: %w", err, ErrInvalidFormat)
 	}
-	if err := validate(Format{*tmpl}); err != nil {
+	if err := validate(Format{*tmpl, ""}); err != nil {
 		return fmt.Errorf("validate: %w", err)
 	}
-	*pf = Format{*tmpl}
+	root, _, _ := strings.Cut(str, "{")
+	root = filepath.Clean(root)
+	*pf = Format{*tmpl, root}
 	return nil
+}
+
+func (pf *Format) Root() string {
+	return pf.root
 }
 
 func (pf *Format) Execute(data Data) (string, error) {
