@@ -66,7 +66,6 @@ func main() {
 	defer db.Close()
 
 	sseServ := sse.New()
-	sseServ.AutoStream = true
 	sseServ.AutoReplay = false
 	defer sseServ.Close()
 
@@ -109,7 +108,7 @@ func main() {
 	}
 
 	go func() {
-		jobTick := func() error {
+		tick := func() error {
 			var job Job
 			switch err := db.FindOne(&job, bolthold.Where("Status").Eq(StatusIncomplete)); {
 			case errors.Is(err, bolthold.ErrNotFound):
@@ -131,7 +130,7 @@ func main() {
 		}
 
 		for {
-			if err := jobTick(); err != nil {
+			if err := tick(); err != nil {
 				log.Printf("error in job: %v", err)
 			}
 			time.Sleep(2 * time.Second)
@@ -160,9 +159,9 @@ func main() {
 
 	mw := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("WWW-Authenticate", "Basic")
 			if _, key, _ := r.BasicAuth(); subtle.ConstantTimeCompare([]byte(key), []byte(*confAPIKey)) != 1 {
-				http.Error(w, "unauthorised", http.StatusUnauthorized)
+				w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
 			log.Printf("req for %s", r.URL)
