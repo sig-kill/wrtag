@@ -62,6 +62,20 @@ func (m Move) ProcessFile(src, dest string) error {
 }
 
 func (Move) CleanDir(src string) error {
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("read dir: %w", err)
+	}
+	for _, entry := range entries {
+		// skip if we have any child directories
+		if entry.IsDir() {
+			return nil
+		}
+	}
+
 	dirSize, err := dirSize(src)
 	if err != nil {
 		return fmt.Errorf("get dir size for sanity check: %w", err)
@@ -112,7 +126,7 @@ func (DryRun) ProcessFile(src, dest string) error {
 }
 
 func (DryRun) CleanDir(src string) error {
-	log.Printf("[dry run] remove all %q", src)
+	log.Printf("[dry run] remove if empty %q", src)
 	return nil
 }
 
@@ -247,12 +261,11 @@ func ProcessDir(
 	if err != nil {
 		return nil, fmt.Errorf("gen dest dir: %w", err)
 	}
-	destDir = filepath.Clean(destDir)
 
 	// lock both source and destination directories
-	defer dirLocks.Lock(srcDir)()
+	defer dirMu.Lock(srcDir)()
 	if srcDir != destDir {
-		defer dirLocks.Lock(destDir)()
+		defer dirMu.Lock(destDir)()
 	}
 
 	labelInfo := musicbrainz.AnyLabelInfo(release)
@@ -323,9 +336,21 @@ func ProcessDir(
 		}
 	}
 
-	if filepath.Clean(srcDir) != filepath.Clean(destDir) {
+	cleanMu.Lock()
+	defer cleanMu.Unlock()
+
+	if srcDir != destDir {
+		// always clean src
 		if err := op.CleanDir(srcDir); err != nil {
 			return nil, fmt.Errorf("clean src dir: %w", err)
+		}
+		// clean all src's parents if this path is in our control
+		if strings.HasPrefix(srcDir, pathFormat.Root()) {
+			for d := srcDir; d != pathFormat.Root(); d = filepath.Dir(d) {
+				if err := op.CleanDir(d); err != nil {
+					return nil, fmt.Errorf("clean src dir parent: %w", err)
+				}
+			}
 		}
 	}
 
@@ -380,7 +405,8 @@ func or[T comparable](items ...T) T {
 	return zero
 }
 
-var dirLocks keyedMutex
+var cleanMu sync.Mutex
+var dirMu keyedMutex
 
 type keyedMutex struct {
 	sync.Map
