@@ -142,10 +142,16 @@ func mainFind() {
 	sort.Strings(paths)
 
 	for _, p := range paths {
-		_ = filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error {
+		err := filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
 			fmt.Println(path)
 			return nil
 		})
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
