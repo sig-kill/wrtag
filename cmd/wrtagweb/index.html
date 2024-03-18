@@ -40,7 +40,7 @@
     <div hx-get="/jobs" hx-trigger="sse:jobs, input changed from:#job-search throttle:500ms, every 5s" hx-include="#job-search" hx-swap="outerHTML" class="contents">
       {{ if eq (len .) 0 }}<p class="text-gray-600">no jobs yet ...</p>{{ end }}
       {{ range . }}
-        <div hx-get="/jobs/{{ .ID }}" hx-trigger="sse:job-{{ .ID }}">
+        <div hx-get="/jobs/{{ .ID }}" hx-trigger="sse:job-{{ .ID }}" hx-include="">
           {{ template "release.html" . }}
         </div>
       {{ end }}
