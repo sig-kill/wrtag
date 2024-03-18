@@ -38,7 +38,7 @@ type FileSystemOperation interface {
 	CleanDir(src string) error
 }
 
-type Move struct{ copy Copy }
+type Move struct{}
 
 func (m Move) ProcessFile(src, dest string) error {
 	if filepath.Clean(src) == filepath.Clean(dest) {
@@ -49,7 +49,7 @@ func (m Move) ProcessFile(src, dest string) error {
 		var errNo syscall.Errno
 		if errors.As(err, &errNo) && errNo == 18 /*  invalid cross-device link */ {
 			// we tried to rename across filesystems, copy and delete instead
-			if err := m.copy.ProcessFile(src, dest); err != nil {
+			if err := (Copy{}).ProcessFile(src, dest); err != nil {
 				return fmt.Errorf("copy from move: %w", err)
 			}
 			if err := os.Remove(src); err != nil {
