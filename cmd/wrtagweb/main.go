@@ -179,7 +179,7 @@ func main() {
 				return strings.Contains(strings.ToLower(path), strings.ToLower(search)), nil
 			})
 		}
-		q = q.SortBy("ID")
+		q = q.SortBy("Time")
 		q = q.Reverse()
 
 		var jobs []*Job
@@ -197,7 +197,7 @@ func main() {
 			respErr(w, http.StatusInternalServerError, "error getting job")
 			return
 		}
-		respTmpl(w, "release.html", job)
+		respTmpl(w, "job", job)
 	})))
 
 	mux.Handle("POST /jobs/{id}", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -222,7 +222,7 @@ func main() {
 			respErr(w, http.StatusInternalServerError, "save job")
 			return
 		}
-		respTmpl(w, "release.html", job)
+		respTmpl(w, "job", job)
 	})))
 
 	mux.Handle("DELETE /jobs/{id}", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -248,11 +248,11 @@ func main() {
 
 	mux.Handle("/{$}", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var jobs []*Job
-		if err := db.Find(&jobs, (&bolthold.Query{}).SortBy("ID").Reverse()); err != nil {
+		if err := db.Find(&jobs, (&bolthold.Query{}).SortBy("Time").Reverse()); err != nil {
 			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
 			return
 		}
-		respTmpl(w, "index.html", jobs)
+		respTmpl(w, "index", jobs)
 	})))
 
 	mux.Handle("/", http.FileServer(http.FS(ui)))
@@ -274,7 +274,7 @@ func main() {
 			http.Error(w, "no path provided", http.StatusBadRequest)
 			return
 		}
-		job := Job{SourcePath: path, Operation: operation}
+		job := Job{SourcePath: path, Operation: operation, Time: time.Now()}
 		if err := db.Insert(bolthold.NextSequence(), &job); err != nil {
 			http.Error(w, fmt.Sprintf("error saving job: %v", err), http.StatusInternalServerError)
 			return
@@ -322,6 +322,7 @@ type Job struct {
 	Status               JobStatus `boltholdIndex:"Status"`
 	Error                string
 	Operation            Operation
+	Time                 time.Time `boltholdIndex:"Time"`
 	UseMBID              string
 	SourcePath, DestPath string
 	SearchResult         *wrtag.SearchResult
@@ -339,13 +340,13 @@ func (j Job) String() string {
 	return strings.Join(parts, " ")
 }
 
-//go:embed *.html *.ico dist/*
+//go:embed *.gohtml *.ico dist/*
 var ui embed.FS
 var uiTmpl = htmltemplate.Must(
 	htmltemplate.
 		New("template").
 		Funcs(funcMap).
-		ParseFS(ui, "*.html"),
+		ParseFS(ui, "*.gohtml"),
 )
 
 var funcMap = htmltemplate.FuncMap{
