@@ -1,0 +1,164 @@
+{{ define "job-colour" }}
+  {{ if eq .Status "" }}bg-orange-200{{ else if .Error }}bg-red-200{{ else }}bg-gray-100{{ end }}
+{{ end }}
+
+{{ define "job" }}
+<div id="job-{{ .ID }}" hx-get="/jobs/{{ .ID }}" hx-trigger="sse:job-{{ .ID }}" hx-include="">
+<div class="fixed inset-0 flex justify-center items-center bg-gray-200 bg-opacity-75">
+<form
+  hx-post="/jobs/{{ .ID }}"
+  hx-target="#job-{{ .ID }}"
+  hx-indicator="this"
+  hx-swap="outerHTML"
+  class="{{ template "job-colour" . }} {{ if eq .Status "" }}in-progress{{ end }} shadow-sm"
+>
+  <div class="p-3 cursor-pointer flex justify-between items-center">
+    <span>{{ .Operation }} path <a class="italic" href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></span>
+    <a href="/#" class="ml-3">[x]</a>
+  </div>
+  <div class="flex flex-col items-start gap-2 bg-gray-100 p-3">
+    {{ if .SearchResult }}
+      <p class="font-bold">{{ printf "%.2f%%" .SearchResult.Score }} match with <a href="https://musicbrainz.org/release/{{ .SearchResult.Release.ID }}" target="_blank">https://musicbrainz.org/release/{{ .SearchResult.Release.ID }}</a></p>
+      {{ if .SearchResult.Diff }}
+        {{ template "diff" .SearchResult.Diff }}
+      {{ end }}
+      {{ if .SearchResult.OriginFile }}
+        {{ template "originfile" .SearchResult.OriginFile }}
+      {{ end }}
+      {{ if .SearchResult.ResearchLinks }}
+        <p>research links <span class="inline-flex gap-2">{{ range .SearchResult.ResearchLinks }}<a target="_blank" href="{{ .URL | url }}">{{ .Name }}</a>{{ end }}</span></p>
+      {{ end }}
+    {{ end }}
+    {{ if eq .Status "" }}
+      <p class="text-gray-600">in progress ...</p>
+    {{ else if eq .Error "needs-input" }}
+      <p><span class="text-red-500">low/no match</span> <button hx-post="/jobs/{{ .ID }}?confirm=1">[use anyway]</button></p>
+      <p>use custom release <input type="text" name="mbid" class="px-2" placeholder="mbid/url" value="{{ .UseMBID }}"></p>
+      <button>[retry]</button>
+    {{ else if .Error }}
+      <p class="text-red-500">{{ .Error }}</p>
+      <p>use custom release <input type="text" name="mbid" class="px-2" placeholder="mbid/url" value="{{ .UseMBID }}"></p>
+      <button>[retry]</button>
+    {{ else }}
+      <p>sucessfully moved to <a href="{{ .DestPath | file | url }}">{{ .DestPath }}</a>
+      <p>use custom release <input type="text" name="mbid" class="px-2" placeholder="mbid/url" value="{{ .UseMBID }}"></p>
+      <button>[reimport]</button>
+    {{ end }}
+  </div>
+</form>
+</div>
+</div>
+{{ end }}
+
+{{ define "originfile" }}
+origin file info
+<table>
+  {{ if not (eq .Permalink "") }}
+    <tr><td class="px-2 text-gray-500">permalink</td> <td class="px-2"><a href="{{ .Permalink }}" rel="noopener noreferrer" target="_blank">{{ .Permalink }}</td></tr>
+  {{ end }}
+  {{ if not (eq .RecordLabel "") }}
+    <tr><td class="px-2 text-gray-500">record label</td> <td class="px-2">{{ .RecordLabel }}</td></tr>
+  {{ end }}
+  {{ if not (eq .CatalogueNumber "") }}
+    <tr><td class="px-2 text-gray-500">catalogue number</td> <td class="px-2">{{ .CatalogueNumber }}</td></tr>
+  {{ end }}
+  {{ if not (eq .Media "") }}
+    <tr><td class="px-2 text-gray-500">media</td> <td class="px-2">{{ .Media }}</td></tr>
+  {{ end }}
+  {{ if not (eq .EditionYear 0) }}
+    <tr><td class="px-2 text-gray-500">edition year</td> <td class="px-2">{{ .EditionYear }}</td></tr>
+  {{ end }}
+</table>
+{{ end }}
+
+{{ define "diff" }}
+<table>
+{{ range . }}
+  <tr class="{{ if not .Equal }}bg-gray-200{{ end }}">
+    <td class="px-2 text-gray-500">{{ .Field }}</td>
+    <td class="px-2 hidden sm:table-cell">
+      {{ if eq (len .Before) 0 }}<span class="text-gray-400">[empty]</span>{{ end }}
+      {{ range .Before }}
+        {{- if (eq .Type 0) }}<span>{{ .Text }}</span>{{ end -}}
+        {{- if (eq .Type -1) }}<span class="text-red-500 font-bold">{{ .Text }}</span>{{ end -}}
+      {{ end }}
+    </td>
+    <td class="px-2">
+      {{ if eq (len .After) 0 }}<span class="text-gray-400">[empty]</span>{{ end }}
+      {{ range .After }}
+        {{- if (eq .Type 0) }}<span>{{ .Text }}</span>{{ end -}}
+        {{- if (eq .Type 1) }}<span class="text-green-600 font-bold">{{ .Text }}</span>{{ end -}}
+      {{ end }}
+    </td>
+  </tr>
+{{ end }}
+</table>
+{{ end }}
+
+{{ define "index" }}
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>wrtag</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="dist/tailwind.js"></script>
+    <script src="dist/htmx.js"></script>
+    <script src="dist/htmx-sse.js"></script>
+    <style type="text/tailwindcss">
+      @layer base {
+        a { @apply font-normal text-blue-600; }
+        button { @apply font-normal text-blue-700; }
+        input { @apply outline outline-1 outline-gray-100 rounded-sm; }
+      }
+      @layer utilities {
+        .htmx-request { @apply animate-pulse opacity-80 pointer-events-none; }
+        .in-progress { @apply animate-pulse opacity-80; }
+      }
+    </style>
+    <script>
+      const checkJobModal = () => {
+        const hash = window.location.hash
+        const id = hash.substring(1)
+        if (!id) {
+          try { htmx.remove(htmx.find("#modal > *")) } catch(e) {}
+          return
+        }
+        htmx.ajax("GET", `/jobs/${id}`, "#modal")
+      };
+
+      document.addEventListener("DOMContentLoaded", () => {
+        checkJobModal()
+        window.addEventListener('hashchange', checkJobModal);
+
+        document.body.addEventListener('htmx:beforeSwap', (evt) => {
+          if (evt.detail.xhr.status)
+            evt.detail.shouldSwap = true;
+        });
+      });
+    </script>
+  </head>
+  <body hx-ext="sse" sse-connect="/events?stream=jobs" class="font-mono antialiased leading-tight text-sm text-gray-800 flex flex-col items-start gap-3 m-0 p-3">
+    <h1 class="text-lg">wrtag</h1>
+    <input id="job-search" type="search" name="search" placeholder="filter jobs" class="border px-3 py-1 shadow-sm" />
+    {{ block "jobs" . }}
+    <div hx-get="/jobs" hx-trigger="sse:jobs, input changed from:#job-search throttle:500ms, every 5s" hx-include="#job-search" hx-swap="outerHTML" class="contents">
+      {{ if eq (len .) 0 }}<p class="text-gray-600">no jobs yet ...</p>{{ end }}
+      {{ range . }}
+        <div class="p-3 cursor {{ template "job-colour" . }}">
+          <span>{{ .Operation }} path <a class="italic" href="#{{ .ID }}">{{ .SourcePath }}</a></span>
+          <button hx-delete="/jobs/{{ .ID }}" hx-swap="none" class="ml-3">[x]</button>
+        </div>
+      {{ end }}
+    </div>
+    {{ end }}
+    <div id="modal"></div>
+    {{ block "error" "" }}
+      <div id="errors" hx-swap-oob="true">
+        {{ if not (eq . "") }}
+          <div class="fixed w-fit bottom-0 right-0 m-3 p-1 bg-red-200 text-red-700">{{ . }}</div>
+        {{ end }}
+      </div>
+    {{ end }}
+  </body>
+</html>
+{{ end }}
