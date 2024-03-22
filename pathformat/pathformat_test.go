@@ -2,12 +2,15 @@ package pathformat_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/pathformat"
 )
 
-func TestPathFormat(t *testing.T) {
+func TestValidation(t *testing.T) {
 	var pf pathformat.Format
 	_, err := pf.Execute(pathformat.Data{})
 	assert.Error(t, err) // we didn't initalise with Parse() yet
@@ -30,4 +33,42 @@ func TestPathFormat(t *testing.T) {
 	// good
 	assert.NoError(t, pf.Parse(`/albums/test/{{ artistCredit .Release.Artists }}/{{ .Release.Title }}/{{ .TrackNum }}`))
 	assert.Equal(t, "/albums/test", pf.Root())
+}
+
+func TestPathFormat(t *testing.T) {
+	var pf pathformat.Format
+	require.NoError(t, pf.Parse(`/music/albums/{{ artistNames .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}{{ if not (eq .Release.ReleaseGroup.Disambiguation "") }} ({{ .Release.ReleaseGroup.Disambiguation | safepath }}){{ end }}/{{ pad0 2 .TrackNum }}.{{ flatTracks .Release.Media | len | pad0 2 }} {{ .Track.Title | safepath }}{{ .Ext }}`))
+
+	track := musicbrainz.Track{
+		Title: "Sharon's Tone",
+	}
+	release := musicbrainz.Release{
+		Title: "Valvable",
+		ReleaseGroup: musicbrainz.ReleaseGroup{
+			FirstReleaseDate: musicbrainz.AnyTime{Time: time.Date(2019, time.January, 0, 0, 0, 0, 0, time.UTC)},
+		},
+		Artists: []musicbrainz.ArtistCredit{
+			{
+				Name: "credit name",
+				Artist: musicbrainz.Artist{
+					Name: "Luke Vibert",
+				},
+			},
+		},
+		Media: []musicbrainz.Media{{
+			Tracks: []musicbrainz.Track{
+				track,
+			},
+		}},
+	}
+
+	path, err := pf.Execute(pathformat.Data{Release: release, Track: track, TrackNum: 1, Ext: ".flac"})
+	require.NoError(t, err)
+	assert.Equal(t, `/music/albums/Luke Vibert/(2018) Valvable/01.01 Sharon's Tone.flac`, path)
+
+	release.ReleaseGroup.Disambiguation = "Deluxe Edition"
+
+	path, err = pf.Execute(pathformat.Data{Release: release, Track: track, TrackNum: 1, Ext: ".flac"})
+	require.NoError(t, err)
+	assert.Equal(t, `/music/albums/Luke Vibert/(2018) Valvable (Deluxe Edition)/01.01 Sharon's Tone.flac`, path)
 }
