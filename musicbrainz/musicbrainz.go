@@ -251,23 +251,12 @@ type Release struct {
 		Back     bool `json:"back"`
 		Count    int  `json:"count"`
 	} `json:"cover-art-archive"`
-	Artists      []ArtistCredit `json:"artist-credit"`
-	Date         AnyTime        `json:"date"`
-	Quality      string         `json:"quality"`
-	Media        []Media        `json:"media"`
-	Status       string         `json:"status"`
-	ReleaseGroup struct {
-		FirstReleaseDate AnyTime        `json:"first-release-date"`
-		Genres           []Genre        `json:"genres"`
-		PrimaryTypeID    string         `json:"primary-type-id"`
-		Disambiguation   string         `json:"disambiguation"`
-		Artists          []ArtistCredit `json:"artist-credit"`
-		SecondaryTypeIDs []any          `json:"secondary-type-ids"`
-		PrimaryType      string         `json:"primary-type"`
-		ID               string         `json:"id"`
-		SecondaryTypes   []any          `json:"secondary-types"`
-		Title            string         `json:"title"`
-	} `json:"release-group"`
+	Artists       []ArtistCredit `json:"artist-credit"`
+	Date          AnyTime        `json:"date"`
+	Quality       string         `json:"quality"`
+	Media         []Media        `json:"media"`
+	Status        string         `json:"status"`
+	ReleaseGroup  ReleaseGroup   `json:"release-group"`
 	ReleaseEvents []struct {
 		Area struct {
 			ID             string   `json:"id"`
@@ -284,10 +273,23 @@ type Release struct {
 	LabelInfo   []LabelInfo `json:"label-info"`
 }
 
+type ReleaseGroup struct {
+	FirstReleaseDate AnyTime        `json:"first-release-date"`
+	Genres           []Genre        `json:"genres"`
+	PrimaryTypeID    string         `json:"primary-type-id"`
+	Disambiguation   string         `json:"disambiguation"`
+	Artists          []ArtistCredit `json:"artist-credit"`
+	SecondaryTypeIDs []any          `json:"secondary-type-ids"`
+	PrimaryType      string         `json:"primary-type"`
+	ID               string         `json:"id"`
+	SecondaryTypes   []any          `json:"secondary-types"`
+	Title            string         `json:"title"`
+}
+
 func CreditString(credits []ArtistCredit) string {
 	var sb strings.Builder
-	for _, mba := range credits {
-		fmt.Fprintf(&sb, "%s%s", mba.Name, mba.JoinPhrase)
+	for _, c := range credits {
+		fmt.Fprintf(&sb, "%s%s", c.Name, c.JoinPhrase)
 	}
 	return sb.String()
 }
