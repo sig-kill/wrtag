@@ -1,11 +1,15 @@
-{{ define "status-colour" }}
-  {{ if eq .Status "" }}bg-orange-200
-  {{ else if .Error }}bg-red-200
-  {{ else }}bg-gray-100
-  {{ end }}
-{{ end }}
-
-<form id="job-{{ .ID }}" hx-post="/jobs/{{ .ID }}" hx-target="this" hx-indicator="this" hx-swap="outerHTML" class="{{ template "status-colour" . }} shadow-sm">
+<form
+  id="job-{{ .ID }}"
+  hx-post="/jobs/{{ .ID }}"
+  hx-target="this"
+  hx-indicator="this"
+  hx-swap="outerHTML"
+  class="
+    {{ if eq .Status "" }}bg-orange-200{{ else if .Error }}bg-red-200{{ else }}bg-gray-100{{ end }}
+    {{ if eq .Status "" }}in-progress{{ end }}
+    shadow-sm
+  "
+>
   <details id="job-{{ .ID }}-details">
     <summary class="p-3 cursor-pointer">
       <span>{{ .Operation }} path <a class="italic" href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></span>
