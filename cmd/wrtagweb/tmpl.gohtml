@@ -10,7 +10,7 @@
   hx-target="#job-{{ .ID }}"
   hx-indicator="this"
   hx-swap="outerHTML"
-  class="{{ template "job-colour" . }} {{ if eq .Status "" }}in-progress{{ end }} shadow-sm"
+  class="max-h-full overflow-auto shadow-sm {{ template "job-colour" . }} {{ if eq .Status "" }}in-progress{{ end }}"
 >
   <div class="p-3 cursor-pointer flex justify-between items-center">
     <span>{{ .Operation }} path <a class="italic" href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></span>
@@ -145,8 +145,8 @@ origin file info
       {{ if eq (len .) 0 }}<p class="text-gray-600">no jobs yet ...</p>{{ end }}
       {{ range . }}
         <div class="p-3 cursor {{ template "job-colour" . }}">
+          <button hx-delete="/jobs/{{ .ID }}" hx-swap="none">[x]</button>
           <span>{{ .Operation }} path <a class="italic" href="#{{ .ID }}">{{ .SourcePath }}</a></span>
-          <button hx-delete="/jobs/{{ .ID }}" hx-swap="none" class="ml-3">[x]</button>
         </div>
       {{ end }}
     </div>
