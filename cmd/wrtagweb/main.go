@@ -223,6 +223,7 @@ func main() {
 			return
 		}
 		respTmpl(w, "job", job)
+		emit(eventAllJobs)
 	})))
 
 	mux.Handle("DELETE /jobs/{id}", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
