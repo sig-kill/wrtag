@@ -161,7 +161,7 @@ func main() {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if _, key, _ := r.BasicAuth(); subtle.ConstantTimeCompare([]byte(key), []byte(*confAPIKey)) != 1 {
 				w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				http.Error(w, "unauthorised", http.StatusUnauthorized)
 				return
 			}
 			log.Printf("req for %s", r.URL)
