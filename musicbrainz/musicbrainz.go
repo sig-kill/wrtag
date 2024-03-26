@@ -320,6 +320,9 @@ func AnyGenres(release *Release) []string {
 			genres = insertUniq(genres, g.Name)
 		}
 	}
+	if len(genres) > 0 {
+		return genres
+	}
 	for _, a := range release.Artists {
 		for _, g := range a.Artist.Genres {
 			genres = insertUniq(genres, g.Name)
