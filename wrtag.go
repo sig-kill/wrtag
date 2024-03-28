@@ -31,6 +31,8 @@ var (
 	ErrNoTracks           = errors.New("no tracks in dir")
 )
 
+const minScore = 92
+
 const rmAllSizeThreshold uint64 = 20 * 1e6 // 20 MB
 
 type FileSystemOperation interface {
@@ -253,7 +255,7 @@ func ProcessDir(
 	}
 
 	score, diff := tagmap.DiffRelease(release, tagFiles)
-	if !yes && score < 95 {
+	if !yes && score < minScore {
 		return &SearchResult{Release: release, Score: score, Diff: diff, ResearchLinks: researchLinks, OriginFile: originFile}, ErrScoreTooLow
 	}
 
