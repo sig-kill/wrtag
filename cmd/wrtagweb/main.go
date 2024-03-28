@@ -48,6 +48,7 @@ func main() {
 	configPath := flag.String("config-path", flagparse.DefaultConfigPath, "path config file")
 
 	confListenAddr := flag.String("listen-addr", "", "listen addr")
+	confPublicURL := flag.String("public-url", "", "public url")
 	confAPIKey := flag.String("api-key", "", "api key")
 	confDBPath := flag.String("db-path", "wrtag.db", "db path")
 
@@ -86,7 +87,7 @@ func main() {
 		if err != nil {
 			if errors.Is(err, wrtag.ErrScoreTooLow) {
 				job.Error = string(JobErrorNeedsInput)
-				notifs.Send(notifications.NeedsInput, job.String())
+				notifs.Send(notifications.NeedsInput, jobNotificationMessage(*confPublicURL, job))
 				return nil
 			}
 			job.Error = err.Error()
@@ -98,7 +99,7 @@ func main() {
 			return fmt.Errorf("gen dest dir: %w", err)
 		}
 
-		notifs.Send(notifications.Complete, job.String())
+		notifs.Send(notifications.Complete, jobNotificationMessage(*confPublicURL, job))
 
 		// either if this was a copy or move job, subsequent re-imports should just be a move so we can retag
 		job.Operation = OperationMove
@@ -329,16 +330,19 @@ type Job struct {
 	SearchResult         *wrtag.SearchResult
 }
 
-func (j Job) String() string {
-	var parts []string
-	parts = append(parts, string(j.Operation))
-	if j.Error != "" {
-		parts = append(parts, j.Error)
-	} else if j.Status != "" {
-		parts = append(parts, string(j.Status))
+func jobNotificationMessage(publicURL string, job *Job) string {
+	var status string
+	if job.Error != "" {
+		status = job.Error
+	} else if job.Status != "" {
+		status = string(job.Status)
 	}
-	parts = append(parts, j.SourcePath)
-	return strings.Join(parts, " ")
+
+	url, _ := url.Parse(publicURL)
+	url.Fragment = fmt.Sprint(job.ID)
+
+	return fmt.Sprintf(`%s %s (%s) %s`,
+		job.Operation, status, job.SourcePath, url)
 }
 
 //go:embed *.gohtml *.ico dist/*
