@@ -139,7 +139,7 @@ origin file info
   </head>
   <body hx-ext="sse" sse-connect="/events?stream=jobs" class="font-mono antialiased leading-tight text-sm text-gray-800 flex flex-col items-start gap-3 m-0 p-3">
     <h1 class="text-lg">wrtag</h1>
-    <input id="job-search" type="search" name="search" placeholder="filter jobs" class="border px-3 py-1 shadow-sm" />
+    <input id="job-search" type="search" name="search" placeholder="filter jobs" class="border px-3 py-1 w-full sm:w-auto shadow-sm" />
     {{ block "jobs" . }}
     <div hx-get="/jobs" hx-trigger="sse:jobs, input changed from:#job-search throttle:500ms, every 5s" hx-include="#job-search" hx-swap="outerHTML" class="contents">
       {{ if eq (len .) 0 }}<p class="text-gray-600">no jobs yet ...</p>{{ end }}
