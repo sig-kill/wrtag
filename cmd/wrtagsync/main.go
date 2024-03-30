@@ -33,13 +33,8 @@ func main() {
 	flagconf.ParseEnv()
 	flagconf.ParseConfig(*configPath)
 
-	root := flag.Arg(0)
-	if root == "" {
-		log.Fatalf("no path provided")
-	}
-
 	leafDirs := map[string]struct{}{}
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(pathFormat.Root(), func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
