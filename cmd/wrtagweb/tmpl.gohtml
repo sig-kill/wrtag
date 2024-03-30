@@ -13,7 +13,7 @@
   class="max-h-full overflow-auto shadow-sm {{ template "job-colour" . }} {{ if eq .Status "" }}in-progress{{ end }}"
 >
   <div class="p-3 cursor-pointer flex justify-between items-center">
-    <span>{{ .Operation }} path <a class="italic" href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></span>
+    <span>{{ .Operation }} path <a class="italic break-words" href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></span>
     <a href="/#" class="ml-3">[x]</a>
   </div>
   <div class="flex flex-col items-start gap-2 bg-gray-100 p-3">
@@ -146,7 +146,7 @@ origin file info
       {{ range . }}
         <div class="p-3 cursor {{ template "job-colour" . }}">
           <button hx-delete="/jobs/{{ .ID }}" hx-swap="none">[x]</button>
-          <span>{{ .Operation }} path <a class="italic" href="#{{ .ID }}">{{ .SourcePath }}</a></span>
+          <span>{{ .Operation }} path <a class="italic break-words" href="#{{ .ID }}">{{ .SourcePath }}</a></span>
         </div>
       {{ end }}
     </div>
