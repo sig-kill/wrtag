@@ -5,8 +5,10 @@ import (
 	"flag"
 	"io/fs"
 	"log"
+	"os/signal"
 	"path/filepath"
 	"sync"
+	"syscall"
 
 	"go.senan.xyz/flagconf"
 
@@ -58,17 +60,25 @@ func main() {
 		close(todo)
 	}()
 
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
 	var wg sync.WaitGroup
 	for range 4 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for dir := range todo {
-				if _, err := wrtag.ProcessDir(context.Background(), mb, tg, &pathFormat, nil, keepFiles, wrtag.Move{}, dir, "", false); err != nil {
-					log.Printf("error processing %q: %v", dir, err)
-					continue
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case dir := <-todo:
+					if _, err := wrtag.ProcessDir(ctx, mb, tg, &pathFormat, nil, keepFiles, wrtag.Move{}, dir, "", false); err != nil {
+						log.Printf("error processing %q: %v", dir, err)
+						continue
+					}
+					log.Printf("done %s", dir)
 				}
-				log.Printf("done %s", dir)
 			}
 		}()
 	}
