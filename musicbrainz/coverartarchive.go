@@ -21,7 +21,7 @@ func caaRequest(ctx context.Context, r *http.Request, dest any) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode/100 != 2 {
-		return fmt.Errorf("non 2xx from caa")
+		return fmt.Errorf("non 2xx from caa: %d", resp.StatusCode)
 	}
 	if err := json.NewDecoder(resp.Body).Decode(dest); err != nil {
 		return fmt.Errorf("decode caa response: %w", err)
