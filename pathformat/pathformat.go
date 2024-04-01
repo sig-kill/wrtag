@@ -132,11 +132,3 @@ var funcMap = texttemplate.FuncMap{
 	"flatTracks": musicbrainz.FlatTracks,
 	"artists":    musicbrainz.ArtistsNames,
 }
-
-func mapp[F, T any](s []F, f func(int, F) T) []T {
-	res := make([]T, len(s))
-	for i, v := range s {
-		res[i] = f(i, v)
-	}
-	return res
-}
