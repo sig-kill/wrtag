@@ -8,10 +8,12 @@ import (
 )
 
 func TestSafePath(t *testing.T) {
-	assert.Equal(t, fileutil.SafePath("hello"), "hello")
-	assert.Equal(t, fileutil.SafePath("hello/"), "hello")
-	assert.Equal(t, fileutil.SafePath("hello/a"), "hello a")
-	assert.Equal(t, fileutil.SafePath("hello / a"), "hello a")
-	assert.Equal(t, fileutil.SafePath("hel\x00lo"), "hello")
-	assert.Equal(t, fileutil.SafePath("a  b"), "a b")
+	assert.Equal(t, "hello", fileutil.SafePath("hello"))
+	assert.Equal(t, "hello", fileutil.SafePath("hello/"))
+	assert.Equal(t, "hello a", fileutil.SafePath("hello/a"))
+	assert.Equal(t, "hello a", fileutil.SafePath("hello / a"))
+	assert.Equal(t, "hello", fileutil.SafePath("hel\x00lo"))
+	assert.Equal(t, "a b", fileutil.SafePath("a  b"))
+	assert.Equal(t, "(2004) Kesto (234.484)", fileutil.SafePath("(2004) Kesto (234.48:4)"))
+	assert.Equal(t, "01.33 Rahina I Mayhem I", fileutil.SafePath("01.33 Rähinä I Mayhem I"))
 }
