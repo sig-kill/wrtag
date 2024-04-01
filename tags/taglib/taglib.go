@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/araddon/dateparse"
@@ -37,10 +36,10 @@ func (TagLib) Read(absPath string) (tagcommon.File, error) {
 }
 
 type File struct {
-	raw       map[string][]string
-	props     *audiotags.AudioProperties
-	file      *audiotags.File
-	closeOnce sync.Once
+	raw      map[string][]string
+	props    *audiotags.AudioProperties
+	file     *audiotags.File
+	didWrite bool
 }
 
 // https://picard-docs.musicbrainz.org/downloads/MusicBrainz_Picard_Tag_Map.html
@@ -69,29 +68,34 @@ func (f *File) DiscNumber() int   { return intSep("/", first(find(f.raw, "discnu
 func (f *File) MBRecordingID() string { return first(find(f.raw, "musicbrainz_trackid")) }
 func (f *File) MBArtistID() []string  { return find(f.raw, "musicbrainz_artistid") }
 
-func (f *File) WriteAlbum(v string)          { f.raw["album"] = []string{v} }
-func (f *File) WriteAlbumArtist(v string)    { f.raw["albumartist"] = []string{v} }
-func (f *File) WriteAlbumArtists(v []string) { f.raw["albumartists"] = v }
-func (f *File) WriteDate(v string)           { f.raw["date"] = []string{v} }
-func (f *File) WriteOriginalDate(v string)   { f.raw["originaldate"] = []string{v} }
-func (f *File) WriteMediaFormat(v string)    { f.raw["media"] = []string{v} }
-func (f *File) WriteLabel(v string)          { f.raw["label"] = []string{v} }
-func (f *File) WriteCatalogueNum(v string)   { f.raw["catalognumber"] = []string{v} }
+func (f *File) WriteAlbum(v string)          { f.set("album", v) }
+func (f *File) WriteAlbumArtist(v string)    { f.set("albumartist", v) }
+func (f *File) WriteAlbumArtists(v []string) { f.set("albumartists", v...) }
+func (f *File) WriteDate(v string)           { f.set("date", v) }
+func (f *File) WriteOriginalDate(v string)   { f.set("originaldate", v) }
+func (f *File) WriteMediaFormat(v string)    { f.set("media", v) }
+func (f *File) WriteLabel(v string)          { f.set("label", v) }
+func (f *File) WriteCatalogueNum(v string)   { f.set("catalognumber", v) }
 
-func (f *File) WriteMBReleaseID(v string)       { f.raw["musicbrainz_albumid"] = []string{v} }
-func (f *File) WriteMBReleaseGroupID(v string)  { f.raw["musicbrainz_releasegroupid"] = []string{v} }
-func (f *File) WriteMBAlbumArtistID(v []string) { f.raw["musicbrainz_albumartistid"] = v }
+func (f *File) WriteMBReleaseID(v string)       { f.set("musicbrainz_albumid", v) }
+func (f *File) WriteMBReleaseGroupID(v string)  { f.set("musicbrainz_releasegroupid", v) }
+func (f *File) WriteMBAlbumArtistID(v []string) { f.set("musicbrainz_albumartistid", v...) }
 
-func (f *File) WriteTitle(v string)     { f.raw["title"] = []string{v} }
-func (f *File) WriteArtist(v string)    { f.raw["artist"] = []string{v} }
-func (f *File) WriteArtists(v []string) { f.raw["artists"] = v }
-func (f *File) WriteGenre(v string)     { f.raw["genre"] = []string{v} }
-func (f *File) WriteGenres(v []string)  { f.raw["genres"] = v }
-func (f *File) WriteTrackNumber(v int)  { f.raw["track"] = []string{intStr(v)} }
-func (f *File) WriteDiscNumber(v int)   { f.raw["discnumber"] = []string{intStr(v)} }
+func (f *File) WriteTitle(v string)     { f.set("title", v) }
+func (f *File) WriteArtist(v string)    { f.set("artist", v) }
+func (f *File) WriteArtists(v []string) { f.set("artists", v...) }
+func (f *File) WriteGenre(v string)     { f.set("genre", v) }
+func (f *File) WriteGenres(v []string)  { f.set("genres", v...) }
+func (f *File) WriteTrackNumber(v int)  { f.set("track", intStr(v)) }
+func (f *File) WriteDiscNumber(v int)   { f.set("discnumber", intStr(v)) }
 
-func (f *File) WriteMBRecordingID(v string) { f.raw["musicbrainz_trackid"] = []string{v} }
-func (f *File) WriteMBArtistID(v []string)  { f.raw["musicbrainz_artistid"] = v }
+func (f *File) WriteMBRecordingID(v string) { f.set("musicbrainz_trackid", v) }
+func (f *File) WriteMBArtistID(v []string)  { f.set("musicbrainz_artistid", v...) }
+
+func (f *File) set(k string, vs ...string) {
+	f.didWrite = true
+	f.raw[k] = vs
+}
 
 func (f *File) Length() int  { return f.props.Length }
 func (f *File) Bitrate() int { return f.props.Bitrate }
@@ -119,15 +123,13 @@ func (f *File) RemoveUnknown() {
 }
 
 func (f *File) Close() error {
-	var err error
-	f.closeOnce.Do(func() {
+	defer f.file.Close()
+	if f.didWrite {
 		if !f.file.WriteTags(f.raw) {
-			err = ErrWrite
-			return
+			return ErrWrite
 		}
-		f.file.Close()
-	})
-	return err
+	}
+	return nil
 }
 
 func first[T comparable](is []T) T {
