@@ -52,16 +52,16 @@ func main() {
 		log.Fatalf("error walking: %v", err)
 	}
 
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
 	todo := make(chan string)
 	go func() {
 		for d := range leafDirs {
 			todo <- d
 		}
-		close(todo)
+		cancel()
 	}()
-
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
 
 	var wg sync.WaitGroup
 	for range 4 {
