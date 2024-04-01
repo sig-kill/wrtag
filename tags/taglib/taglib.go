@@ -44,9 +44,15 @@ type File struct {
 
 // https://picard-docs.musicbrainz.org/downloads/MusicBrainz_Picard_Tag_Map.html
 
-func (f *File) Album() string           { return first(find(f.raw, "album")) }
-func (f *File) AlbumArtist() string     { return first(find(f.raw, "albumartist", "album artist")) }
-func (f *File) AlbumArtists() []string  { return find(f.raw, "albumartists", "album_artists") }
+func (f *File) Album() string          { return first(find(f.raw, "album")) }
+func (f *File) AlbumArtist() string    { return first(find(f.raw, "albumartist", "album artist")) }
+func (f *File) AlbumArtists() []string { return find(f.raw, "albumartists", "album_artists") }
+func (f *File) AlbumArtistCredit() string {
+	return first(find(f.raw, "albumartist_credit", "album artist credit"))
+}
+func (f *File) AlbumArtistsCredit() []string {
+	return find(f.raw, "albumartists_credit", "album_artists_credit")
+}
 func (f *File) Date() time.Time         { return anyTime(first(find(f.raw, "date", "year"))) }
 func (f *File) OriginalDate() time.Time { return anyTime(first(find(f.raw, "originaldate"))) }
 func (f *File) MediaFormat() string     { return first(find(f.raw, "media")) }
@@ -57,37 +63,43 @@ func (f *File) MBReleaseID() string       { return first(find(f.raw, "musicbrain
 func (f *File) MBReleaseGroupID() string  { return first(find(f.raw, "musicbrainz_releasegroupid")) }
 func (f *File) MBAlbumArtistID() []string { return find(f.raw, "musicbrainz_albumartistid") }
 
-func (f *File) Title() string     { return first(find(f.raw, "title")) }
-func (f *File) Artist() string    { return first(find(f.raw, "artist")) }
-func (f *File) Artists() []string { return find(f.raw, "artists") }
-func (f *File) Genre() string     { return first(find(f.raw, "genre")) }
-func (f *File) Genres() []string  { return find(f.raw, "genres") }
-func (f *File) TrackNumber() int  { return intSep("/", first(find(f.raw, "tracknumber", "track"))) } // eg. 5/12
-func (f *File) DiscNumber() int   { return intSep("/", first(find(f.raw, "discnumber"))) }           // eg. 1/2
+func (f *File) Title() string           { return first(find(f.raw, "title")) }
+func (f *File) Artist() string          { return first(find(f.raw, "artist")) }
+func (f *File) Artists() []string       { return find(f.raw, "artists") }
+func (f *File) ArtistCredit() string    { return first(find(f.raw, "artist_credit")) }
+func (f *File) ArtistsCredit() []string { return find(f.raw, "artists_credit") }
+func (f *File) Genre() string           { return first(find(f.raw, "genre")) }
+func (f *File) Genres() []string        { return find(f.raw, "genres") }
+func (f *File) TrackNumber() int        { return intSep("/", first(find(f.raw, "tracknumber", "track"))) } // eg. 5/12
+func (f *File) DiscNumber() int         { return intSep("/", first(find(f.raw, "discnumber"))) }           // eg. 1/2
 
 func (f *File) MBRecordingID() string { return first(find(f.raw, "musicbrainz_trackid")) }
 func (f *File) MBArtistID() []string  { return find(f.raw, "musicbrainz_artistid") }
 
-func (f *File) WriteAlbum(v string)          { f.set("album", v) }
-func (f *File) WriteAlbumArtist(v string)    { f.set("albumartist", v) }
-func (f *File) WriteAlbumArtists(v []string) { f.set("albumartists", v...) }
-func (f *File) WriteDate(v string)           { f.set("date", v) }
-func (f *File) WriteOriginalDate(v string)   { f.set("originaldate", v) }
-func (f *File) WriteMediaFormat(v string)    { f.set("media", v) }
-func (f *File) WriteLabel(v string)          { f.set("label", v) }
-func (f *File) WriteCatalogueNum(v string)   { f.set("catalognumber", v) }
+func (f *File) WriteAlbum(v string)                { f.set("album", v) }
+func (f *File) WriteAlbumArtist(v string)          { f.set("albumartist", v) }
+func (f *File) WriteAlbumArtists(v []string)       { f.set("albumartists", v...) }
+func (f *File) WriteAlbumArtistCredit(v string)    { f.set("albumartist_credit", v) }
+func (f *File) WriteAlbumArtistsCredit(v []string) { f.set("albumartists_credit", v...) }
+func (f *File) WriteDate(v string)                 { f.set("date", v) }
+func (f *File) WriteOriginalDate(v string)         { f.set("originaldate", v) }
+func (f *File) WriteMediaFormat(v string)          { f.set("media", v) }
+func (f *File) WriteLabel(v string)                { f.set("label", v) }
+func (f *File) WriteCatalogueNum(v string)         { f.set("catalognumber", v) }
 
 func (f *File) WriteMBReleaseID(v string)       { f.set("musicbrainz_albumid", v) }
 func (f *File) WriteMBReleaseGroupID(v string)  { f.set("musicbrainz_releasegroupid", v) }
 func (f *File) WriteMBAlbumArtistID(v []string) { f.set("musicbrainz_albumartistid", v...) }
 
-func (f *File) WriteTitle(v string)     { f.set("title", v) }
-func (f *File) WriteArtist(v string)    { f.set("artist", v) }
-func (f *File) WriteArtists(v []string) { f.set("artists", v...) }
-func (f *File) WriteGenre(v string)     { f.set("genre", v) }
-func (f *File) WriteGenres(v []string)  { f.set("genres", v...) }
-func (f *File) WriteTrackNumber(v int)  { f.set("track", intStr(v)) }
-func (f *File) WriteDiscNumber(v int)   { f.set("discnumber", intStr(v)) }
+func (f *File) WriteTitle(v string)           { f.set("title", v) }
+func (f *File) WriteArtist(v string)          { f.set("artist", v) }
+func (f *File) WriteArtists(v []string)       { f.set("artists", v...) }
+func (f *File) WriteArtistCredit(v string)    { f.set("artist_credit", v) }
+func (f *File) WriteArtistsCredit(v []string) { f.set("artists_credit", v...) }
+func (f *File) WriteGenre(v string)           { f.set("genre", v) }
+func (f *File) WriteGenres(v []string)        { f.set("genres", v...) }
+func (f *File) WriteTrackNumber(v int)        { f.set("track", intStr(v)) }
+func (f *File) WriteDiscNumber(v int)         { f.set("discnumber", intStr(v)) }
 
 func (f *File) WriteMBRecordingID(v string) { f.set("musicbrainz_trackid", v) }
 func (f *File) WriteMBArtistID(v []string)  { f.set("musicbrainz_artistid", v...) }

@@ -286,7 +286,29 @@ type ReleaseGroup struct {
 	Title            string         `json:"title"`
 }
 
-func CreditString(credits []ArtistCredit) string {
+func ArtistsNames(credits []ArtistCredit) []string {
+	var r []string
+	for _, c := range credits {
+		r = append(r, c.Artist.Name)
+	}
+	return r
+}
+func ArtistsString(credits []ArtistCredit) string {
+	var sb strings.Builder
+	for _, c := range credits {
+		fmt.Fprintf(&sb, "%s%s", c.Artist.Name, c.JoinPhrase)
+	}
+	return sb.String()
+}
+
+func ArtistsCreditNames(credits []ArtistCredit) []string {
+	var r []string
+	for _, c := range credits {
+		r = append(r, c.Name)
+	}
+	return r
+}
+func ArtistsCreditString(credits []ArtistCredit) string {
 	var sb strings.Builder
 	for _, c := range credits {
 		fmt.Fprintf(&sb, "%s%s", c.Name, c.JoinPhrase)

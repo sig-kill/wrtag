@@ -129,14 +129,8 @@ var funcMap = texttemplate.FuncMap{
 	"sort":     func(strings []string) []string { sort.Strings(strings); return strings },
 	"safepath": func(p string) string { return fileutil.SafePath(p) },
 
-	"flatTracks":   musicbrainz.FlatTracks,
-	"artistCredit": musicbrainz.CreditString,
-	"artistNames": func(ar []musicbrainz.ArtistCredit) []string {
-		return mapp(ar, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.Name })
-	},
-	"artistMBIDs": func(ar []musicbrainz.ArtistCredit) []string {
-		return mapp(ar, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID })
-	},
+	"flatTracks": musicbrainz.FlatTracks,
+	"artists":    musicbrainz.ArtistsNames,
 }
 
 func mapp[F, T any](s []F, f func(int, F) T) []T {

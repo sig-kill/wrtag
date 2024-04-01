@@ -20,24 +20,24 @@ func TestValidation(t *testing.T) {
 	assert.ErrorIs(t, pf.Parse(" "), pathformat.ErrInvalidFormat)
 	assert.ErrorIs(t, pf.Parse("🤤"), pathformat.ErrInvalidFormat)
 
-	assert.ErrorIs(t, pf.Parse(`/albums/test/{{ artistCredit .Release.Artists }}/{{ .Release.Title }}`), pathformat.ErrAmbiguousFormat)
+	assert.ErrorIs(t, pf.Parse(`/albums/test/{{ artists .Release.Artists | join " " }}/{{ .Release.Title }}`), pathformat.ErrAmbiguousFormat)
 	assert.ErrorIs(t, pf.Parse(`/albums/test/{{ .Track.Title }}`), pathformat.ErrAmbiguousFormat)
 	assert.ErrorIs(t, pf.Parse(`/albums/test/{{ .TrackNum }}`), pathformat.ErrAmbiguousFormat)
 
 	// bad data
-	assert.ErrorIs(t, pf.Parse(`/albums/test/{{ artistCredit .Release.Artists }}/{{ .Release.ID }}/`), pathformat.ErrBadData)                   // test case is missing ID
-	assert.ErrorIs(t, pf.Parse(`/albums/test/{{ artistCredit .Release.Artists }}//`), pathformat.ErrBadData)                                    // double slash anyway
-	assert.ErrorIs(t, pf.Parse(`/albums/test/{{ artistCredit .Release.Artists }}/{{ .Release.Title }}/{{ .Track.ID }}`), pathformat.ErrBadData) // implicit trailing slash from missing ID
-	assert.ErrorIs(t, pf.Parse(`/albums/test/{{ .Track.ID }}/`), pathformat.ErrBadData)                                                         //
+	assert.ErrorIs(t, pf.Parse(`/albums/test/{{ artists .Release.Artists | join " " }}/{{ .Release.ID }}/`), pathformat.ErrBadData)                   // test case is missing ID
+	assert.ErrorIs(t, pf.Parse(`/albums/test/{{ artists .Release.Artists | join " " }}//`), pathformat.ErrBadData)                                    // double slash anyway
+	assert.ErrorIs(t, pf.Parse(`/albums/test/{{ artists .Release.Artists | join " " }}/{{ .Release.Title }}/{{ .Track.ID }}`), pathformat.ErrBadData) // implicit trailing slash from missing ID
+	assert.ErrorIs(t, pf.Parse(`/albums/test/{{ .Track.ID }}/`), pathformat.ErrBadData)                                                               //
 
 	// good
-	assert.NoError(t, pf.Parse(`/albums/test/{{ artistCredit .Release.Artists }}/{{ .Release.Title }}/{{ .TrackNum }}`))
+	assert.NoError(t, pf.Parse(`/albums/test/{{ artists .Release.Artists | join " " }}/{{ .Release.Title }}/{{ .TrackNum }}`))
 	assert.Equal(t, "/albums/test", pf.Root())
 }
 
 func TestPathFormat(t *testing.T) {
 	var pf pathformat.Format
-	require.NoError(t, pf.Parse(`/music/albums/{{ artistNames .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}{{ if not (eq .Release.ReleaseGroup.Disambiguation "") }} ({{ .Release.ReleaseGroup.Disambiguation | safepath }}){{ end }}/{{ pad0 2 .TrackNum }}.{{ flatTracks .Release.Media | len | pad0 2 }} {{ .Track.Title | safepath }}{{ .Ext }}`))
+	require.NoError(t, pf.Parse(`/music/albums/{{ artists .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}{{ if not (eq .Release.ReleaseGroup.Disambiguation "") }} ({{ .Release.ReleaseGroup.Disambiguation | safepath }}){{ end }}/{{ pad0 2 .TrackNum }}.{{ flatTracks .Release.Media | len | pad0 2 }} {{ .Track.Title | safepath }}{{ .Ext }}`))
 
 	track := musicbrainz.Track{
 		Title: "Sharon's Tone",

@@ -48,7 +48,7 @@ func DiffRelease(release *musicbrainz.Release, files []tagcommon.File) (float64,
 	var diffs []Diff
 	diffs = append(diffs,
 		add("release", fone.Album(), release.Title),
-		add("artist", fone.AlbumArtist(), musicbrainz.CreditString(release.Artists)),
+		add("artist", fone.AlbumArtist(), musicbrainz.ArtistsString(release.Artists)),
 		add("label", fone.Label(), labelInfo.Label.Name),
 		add("catalogue num", fone.CatalogueNum(), labelInfo.CatalogNumber),
 		add("media format", fone.MediaFormat(), release.Media[0].Format),
@@ -67,7 +67,7 @@ func DiffRelease(release *musicbrainz.Release, files []tagcommon.File) (float64,
 		diffs = append(diffs, add(
 			fmt.Sprintf("track %d", i+1),
 			strings.Join(filter(f.Artist(), f.Title()), " – "),
-			strings.Join(filter(musicbrainz.CreditString(rtracks[i].Artists), rtracks[i].Title), " – "),
+			strings.Join(filter(musicbrainz.ArtistsString(rtracks[i].Artists), rtracks[i].Title), " – "),
 		))
 	}
 
@@ -90,8 +90,10 @@ func WriteFile(
 	}
 
 	f.WriteAlbum(release.Title)
-	f.WriteAlbumArtist(musicbrainz.CreditString(release.Artists))
-	f.WriteAlbumArtists(mapp(release.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.Name }))
+	f.WriteAlbumArtist(musicbrainz.ArtistsString(release.Artists))
+	f.WriteAlbumArtists(musicbrainz.ArtistsNames(release.Artists))
+	f.WriteAlbumArtistCredit(musicbrainz.ArtistsCreditString(release.Artists))
+	f.WriteAlbumArtistsCredit(musicbrainz.ArtistsCreditNames(release.Artists))
 	f.WriteDate(release.Date.Format(time.DateOnly))
 	f.WriteOriginalDate(release.ReleaseGroup.FirstReleaseDate.Format(time.DateOnly))
 	f.WriteMediaFormat(release.Media[0].Format)
@@ -103,8 +105,10 @@ func WriteFile(
 	f.WriteMBAlbumArtistID(mapp(release.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID }))
 
 	f.WriteTitle(releaseTrack.Title)
-	f.WriteArtist(musicbrainz.CreditString(releaseTrack.Artists))
-	f.WriteArtists(mapp(releaseTrack.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.Name }))
+	f.WriteArtist(musicbrainz.ArtistsString(releaseTrack.Artists))
+	f.WriteArtists(musicbrainz.ArtistsNames(releaseTrack.Artists))
+	f.WriteArtistCredit(musicbrainz.ArtistsCreditString(releaseTrack.Artists))
+	f.WriteArtistsCredit(musicbrainz.ArtistsCreditNames(releaseTrack.Artists))
 	f.WriteGenre(anyGenre)
 	f.WriteGenres(genres)
 	f.WriteTrackNumber(i + 1)
