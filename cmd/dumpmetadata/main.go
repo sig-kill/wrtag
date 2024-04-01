@@ -13,36 +13,35 @@ func main() {
 
 	var errs []error
 	for _, path := range os.Args[1:] {
-		fmt.Printf("path\t%s\n", path)
 		file, err := tg.Read(path)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("read %s: %w", path, err))
 			continue
 		}
 
-		fmt.Printf("    Album\t%s\n", file.Album())
-		fmt.Printf("    AlbumArtist\t%s\n", file.AlbumArtist())
-		fmt.Printf("    AlbumArtists\t%s\n", file.AlbumArtists())
-		fmt.Printf("    Date\t%s\n", file.Date())
-		fmt.Printf("    OriginalDate\t%s\n", file.OriginalDate())
-		fmt.Printf("    MediaFormat\t%s\n", file.MediaFormat())
-		fmt.Printf("    Label\t%s\n", file.Label())
-		fmt.Printf("    CatalogueNum\t%s\n", file.CatalogueNum())
+		fmt.Printf("%s\tAlbum\t%s\n", path, file.Album())
+		fmt.Printf("%s\tAlbumArtist\t%s\n", path, file.AlbumArtist())
+		fmt.Printf("%s\tAlbumArtists\t%s\n", path, file.AlbumArtists())
+		fmt.Printf("%s\tDate\t%s\n", path, file.Date())
+		fmt.Printf("%s\tOriginalDate\t%s\n", path, file.OriginalDate())
+		fmt.Printf("%s\tMediaFormat\t%s\n", path, file.MediaFormat())
+		fmt.Printf("%s\tLabel\t%s\n", path, file.Label())
+		fmt.Printf("%s\tCatalogueNum\t%s\n", path, file.CatalogueNum())
 
-		fmt.Printf("    MBReleaseID\t%s\n", file.MBReleaseID())
-		fmt.Printf("    MBReleaseGroupID\t%s\n", file.MBReleaseGroupID())
-		fmt.Printf("    MBAlbumArtistID\t%s\n", file.MBAlbumArtistID())
+		fmt.Printf("%s\tMBReleaseID\t%s\n", path, file.MBReleaseID())
+		fmt.Printf("%s\tMBReleaseGroupID\t%s\n", path, file.MBReleaseGroupID())
+		fmt.Printf("%s\tMBAlbumArtistID\t%s\n", path, file.MBAlbumArtistID())
 
-		fmt.Printf("    Title\t%s\n", file.Title())
-		fmt.Printf("    Artist\t%s\n", file.Artist())
-		fmt.Printf("    Artists\t%s\n", file.Artists())
-		fmt.Printf("    Genre\t%s\n", file.Genre())
-		fmt.Printf("    Genres\t%s\n", file.Genres())
-		fmt.Printf("    TrackNumber\t%v\n", file.TrackNumber())
-		fmt.Printf("    DiscNumber\t%v\n", file.DiscNumber())
+		fmt.Printf("%s\tTitle\t%s\n", path, file.Title())
+		fmt.Printf("%s\tArtist\t%s\n", path, file.Artist())
+		fmt.Printf("%s\tArtists\t%s\n", path, file.Artists())
+		fmt.Printf("%s\tGenre\t%s\n", path, file.Genre())
+		fmt.Printf("%s\tGenres\t%s\n", path, file.Genres())
+		fmt.Printf("%s\tTrackNumber\t%v\n", path, file.TrackNumber())
+		fmt.Printf("%s\tDiscNumber\t%v\n", path, file.DiscNumber())
 
-		fmt.Printf("    MBRecordingID\t%s\n", file.MBRecordingID())
-		fmt.Printf("    MBArtistID\t%s\n", file.MBArtistID())
+		fmt.Printf("%s\tMBRecordingID\t%s\n", path, file.MBRecordingID())
+		fmt.Printf("%s\tMBArtistID\t%s\n", path, file.MBArtistID())
 
 		if err := file.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("close %s: %w", path, err))
