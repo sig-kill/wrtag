@@ -19,6 +19,8 @@ import (
 const mbBase = "https://musicbrainz.org/ws/2/"
 const caaBase = "https://coverartarchive.org/"
 
+const userAgent = `wrtag/0.0.0-alpha ( https://go.senan.xyz/wrtag )`
+
 var ErrNoResults = fmt.Errorf("no results")
 
 type Client struct {
@@ -29,7 +31,7 @@ type Client struct {
 func NewClient() *Client {
 	return &Client{
 		httpClient: &http.Client{},
-		limiter:    rate.NewLimiter(rate.Every(time.Second), 1), // https://beta.musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting
+		limiter:    rate.NewLimiter(rate.Every(time.Second), 1), // https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting
 	}
 }
 
@@ -39,6 +41,8 @@ func (c *Client) request(ctx context.Context, r *http.Request, dest any) error {
 	}
 
 	log.Printf("making mb request %s", r.URL)
+
+	r.Header.Set("User-Agent", userAgent)
 
 	resp, err := c.httpClient.Do(r.WithContext(ctx))
 	if err != nil {
