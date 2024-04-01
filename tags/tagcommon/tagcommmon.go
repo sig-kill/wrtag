@@ -16,6 +16,8 @@ type File interface {
 	Album() string
 	AlbumArtist() string
 	AlbumArtists() []string
+	AlbumArtistCredit() string
+	AlbumArtistsCredit() []string
 	Date() time.Time
 	OriginalDate() time.Time
 	MediaFormat() string
@@ -29,6 +31,8 @@ type File interface {
 	Title() string
 	Artist() string
 	Artists() []string
+	ArtistCredit() string
+	ArtistsCredit() []string
 	Genre() string
 	Genres() []string
 	TrackNumber() int
@@ -40,6 +44,8 @@ type File interface {
 	WriteAlbum(v string)
 	WriteAlbumArtist(v string)
 	WriteAlbumArtists(v []string)
+	WriteAlbumArtistCredit(v string)
+	WriteAlbumArtistsCredit(v []string)
 	WriteDate(v string)
 	WriteOriginalDate(v string)
 	WriteMediaFormat(v string)
@@ -53,6 +59,8 @@ type File interface {
 	WriteTitle(v string)
 	WriteArtist(v string)
 	WriteArtists(v []string)
+	WriteArtistCredit(v string)
+	WriteArtistsCredit(v []string)
 	WriteGenre(v string)
 	WriteGenres(v []string)
 	WriteTrackNumber(v int)
