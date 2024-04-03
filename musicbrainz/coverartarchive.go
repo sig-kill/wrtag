@@ -18,11 +18,15 @@ type CAAClient struct {
 func NewCAAClient(httpClient *http.Client) *CAAClient {
 	return &CAAClient{
 		httpClient: httpClient,
-		limiter:    rate.NewLimiter(rate.Inf, 1), // not sure what their limits are yet
+		limiter:    rate.NewLimiter(rate.Inf, 1), // https://wiki.musicbrainz.org/Cover_Art_Archive/API#Rate_limiting_rules
 	}
 }
 
 func (c *CAAClient) request(ctx context.Context, r *http.Request, dest any) error {
+	if err := c.limiter.Wait(ctx); err != nil {
+		return fmt.Errorf("wait: %w", err)
+	}
+
 	log.Printf("making caa request %s", r.URL)
 
 	r = r.WithContext(ctx)
