@@ -22,6 +22,18 @@ type Diff struct {
 
 type TagWeights map[string]float64
 
+func (tw TagWeights) For(field string) float64 {
+	if field == "" {
+		return 1
+	}
+	for f, w := range tw {
+		if strings.HasPrefix(field, f) {
+			return w
+		}
+	}
+	return 1
+}
+
 func DiffRelease(weights TagWeights, release *musicbrainz.Release, files []tagcommon.File) (float64, []Diff) {
 	if len(files) == 0 {
 		return 0, nil
@@ -67,14 +79,9 @@ func Differ(weights TagWeights, score *float64) func(field string, a, b string) 
 	var diff float64
 
 	return func(field, a, b string) Diff {
-		var weight = 1.0
-		if w, ok := weights[field]; ok {
-			weight = w
-		}
-
 		diffs := dmp.DiffMain(a, b, false)
 		dist := float64(dmp.DiffLevenshtein(diffs))
-		distWeighted := dist * weight
+		distWeighted := dist * weights.For(field)
 
 		diff += distWeighted
 		total += float64(len([]rune(b)))
