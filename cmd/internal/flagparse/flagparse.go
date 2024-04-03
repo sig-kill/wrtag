@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"go.senan.xyz/wrtag/notifications"
 	"go.senan.xyz/wrtag/pathformat"
 	"go.senan.xyz/wrtag/researchlink"
+	"go.senan.xyz/wrtag/tagmap"
 )
 
 const name = "wrtag"
@@ -49,7 +51,7 @@ func (n Notifications) String() string { return "" }
 func (n Notifications) Set(value string) error {
 	eventsRaw, uri, ok := strings.Cut(value, " ")
 	if !ok {
-		return fmt.Errorf("invalid notification uri format. expected \"ev1,ev2 uri\"")
+		return fmt.Errorf("invalid notification uri format. expected eg \"ev1,ev2 uri\"")
 	}
 	var lineErrs []error
 	for _, ev := range strings.Split(eventsRaw, ",") {
@@ -61,3 +63,27 @@ func (n Notifications) Set(value string) error {
 }
 
 var _ flag.Value = Notifications{}
+
+type TagWeights struct{ *tagmap.TagWeights }
+
+func (tw TagWeights) String() string { return "" }
+func (tw TagWeights) Set(value string) error {
+	const sep = " "
+	i := strings.LastIndex(value, sep)
+	if i < 0 {
+		return fmt.Errorf("invalid tag weight format. expected eg \"tag name 0.5\"")
+	}
+	tag := strings.TrimSpace(value[:i])
+	weightStr := strings.TrimSpace(value[i+len(sep):])
+	weight, err := strconv.ParseFloat(weightStr, 64)
+	if err != nil {
+		return fmt.Errorf("parse weight: %w", err)
+	}
+	if *tw.TagWeights == nil {
+		*tw.TagWeights = tagmap.TagWeights{}
+	}
+	(*tw.TagWeights)[tag] = weight
+	return nil
+}
+
+var _ flag.Value = TagWeights{}

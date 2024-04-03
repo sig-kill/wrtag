@@ -17,6 +17,7 @@ import (
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/pathformat"
 	"go.senan.xyz/wrtag/researchlink"
+	"go.senan.xyz/wrtag/tagmap"
 	"go.senan.xyz/wrtag/tags/tagcommon"
 	"go.senan.xyz/wrtag/tags/taglib"
 )
@@ -30,11 +31,14 @@ var dmp = diffmatchpatch.New()
 func main() {
 	var pathFormat pathformat.Format
 	flag.Var(flagparse.PathFormat{&pathFormat}, "path-format", "path format")
+	var tagWeights tagmap.TagWeights
+	flag.Var(flagparse.TagWeights{&tagWeights}, "tag-weight", "tag weight")
 	var researchLinkQuerier researchlink.Querier
 	flag.Var(flagparse.Querier{&researchLinkQuerier}, "research-link", "research link")
 	var keepFiles = map[string]struct{}{}
 	flag.Func("keep-file", "files to keep from source directories",
 		func(s string) error { keepFiles[s] = struct{}{}; return nil })
+
 	configPath := flag.String("config-path", flagparse.DefaultConfigPath, "path config file")
 
 	yes := flag.Bool("yes", false, "use the found release anyway despite a low score")
@@ -60,7 +64,7 @@ func main() {
 		log.Fatalf("need a dir")
 	}
 
-	r, err := wrtag.ProcessDir(context.Background(), mb, tg, &pathFormat, &researchLinkQuerier, keepFiles, op, dir, *useMBID, *yes)
+	r, err := wrtag.ProcessDir(context.Background(), mb, tg, &pathFormat, tagWeights, &researchLinkQuerier, keepFiles, op, dir, *useMBID, *yes)
 	if err != nil && !errors.Is(err, wrtag.ErrScoreTooLow) {
 		log.Fatalf("error processing %q: %v", dir, err)
 	}

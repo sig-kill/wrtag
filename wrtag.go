@@ -184,7 +184,7 @@ type SearchResult struct {
 
 func ProcessDir(
 	ctx context.Context, mb MusicbrainzClient, tg tagcommon.Reader,
-	pathFormat *pathformat.Format, researchLinkQuerier *researchlink.Querier, keepFiles map[string]struct{},
+	pathFormat *pathformat.Format, tagWeights tagmap.TagWeights, researchLinkQuerier *researchlink.Querier, keepFiles map[string]struct{},
 	op FileSystemOperation, srcDir string,
 	useMBID string, yes bool,
 ) (*SearchResult, error) {
@@ -254,7 +254,7 @@ func ProcessDir(
 		return &SearchResult{Release: release, ResearchLinks: researchLinks, OriginFile: originFile}, fmt.Errorf("%w: %d/%d", ErrTrackCountMismatch, len(tagFiles), len(releaseTracks))
 	}
 
-	score, diff := tagmap.DiffRelease(tagmap.TagWeights{}, release, tagFiles)
+	score, diff := tagmap.DiffRelease(tagWeights, release, tagFiles)
 	if !yes && score < minScore {
 		return &SearchResult{Release: release, Score: score, Diff: diff, ResearchLinks: researchLinks, OriginFile: originFile}, ErrScoreTooLow
 	}
