@@ -6,15 +6,27 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"golang.org/x/time/rate"
 )
 
-var caaClient = http.Client{}
+type CAAClient struct {
+	httpClient *http.Client
+	limiter    *rate.Limiter
+}
 
-func caaRequest(ctx context.Context, r *http.Request, dest any) error {
+func NewCAAClient(httpClient *http.Client) *CAAClient {
+	return &CAAClient{
+		httpClient: httpClient,
+		limiter:    rate.NewLimiter(rate.Inf, 1), // not sure what their limits are yet
+	}
+}
+
+func (c *CAAClient) request(ctx context.Context, r *http.Request, dest any) error {
 	log.Printf("making caa request %s", r.URL)
 
 	r = r.WithContext(ctx)
-	resp, err := caaClient.Do(r)
+	resp, err := c.httpClient.Do(r.WithContext(ctx))
 	if err != nil {
 		return fmt.Errorf("make caa request: %w", err)
 	}
@@ -29,12 +41,12 @@ func caaRequest(ctx context.Context, r *http.Request, dest any) error {
 	return nil
 }
 
-func GetCoverURL(ctx context.Context, release *Release) (string, error) {
+func (c *CAAClient) GetCoverURL(ctx context.Context, release *Release) (string, error) {
 	// try release first
 	if release.CoverArtArchive.Front {
 		req, _ := http.NewRequest(http.MethodGet, joinPath(caaBase, "release", release.ID), nil)
 		var caa caaResponse
-		if err := caaRequest(ctx, req, &caa); err != nil {
+		if err := c.request(ctx, req, &caa); err != nil {
 			return "", fmt.Errorf("make caa release request: %w", err)
 		}
 		for _, img := range caa.Images {
@@ -47,7 +59,7 @@ func GetCoverURL(ctx context.Context, release *Release) (string, error) {
 	// otherwise fallback to release group
 	req, _ := http.NewRequest(http.MethodGet, joinPath(caaBase, "release-group", release.ReleaseGroup.ID), nil)
 	var caa caaResponse
-	if err := caaRequest(ctx, req, &caa); err != nil {
+	if err := c.request(ctx, req, &caa); err != nil {
 		return "", fmt.Errorf("make caa release group request: %w", err)
 	}
 	for _, img := range caa.Images {

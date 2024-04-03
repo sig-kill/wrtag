@@ -34,7 +34,7 @@ import (
 )
 
 var tg = &taglib.TagLib{}
-var mb = musicbrainz.NewClient()
+var mb = musicbrainz.NewClient(http.DefaultClient)
 
 func main() {
 	var pathFormat pathformat.Format
