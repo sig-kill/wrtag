@@ -55,6 +55,10 @@ func (c *mockMB) SearchRelease(ctx context.Context, q musicbrainz.ReleaseQuery) 
 	return nil, musicbrainz.ErrNoResults
 }
 
+func (c *mockMB) GetCoverURL(ctx context.Context, release *musicbrainz.Release) (string, error) {
+	return "", nil
+}
+
 func mainTagWrite() {
 	flag.Parse()
 

@@ -26,12 +26,16 @@ var ErrNoResults = fmt.Errorf("no results")
 type Client struct {
 	httpClient *http.Client
 	limiter    *rate.Limiter
+
+	*CAAClient
 }
 
-func NewClient() *Client {
+func NewClient(httpClient *http.Client) *Client {
 	return &Client{
-		httpClient: &http.Client{},
+		httpClient: httpClient,
 		limiter:    rate.NewLimiter(rate.Every(time.Second), 1), // https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting
+
+		CAAClient: NewCAAClient(httpClient),
 	}
 }
 

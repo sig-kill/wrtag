@@ -5,6 +5,7 @@ import (
 	"flag"
 	"io/fs"
 	"log"
+	"net/http"
 	"os/signal"
 	"path/filepath"
 	"sync"
@@ -21,7 +22,7 @@ import (
 	"go.senan.xyz/wrtag/tags/taglib"
 )
 
-var mb wrtag.MusicbrainzClient = musicbrainz.NewClient()
+var mb wrtag.MusicbrainzClient = musicbrainz.NewClient(http.DefaultClient)
 var tg tagcommon.Reader = taglib.TagLib{}
 
 func main() {

@@ -172,6 +172,7 @@ func ReadDir(tg tagcommon.Reader, path string) (string, []string, []tagcommon.Fi
 
 type MusicbrainzClient interface {
 	SearchRelease(ctx context.Context, q musicbrainz.ReleaseQuery) (*musicbrainz.Release, error)
+	GetCoverURL(ctx context.Context, release *musicbrainz.Release) (string, error)
 }
 
 type SearchResult struct {
@@ -311,7 +312,7 @@ func ProcessDir(
 		}
 	} else {
 		// get mb cover
-		coverURL, err := musicbrainz.GetCoverURL(ctx, release)
+		coverURL, err := mb.GetCoverURL(ctx, release)
 		if err != nil {
 			return nil, fmt.Errorf("request cover url: %w", err)
 		}

@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"strings"
 
 	"github.com/sergi/go-diff/diffmatchpatch"
@@ -23,7 +24,7 @@ import (
 )
 
 // replaced while testing
-var mb wrtag.MusicbrainzClient = musicbrainz.NewClient()
+var mb wrtag.MusicbrainzClient = musicbrainz.NewClient(http.DefaultClient)
 
 var tg tagcommon.Reader = taglib.TagLib{}
 var dmp = diffmatchpatch.New()
