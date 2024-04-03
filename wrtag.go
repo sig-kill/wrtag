@@ -188,7 +188,7 @@ func ProcessDir(
 	op FileSystemOperation, srcDir string,
 	useMBID string, yes bool,
 ) (*SearchResult, error) {
-	srcDir = filepath.Clean(srcDir)
+	srcDir, _ = filepath.Abs(srcDir)
 
 	cover, paths, tagFiles, err := ReadDir(tg, srcDir)
 	if err != nil {
@@ -263,6 +263,7 @@ func ProcessDir(
 	if err != nil {
 		return nil, fmt.Errorf("gen dest dir: %w", err)
 	}
+	destDir, _ = filepath.Abs(destDir)
 
 	// lock both source and destination directories
 	defer dirMu.Lock(srcDir)()
