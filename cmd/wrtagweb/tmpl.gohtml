@@ -6,7 +6,7 @@
 <div id="job-{{ .ID }}" hx-get="/jobs/{{ .ID }}" hx-trigger="sse:job-{{ .ID }}" hx-include="">
 <div class="fixed inset-0 flex justify-center items-center bg-gray-200 bg-opacity-75">
 <form
-  hx-post="/jobs/{{ .ID }}"
+  hx-put="/jobs/{{ .ID }}"
   hx-target="#job-{{ .ID }}"
   hx-indicator="this"
   hx-swap="outerHTML"
@@ -32,7 +32,7 @@
     {{ if eq .Status "" }}
       <p class="text-gray-600">in progress ...</p>
     {{ else if eq .Error "needs-input" }}
-      <p><span class="text-red-500">low/no match</span> <button hx-post="/jobs/{{ .ID }}?confirm=1">[use anyway]</button></p>
+      <p><span class="text-red-500">low/no match</span> <button hx-put="/jobs/{{ .ID }}?confirm=1">[use anyway]</button></p>
       <p>use custom release <input type="text" name="mbid" class="px-2" placeholder="mbid/url" value="{{ .UseMBID }}"></p>
       <button>[retry]</button>
     {{ else if .Error }}
@@ -139,7 +139,26 @@ origin file info
   </head>
   <body hx-ext="sse" sse-connect="/events?stream=jobs" class="font-mono antialiased leading-tight text-sm text-gray-800 flex flex-col items-start gap-3 m-0 p-3">
     <h1 class="text-lg">wrtag</h1>
-    <input id="job-search" type="search" name="search" placeholder="filter jobs" class="border px-3 py-1 w-full sm:w-auto shadow-sm" />
+    <form hx-post="/jobs">
+      {{ block "job-import" . }}
+      <div class="flex gap-3 items-center">
+        <span class="text-gray-600">manual import</span>
+        <input name="path" placeholder="/mnt/media/music/The Fall - Dragnet" class="border px-3 py-1 w-full sm:w-auto shadow-sm" />
+        <fieldset>
+          <input type="radio" name="operation" value="copy" checked />
+          <label for="huey">copy</label>
+          <input type="radio" name="operation" value="move" />
+          <label for="dewey">move</label>
+        </fieldset>
+      </div>
+      {{ end }}
+    </form>
+    <hr class="w-full border border-b-gray-400" />
+    <p>found {{ len . }} jobs, {{ len . }} active</p>
+    <div class="flex gap-3 items-center">
+      <span class="text-gray-600">filter jobs</span>
+      <input id="job-search" type="search" name="search" placeholder="filter jobs" class="border px-3 py-1 w-full sm:w-auto shadow-sm" />
+    </div>
     {{ block "jobs" . }}
     <div hx-get="/jobs" hx-trigger="sse:jobs, input changed from:#job-search throttle:500ms, every 5s" hx-include="#job-search" hx-swap="outerHTML" class="contents">
       {{ if eq (len .) 0 }}<p class="text-gray-600">no jobs yet ...</p>{{ end }}
