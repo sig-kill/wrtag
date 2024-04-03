@@ -194,6 +194,26 @@ func main() {
 		respTmpl(w, "jobs", jobs)
 	})))
 
+	mux.Handle("POST /jobs", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		operation, err := parseOperation(r.FormValue("operation"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		path := r.FormValue("path")
+		if path == "" {
+			http.Error(w, "no path provided", http.StatusBadRequest)
+			return
+		}
+		job := Job{SourcePath: path, Operation: operation, Time: time.Now()}
+		if err := db.Insert(bolthold.NextSequence(), &job); err != nil {
+			http.Error(w, fmt.Sprintf("error saving job: %v", err), http.StatusInternalServerError)
+			return
+		}
+		respTmpl(w, "job-import", nil)
+		emit(eventAllJobs)
+	})))
+
 	mux.Handle("GET /jobs/{id}", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(r.PathValue("id"))
 		var job Job
@@ -204,7 +224,7 @@ func main() {
 		respTmpl(w, "job", job)
 	})))
 
-	mux.Handle("POST /jobs/{id}", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("PUT /jobs/{id}", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(r.PathValue("id"))
 		confirm, _ := strconv.ParseBool(r.FormValue("confirm"))
 		useMBID := r.FormValue("mbid")
@@ -264,14 +284,9 @@ func main() {
 
 	// external API
 	mux.HandleFunc("POST /op/{operation}", func(w http.ResponseWriter, r *http.Request) {
-		var operation Operation
-		switch op := r.PathValue("operation"); op {
-		case "copy":
-			operation = OperationCopy
-		case "move":
-			operation = OperationMove
-		default:
-			http.Error(w, fmt.Sprintf("invalid operation %q", op), http.StatusBadRequest)
+		operation, err := parseOperation(r.PathValue("operation"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		path := r.FormValue("path")
@@ -310,6 +325,17 @@ const (
 	OperationCopy Operation = "copy"
 	OperationMove Operation = "move"
 )
+
+func parseOperation(str string) (Operation, error) {
+	switch str {
+	case "copy":
+		return OperationCopy, nil
+	case "move":
+		return OperationMove, nil
+	default:
+		return "", fmt.Errorf("invalid operation %q", str)
+	}
+}
 
 func wrtagOperation(op Operation) wrtag.FileSystemOperation {
 	switch op {
