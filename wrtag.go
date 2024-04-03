@@ -254,7 +254,7 @@ func ProcessDir(
 		return &SearchResult{Release: release, ResearchLinks: researchLinks, OriginFile: originFile}, fmt.Errorf("%w: %d/%d", ErrTrackCountMismatch, len(tagFiles), len(releaseTracks))
 	}
 
-	score, diff := tagmap.DiffRelease(release, tagFiles)
+	score, diff := tagmap.DiffRelease(tagmap.TagWeights{}, release, tagFiles)
 	if !yes && score < minScore {
 		return &SearchResult{Release: release, Score: score, Diff: diff, ResearchLinks: researchLinks, OriginFile: originFile}, ErrScoreTooLow
 	}
