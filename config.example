@@ -23,3 +23,10 @@
 
 #keep-file origin.yaml
 #keep-file log.cue
+
+# custom tag weights can be provided to customise how the scoring algorithm weights certain tags. the default weight of any
+# tag is 1, so provide a float <1 for less weight, and >1 for more weight. a weight of 0 means ignore the tag completely.
+# like any other array like config option, it can be repeated for multiple tag weights
+
+#tag-weight media format 0.5
+#tag-weight catalogue num 1.2

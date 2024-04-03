@@ -29,6 +29,7 @@ import (
 	"go.senan.xyz/wrtag/notifications"
 	"go.senan.xyz/wrtag/pathformat"
 	"go.senan.xyz/wrtag/researchlink"
+	"go.senan.xyz/wrtag/tagmap"
 	"go.senan.xyz/wrtag/tags/taglib"
 )
 
@@ -38,6 +39,8 @@ var mb = musicbrainz.NewClient()
 func main() {
 	var pathFormat pathformat.Format
 	flag.Var(flagparse.PathFormat{&pathFormat}, "path-format", "path-format")
+	var tagWeights tagmap.TagWeights
+	flag.Var(flagparse.TagWeights{&tagWeights}, "tag-weight", "tag weight")
 	var researchLinkQuerier researchlink.Querier
 	flag.Var(flagparse.Querier{&researchLinkQuerier}, "research-link", "research link")
 	var keepFiles = map[string]struct{}{}
@@ -83,7 +86,7 @@ func main() {
 		job.Status = StatusComplete
 
 		var err error
-		job.SearchResult, err = wrtag.ProcessDir(ctx, mb, tg, &pathFormat, &researchLinkQuerier, keepFiles, wrtagOperation(job.Operation), job.SourcePath, job.UseMBID, yes)
+		job.SearchResult, err = wrtag.ProcessDir(ctx, mb, tg, &pathFormat, tagWeights, &researchLinkQuerier, keepFiles, wrtagOperation(job.Operation), job.SourcePath, job.UseMBID, yes)
 		if err != nil {
 			if errors.Is(err, wrtag.ErrScoreTooLow) {
 				job.Error = string(JobErrorNeedsInput)
