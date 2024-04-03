@@ -20,60 +20,74 @@ type Diff struct {
 	Equal         bool
 }
 
-func DiffRelease(release *musicbrainz.Release, files []tagcommon.File) (float64, []Diff) {
-	var charsTotal int
-	var charsDiff int
-	add := func(f, a, b string) Diff {
-		diffs := dmp.DiffMain(a, b, false)
-		charsTotal += len([]rune(b))
+type TagWeights map[string]float64
 
-		charDiff := dmp.DiffLevenshtein(diffs)
-		charsDiff += charDiff
-
-		return Diff{
-			Field:  f,
-			Before: filterDiff(diffs, func(d diffmatchpatch.Diff) bool { return d.Type <= diffmatchpatch.DiffEqual }),
-			After:  filterDiff(diffs, func(d diffmatchpatch.Diff) bool { return d.Type >= diffmatchpatch.DiffEqual }),
-			Equal:  charDiff == 0,
-		}
-	}
-
+func DiffRelease(weights TagWeights, release *musicbrainz.Release, files []tagcommon.File) (float64, []Diff) {
 	if len(files) == 0 {
 		return 0, nil
 	}
-	fone := files[0]
 
 	labelInfo := musicbrainz.AnyLabelInfo(release)
+	first := files[0]
+
+	var score float64
+	diff := Differ(weights, &score)
 
 	var diffs []Diff
 	diffs = append(diffs,
-		add("release", fone.Album(), release.Title),
-		add("artist", fone.AlbumArtist(), musicbrainz.ArtistsString(release.Artists)),
-		add("label", fone.Label(), labelInfo.Label.Name),
-		add("catalogue num", fone.CatalogueNum(), labelInfo.CatalogNumber),
-		add("media format", fone.MediaFormat(), release.Media[0].Format),
+		diff("release", first.Album(), release.Title),
+		diff("artist", first.AlbumArtist(), musicbrainz.ArtistsString(release.Artists)),
+		diff("label", first.Label(), labelInfo.Label.Name),
+		diff("catalogue num", first.CatalogueNum(), labelInfo.CatalogNumber),
+		diff("media format", first.MediaFormat(), release.Media[0].Format),
 	)
 
 	rtracks := musicbrainz.FlatTracks(release.Media)
 	for i, f := range files {
 		if i > len(rtracks)-1 {
-			diffs = append(diffs, add(
+			diffs = append(diffs, diff(
 				fmt.Sprintf("track %d", i+1),
 				strings.Join(filter(f.Artist(), f.Title()), " – "),
 				"",
 			))
 			continue
 		}
-		diffs = append(diffs, add(
+		diffs = append(diffs, diff(
 			fmt.Sprintf("track %d", i+1),
 			strings.Join(filter(f.Artist(), f.Title()), " – "),
 			strings.Join(filter(musicbrainz.ArtistsString(rtracks[i].Artists), rtracks[i].Title), " – "),
 		))
 	}
 
-	score := 100 - (float64(charsDiff) * 100 / float64(charsTotal))
-
 	return score, diffs
+}
+
+func Differ(weights TagWeights, score *float64) func(field string, a, b string) Diff {
+	var total float64
+	var diff float64
+
+	return func(field, a, b string) Diff {
+		var weight = 1.0
+		if w, ok := weights[field]; ok {
+			weight = w
+		}
+
+		diffs := dmp.DiffMain(a, b, false)
+		dist := float64(dmp.DiffLevenshtein(diffs))
+		distWeighted := dist * weight
+
+		diff += distWeighted
+		total += float64(len([]rune(b)))
+
+		*score = 100 - (diff * 100 / total)
+
+		return Diff{
+			Field:  field,
+			Before: filterDiff(diffs, func(d diffmatchpatch.Diff) bool { return d.Type <= diffmatchpatch.DiffEqual }),
+			After:  filterDiff(diffs, func(d diffmatchpatch.Diff) bool { return d.Type >= diffmatchpatch.DiffEqual }),
+			Equal:  dist == 0,
+		}
+	}
 }
 
 func WriteFile(
