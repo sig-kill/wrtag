@@ -180,7 +180,7 @@ func (DryRun) TrimDir(dc DirContext, src string) error {
 }
 
 func (DryRun) CleanDir(dc DirContext, limit string, src string) error {
-	log.Printf("[dry run] remove if empty (incl parents) %q", src)
+	log.Printf("[dry run] if move, remove with parents %q", src)
 	return nil
 }
 
