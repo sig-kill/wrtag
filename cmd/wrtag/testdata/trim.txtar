@@ -1,0 +1,21 @@
+env WRTAG_PATH_FORMAT='albums/{{ .Release.Title }}/{{ .Track.Title }}{{ .Ext }}'
+env WRTAG_KEEP_FILE=keep-file
+
+exec tag-write 'albums/Kat Moda/01.03 Alarms.flac'                    Title '"t 1"'
+exec tag-write 'albums/Kat Moda/02.03 The Bells.flac'                 Title '"t 2"'
+exec tag-write 'albums/Kat Moda/03.03 The Bells (Festival mix).flac'  Title '"t 3"'
+
+exec tag-write 'albums/Kat Moda/*.flac' MBReleaseID '"e47d04a4-7460-427d-a731-cc82386d85f1"'
+
+exec touch 'albums/Kat Moda/cover.png'
+exec touch 'albums/Kat Moda/keep-file'
+
+# the two unknown files
+exec touch 'albums/Kat Moda/extra-file-1.huh'
+exec touch 'albums/Kat Moda/extra some other'
+
+# move files, make sure we only delete the 2 extra files. tracks, cover, and keep files remain
+exec wrtag -yes move 'albums/Kat Moda'
+stderr -count=2 '\[warn\]'
+stderr '\[warn\] .*\/extra some other'
+stderr '\[warn\] .*\/extra-file-1\.huh'
