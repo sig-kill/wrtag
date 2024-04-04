@@ -76,7 +76,7 @@ func (c *Client) GetRelease(ctx context.Context, mbid string) (*Release, error) 
 	url, _ := url.Parse(joinPath(mbBase, "release", mbid))
 	url.RawQuery = urlV.Encode()
 
-	req, _ := http.NewRequest(http.MethodGet, url.String(), nil)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
 
 	var sr Release
 	if err := c.request(ctx, req, &sr); err != nil {
@@ -152,7 +152,7 @@ func (c *Client) SearchRelease(ctx context.Context, q ReleaseQuery) (*Release, e
 
 	url, _ := url.Parse(joinPath(mbBase, "release"))
 	url.RawQuery = urlV.Encode()
-	req, _ := http.NewRequest(http.MethodGet, url.String(), nil)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
 
 	var sr struct {
 		Releases []struct {
