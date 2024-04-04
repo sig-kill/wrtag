@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -326,33 +327,17 @@ func ProcessDir(
 		}
 	}
 
+	if cover == "" {
+		cover, err = tryDownloadMusicbrainzCover(ctx, mb, release)
+		if err != nil {
+			return nil, fmt.Errorf("try download mb cover: %w", err)
+		}
+		defer os.Remove(cover)
+	}
 	if cover != "" {
-		// use local cover
 		coverDest := filepath.Join(destDir, "cover"+filepath.Ext(cover))
 		if err := op.ProcessFile(dc, cover, coverDest); err != nil {
 			return nil, fmt.Errorf("move file to dest: %w", err)
-		}
-	} else {
-		// get mb cover
-		coverURL, err := mb.GetCoverURL(ctx, release)
-		if err != nil {
-			return nil, fmt.Errorf("request cover url: %w", err)
-		}
-		if coverURL != "" {
-			coverDest := filepath.Join(destDir, "cover"+filepath.Ext(coverURL))
-			coverf, err := os.Create(coverDest)
-			if err != nil {
-				return nil, fmt.Errorf("create cover destination file: %w", err)
-			}
-			resp, err := http.Get(coverURL)
-			if err != nil {
-				return nil, fmt.Errorf("create cover destination file: %w", err)
-			}
-			n, _ := io.Copy(coverf, resp.Body)
-			resp.Body.Close()
-			coverf.Close()
-
-			log.Printf("wrote cover to %s (%d bytes)", coverDest, n)
 		}
 	}
 
@@ -379,6 +364,34 @@ func DestDir(pathFormat *pathformat.Format, release *musicbrainz.Release) (strin
 	}
 	dir := filepath.Dir(path)
 	return dir, nil
+}
+
+func tryDownloadMusicbrainzCover(ctx context.Context, mb MusicbrainzClient, release *musicbrainz.Release) (string, error) {
+	coverURL, err := mb.GetCoverURL(ctx, release)
+	if err != nil {
+		return "", fmt.Errorf("request cover url: %w", err)
+	}
+	if coverURL == "" {
+		return "", nil
+	}
+
+	// TODO: make sure we put this on the same filesystem as the dest dir?
+	tmpf, err := os.CreateTemp("", "wrtag-cover-*"+path.Ext(coverURL))
+	if err != nil {
+		return "", err
+	}
+	defer tmpf.Close()
+
+	resp, err := http.Get(coverURL)
+	if err != nil {
+		return "", fmt.Errorf("create cover destination file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	n, _ := io.Copy(tmpf, resp.Body)
+	log.Printf("wrote cover to tmp (%d bytes)", n)
+
+	return tmpf.Name(), nil
 }
 
 func dirSize(path string) (uint64, error) {
