@@ -85,6 +85,7 @@ func mainTagWrite() {
 
 		for i := 0; i < len(pairs)-1; i += 2 {
 			field, jsonValue := pairs[i], pairs[i+1]
+
 			method := reflect.ValueOf(f).MethodByName("Write" + field)
 			dest := reflect.New(method.Type().In(0))
 			if err := json.Unmarshal([]byte(jsonValue), dest.Interface()); err != nil {
@@ -100,12 +101,13 @@ func mainTagWrite() {
 func mainTagCheck() {
 	flag.Parse()
 
-	pat, field, jsonValue := flag.Arg(0), flag.Arg(1), flag.Arg(2)
+	pat := flag.Arg(0)
 	paths := parsePattern(pat)
 	if len(paths) == 0 {
 		log.Fatalf("no paths to match pattern")
 	}
 
+	field, jsonValue := flag.Arg(1), flag.Arg(2)
 	for _, p := range paths {
 		f, err := tg.Read(p)
 		if err != nil {
