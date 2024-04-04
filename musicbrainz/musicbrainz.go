@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,10 +18,15 @@ import (
 
 const mbBase = "https://musicbrainz.org/ws/2/"
 const caaBase = "https://coverartarchive.org/"
-
 const userAgent = `wrtag/0.0.0-alpha ( https://go.senan.xyz/wrtag )`
 
 var ErrNoResults = fmt.Errorf("no results")
+
+type StatusError int
+
+func (se StatusError) Error() string {
+	return strconv.Itoa(int(se))
+}
 
 type Client struct {
 	httpClient *http.Client
@@ -47,13 +53,14 @@ func (c *Client) request(ctx context.Context, r *http.Request, dest any) error {
 
 	r.Header.Set("User-Agent", userAgent)
 
-	resp, err := c.httpClient.Do(r.WithContext(ctx))
+	r = r.WithContext(ctx)
+	resp, err := c.httpClient.Do(r)
 	if err != nil {
 		return fmt.Errorf("search: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode/100 != 2 {
-		return fmt.Errorf("search returned non 2xx: %d", resp.StatusCode)
+		return fmt.Errorf("musicbrainz returned non 2xx: %w", StatusError(resp.StatusCode))
 	}
 	if err := json.NewDecoder(resp.Body).Decode(dest); err != nil {
 		return fmt.Errorf("decode response: %w", err)
