@@ -341,21 +341,28 @@ func ProcessDir(
 		}
 	}
 
-	cleanMu.Lock()
-	defer cleanMu.Unlock()
-
 	if srcDir != destDir {
-		// always clean src
-		if err := op.CleanDir(srcDir); err != nil {
-			return nil, fmt.Errorf("clean src dir: %w", err)
-		}
-		// clean all src's parents if this path is in our control
-		if strings.HasPrefix(srcDir, pathFormat.Root()) {
-			for d := srcDir; d != pathFormat.Root(); d = filepath.Dir(d) {
-				if err := op.CleanDir(d); err != nil {
-					return nil, fmt.Errorf("clean src dir parent: %w", err)
+		err := func() error {
+			// always clean src
+			if err := op.CleanDir(srcDir); err != nil {
+				return fmt.Errorf("src dir: %w", err)
+			}
+
+			cleanMu.Lock()
+			defer cleanMu.Unlock()
+
+			// clean all src's parents if this path is in our control
+			if strings.HasPrefix(srcDir, pathFormat.Root()) {
+				for d := filepath.Dir(srcDir); d != pathFormat.Root(); d = filepath.Dir(d) {
+					if err := op.CleanDir(d); err != nil {
+						return fmt.Errorf("src dir parent: %w", err)
+					}
 				}
 			}
+			return nil
+		}()
+		if err != nil {
+			return nil, fmt.Errorf("clean: %w", err)
 		}
 	}
 
