@@ -63,10 +63,15 @@ func (c *mockMB) GetCoverURL(ctx context.Context, release *musicbrainz.Release) 
 func mainTagWrite() {
 	flag.Parse()
 
-	pat, field, jsonValue := flag.Arg(0), flag.Arg(1), flag.Arg(2)
+	pat := flag.Arg(0)
 	paths := parsePattern(pat)
 	if len(paths) == 0 {
 		log.Fatalf("no paths to match pattern")
+	}
+
+	pairs := flag.Args()[1:]
+	if len(pairs)%2 != 0 {
+		log.Fatalf("invalid field/value pairs")
 	}
 
 	for _, p := range paths {
@@ -78,12 +83,15 @@ func mainTagWrite() {
 			log.Fatalf("open tag file: %v", err)
 		}
 
-		method := reflect.ValueOf(f).MethodByName("Write" + field)
-		dest := reflect.New(method.Type().In(0))
-		if err := json.Unmarshal([]byte(jsonValue), dest.Interface()); err != nil {
-			log.Fatalf("unmarshal json to arg: %v", err)
+		for i := 0; i < len(pairs)-1; i += 2 {
+			field, jsonValue := pairs[i], pairs[i+1]
+			method := reflect.ValueOf(f).MethodByName("Write" + field)
+			dest := reflect.New(method.Type().In(0))
+			if err := json.Unmarshal([]byte(jsonValue), dest.Interface()); err != nil {
+				log.Fatalf("unmarshal json to arg: %v", err)
+			}
+			method.Call([]reflect.Value{dest.Elem()})
 		}
-		method.Call([]reflect.Value{dest.Elem()})
 
 		f.Close()
 	}
