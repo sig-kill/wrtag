@@ -36,9 +36,10 @@ const minScore = 92
 const rmAllSizeThreshold uint64 = 20 * 1e6 // 20 MB
 
 type FileSystemOperation interface {
-	ProcessFile(dc DirContext, src, dest string) error
-	CleanDir(dc DirContext, limit string, src string) error
 	ReadOnly() bool
+	ProcessFile(dc DirContext, src, dest string) error
+	TrimDir(dc DirContext, src string) error                // remove unknown files
+	CleanDir(dc DirContext, limit string, src string) error // remove dir and its parents
 }
 
 type DirContext struct {
@@ -60,6 +61,7 @@ func (m Move) ReadOnly() bool {
 }
 
 func (m Move) ProcessFile(dc DirContext, src, dest string) error {
+	dest, _ = filepath.Abs(dest)
 	dc.knownDestPaths[dest] = struct{}{}
 
 	if filepath.Clean(src) == filepath.Clean(dest) {
@@ -83,6 +85,21 @@ func (m Move) ProcessFile(dc DirContext, src, dest string) error {
 	return nil
 }
 
+func (m Move) TrimDir(dc DirContext, src string) error {
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return fmt.Errorf("read dir: %w", err)
+	}
+	for _, entry := range entries {
+		path := filepath.Join(src, entry.Name())
+		if _, ok := dc.knownDestPaths[path]; !ok {
+			log.Printf("[warn] found extra file %q which may be deleted in future updates", path)
+			continue
+		}
+	}
+	return nil
+}
+
 func (m Move) CleanDir(dc DirContext, limit string, src string) error {
 	if limit == "" {
 		panic("empty limit dir")
@@ -97,6 +114,7 @@ func (m Move) CleanDir(dc DirContext, limit string, src string) error {
 	}
 
 	// clean all src's parents if this path is in our control
+
 	cleanMu.Lock()
 	defer cleanMu.Unlock()
 
@@ -137,6 +155,10 @@ func (Copy) ProcessFile(dc DirContext, src, dest string) error {
 	return nil
 }
 
+func (Copy) TrimDir(dc DirContext, src string) error {
+	return nil
+}
+
 func (Copy) CleanDir(dc DirContext, limit string, src string) error {
 	return nil
 }
@@ -152,8 +174,13 @@ func (DryRun) ProcessFile(dc DirContext, src, dest string) error {
 	return nil
 }
 
+func (DryRun) TrimDir(dc DirContext, src string) error {
+	log.Printf("[dry run] trim dir %q", src)
+	return nil
+}
+
 func (DryRun) CleanDir(dc DirContext, limit string, src string) error {
-	log.Printf("[dry run] remove if empty %q", src)
+	log.Printf("[dry run] remove if empty (incl parents) %q", src)
 	return nil
 }
 
@@ -345,6 +372,10 @@ func ProcessDir(
 		if err := op.ProcessFile(dc, filepath.Join(srcDir, kf), filepath.Join(destDir, kf)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("process keep file %q: %w", kf, err)
 		}
+	}
+
+	if err := op.TrimDir(dc, destDir); err != nil {
+		return nil, fmt.Errorf("trim: %w", err)
 	}
 
 	if srcDir != destDir {
