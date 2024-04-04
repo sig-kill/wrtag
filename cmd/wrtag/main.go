@@ -44,6 +44,7 @@ func main() {
 
 	yes := flag.Bool("yes", false, "use the found release anyway despite a low score")
 	useMBID := flag.String("mbid", "", "overwrite matched mbid")
+	dryRun := flag.Bool("dry-run", false, "dry run")
 
 	flag.Parse()
 	flagconf.ParseEnv()
@@ -53,11 +54,9 @@ func main() {
 	var op wrtag.FileSystemOperation
 	switch command {
 	case "move":
-		op = wrtag.Move{}
+		op = wrtag.Move{DryRun: *dryRun}
 	case "copy":
-		op = wrtag.Copy{}
-	case "dry-run":
-		op = wrtag.DryRun{}
+		op = wrtag.Copy{DryRun: *dryRun}
 	default:
 		log.Fatalf("unknown command %q", command)
 	}

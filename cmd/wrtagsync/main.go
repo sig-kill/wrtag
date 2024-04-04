@@ -33,6 +33,8 @@ func main() {
 	var keepFiles = map[string]struct{}{}
 	flag.Func("keep-file", "files to keep from source directories",
 		func(s string) error { keepFiles[s] = struct{}{}; return nil })
+	dryRun := flag.Bool("dry-run", false, "dry run")
+
 	configPath := flag.String("config-path", flagparse.DefaultConfigPath, "path config file")
 
 	flag.Parse()
@@ -77,7 +79,7 @@ func main() {
 				case <-ctx.Done():
 					return
 				case dir := <-todo:
-					if _, err := wrtag.ProcessDir(ctx, mb, tg, &pathFormat, tagWeights, nil, keepFiles, wrtag.Move{}, dir, "", false); err != nil {
+					if _, err := wrtag.ProcessDir(ctx, mb, tg, &pathFormat, tagWeights, nil, keepFiles, wrtag.Move{DryRun: *dryRun}, dir, "", false); err != nil {
 						log.Printf("error processing %q: %v", dir, err)
 						continue
 					}
