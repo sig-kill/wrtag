@@ -1,14 +1,13 @@
 package musicbrainz
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
-	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -337,39 +336,30 @@ type GenreInfo struct {
 	Count uint
 }
 
-func AnyGenres(release *Release) []string {
-	var genres []string
-	for _, g := range release.Genres {
-		genres = insertUniq(genres, g.Name)
-	}
-	for _, g := range release.ReleaseGroup.Genres {
-		genres = insertUniq(genres, g.Name)
-	}
+func AnyGenres(release *Release) (genres []Genre) {
+	defer func() {
+		genres = mergeAndSortGenres(genres)
+	}()
+
+	// try release and artist first
+	genres = append(genres, release.Genres...)
+	genres = append(genres, release.ReleaseGroup.Genres...)
 	for _, t := range FlatTracks(release.Media) {
-		for _, g := range t.Recording.Genres {
-			genres = insertUniq(genres, g.Name)
-		}
-	}
-	if len(genres) > 0 {
-		return genres
+		genres = append(genres, t.Recording.Genres...)
 	}
 	for _, a := range release.Artists {
-		for _, g := range a.Artist.Genres {
-			genres = insertUniq(genres, g.Name)
-		}
+		genres = append(genres, a.Artist.Genres...)
 	}
 	for _, a := range release.ReleaseGroup.Artists {
-		for _, g := range a.Artist.Genres {
-			genres = insertUniq(genres, g.Name)
-		}
+		genres = append(genres, a.Artist.Genres...)
 	}
 	if len(genres) > 0 {
 		return genres
 	}
+
+	// fallback to label
 	for _, l := range release.LabelInfo {
-		for _, g := range l.Label.Genres {
-			genres = insertUniq(genres, g.Name)
-		}
+		genres = append(genres, l.Label.Genres...)
 	}
 	return genres
 }
@@ -402,6 +392,25 @@ func (at *AnyTime) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func mergeAndSortGenres(genres []Genre) []Genre {
+	genreIDs := map[string]*Genre{}
+	for _, g := range genres {
+		if _, ok := genreIDs[g.ID]; !ok {
+			genreIDs[g.ID] = &g
+			continue
+		}
+		genreIDs[g.ID].Count += g.Count
+	}
+	var out []Genre
+	for _, g := range genreIDs {
+		out = append(out, *g)
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].Count > out[j].Count
+	})
+	return out
+}
+
 // https://lucene.apache.org/core/7_7_2/queryparser/org/apache/lucene/queryparser/classic/package-summary.html#Escaping_Special_Characters
 var escapeLucene *strings.Replacer
 
@@ -422,11 +431,4 @@ func field(k string, v any) string {
 func joinPath(base string, p ...string) string {
 	r, _ := url.JoinPath(base, p...)
 	return r
-}
-
-func insertUniq[T cmp.Ordered](vs []T, v T) []T {
-	if i, ok := slices.BinarySearch(vs, v); !ok {
-		vs = slices.Insert(vs, i, v)
-	}
-	return vs
 }
