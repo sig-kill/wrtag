@@ -98,16 +98,20 @@ func Differ(weights TagWeights, score *float64) func(field string, a, b string) 
 }
 
 func WriteFile(
-	release *musicbrainz.Release, labelInfo musicbrainz.LabelInfo, genres []string,
+	release *musicbrainz.Release, labelInfo musicbrainz.LabelInfo, genres []musicbrainz.Genre,
 	releaseTrack *musicbrainz.Track, i int, f tagcommon.File,
 ) {
 	if ru, ok := f.(interface{ RemoveUnknown() }); ok {
 		ru.RemoveUnknown()
 	}
 
+	var genreNames []string
+	for _, g := range genres[:min(6, len(genres))] { // top 6 genre strings
+		genreNames = append(genreNames, g.Name)
+	}
 	var anyGenre string
-	if len(genres) > 0 {
-		anyGenre = genres[0]
+	if len(genreNames) > 0 {
+		anyGenre = genreNames[0]
 	}
 
 	f.WriteAlbum(release.Title)
@@ -131,7 +135,7 @@ func WriteFile(
 	f.WriteArtistCredit(musicbrainz.ArtistsCreditString(releaseTrack.Artists))
 	f.WriteArtistsCredit(musicbrainz.ArtistsCreditNames(releaseTrack.Artists))
 	f.WriteGenre(anyGenre)
-	f.WriteGenres(genres)
+	f.WriteGenres(genreNames)
 	f.WriteTrackNumber(i + 1)
 	f.WriteDiscNumber(1)
 
