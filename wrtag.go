@@ -57,6 +57,7 @@ func (m Move) ProcessFile(src, dest string) error {
 			if err := os.Remove(src); err != nil {
 				return fmt.Errorf("remove from move: %w", err)
 			}
+			return nil
 		}
 		return fmt.Errorf("rename: %w", err)
 	}
