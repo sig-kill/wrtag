@@ -126,7 +126,7 @@ func (f *File) RemoveUnknown() {
 	for k := range f.raw {
 		switch strings.ToLower(k) {
 		// TODO: re use from above somehow
-		case "title", "artist", "artists", "album", "albumartist", "albumartists", "genre", "genres", "track", "discnumber", "media", "date", "originaldate", "label", "catalognumber",
+		case "title", "artist", "artists", "artist_credit", "artists_credit", "album", "albumartist", "albumartists", "albumartist_credit", "albumartists_credit", "genre", "genres", "track", "discnumber", "media", "date", "originaldate", "label", "catalognumber",
 			"musicbrainz_trackid", "musicbrainz_albumid", "musicbrainz_releasegroupid", "musicbrainz_artistid", "musicbrainz_albumartistid":
 		default:
 			delete(f.raw, k)

@@ -22,6 +22,8 @@ func main() {
 		file.WriteAlbum("")
 		file.WriteAlbumArtist("")
 		file.WriteAlbumArtists(nil)
+		file.WriteAlbumArtistCredit("")
+		file.WriteAlbumArtistsCredit(nil)
 		file.WriteDate("")
 		file.WriteOriginalDate("")
 		file.WriteMediaFormat("")
@@ -35,6 +37,8 @@ func main() {
 		file.WriteTitle("")
 		file.WriteArtist("")
 		file.WriteArtists(nil)
+		file.WriteArtistCredit("")
+		file.WriteArtistsCredit(nil)
 		file.WriteGenre("")
 		file.WriteGenres(nil)
 		file.WriteTrackNumber(0)
@@ -42,6 +46,10 @@ func main() {
 
 		file.WriteMBRecordingID("")
 		file.WriteMBArtistID(nil)
+
+		if ru, ok := file.(interface{ RemoveUnknown() }); ok {
+			ru.RemoveUnknown()
+		}
 
 		if err := file.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("close %s: %w", path, err))
