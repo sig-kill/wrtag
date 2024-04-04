@@ -3,6 +3,7 @@ package musicbrainz
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -30,14 +31,14 @@ func (c *CAAClient) request(ctx context.Context, r *http.Request, dest any) erro
 	log.Printf("making caa request %s", r.URL)
 
 	r = r.WithContext(ctx)
-	resp, err := c.httpClient.Do(r.WithContext(ctx))
+	resp, err := c.httpClient.Do(r)
 	if err != nil {
 		return fmt.Errorf("make caa request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode/100 != 2 {
-		return fmt.Errorf("non 2xx from caa: %d", resp.StatusCode)
+		return fmt.Errorf("caa returned non 2xx: %w", StatusError(resp.StatusCode))
 	}
 	if err := json.NewDecoder(resp.Body).Decode(dest); err != nil {
 		return fmt.Errorf("decode caa response: %w", err)
@@ -48,24 +49,41 @@ func (c *CAAClient) request(ctx context.Context, r *http.Request, dest any) erro
 func (c *CAAClient) GetCoverURL(ctx context.Context, release *Release) (string, error) {
 	// try release first
 	if release.CoverArtArchive.Front {
-		req, _ := http.NewRequest(http.MethodGet, joinPath(caaBase, "release", release.ID), nil)
-		var caa caaResponse
-		if err := c.request(ctx, req, &caa); err != nil {
-			return "", fmt.Errorf("make caa release request: %w", err)
+		url, err := c.getCoverURL(ctx, joinPath(caaBase, "release", release.ID))
+		if err != nil {
+			return "", fmt.Errorf("try release: %w", err)
 		}
-		for _, img := range caa.Images {
-			if img.Front {
-				return img.Image, nil
-			}
+		if url != "" {
+			return url, nil
 		}
 	}
 
-	// otherwise fallback to release group
-	req, _ := http.NewRequest(http.MethodGet, joinPath(caaBase, "release-group", release.ReleaseGroup.ID), nil)
-	var caa caaResponse
-	if err := c.request(ctx, req, &caa); err != nil {
-		return "", fmt.Errorf("make caa release group request: %w", err)
+	// fall back to release group
+	url, err := c.getCoverURL(ctx, joinPath(caaBase, "release-group", release.ReleaseGroup.ID))
+	if err != nil {
+		return "", fmt.Errorf("try release group: %w", err)
 	}
+	if url != "" {
+		return url, nil
+	}
+	return "", nil
+}
+
+func (c *CAAClient) getCoverURL(ctx context.Context, url string) (string, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return "", fmt.Errorf("create request: %w", err)
+	}
+
+	var caa caaResponse
+	err = c.request(ctx, req, &caa)
+	if se := StatusError(0); errors.As(err, &se) && se == http.StatusNotFound {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("make caa release request: %w", err)
+	}
+
 	for _, img := range caa.Images {
 		if img.Front {
 			return img.Image, nil
