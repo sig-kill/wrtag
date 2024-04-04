@@ -1,6 +1,7 @@
 package wrtag
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -11,7 +12,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -189,11 +190,14 @@ func ReadDir(tg tagcommon.Reader, path string) (string, []string, []tagcommon.Fi
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("glob dir: %w", err)
 	}
-	sort.Strings(allPaths)
+
+	type pathFile struct {
+		path string
+		tagcommon.File
+	}
 
 	var cover string
-	var paths []string
-	var files []tagcommon.File
+	var pathFiles []pathFile
 	for _, path := range allPaths {
 		switch strings.ToLower(filepath.Ext(path)) {
 		case ".jpg", ".jpeg", ".png", ".bmp", ".gif":
@@ -206,13 +210,27 @@ func ReadDir(tg tagcommon.Reader, path string) (string, []string, []tagcommon.Fi
 			if err != nil {
 				return "", nil, nil, fmt.Errorf("read track: %w", err)
 			}
-			paths = append(paths, path)
-			files = append(files, file)
+			pathFiles = append(pathFiles, pathFile{path, file})
 			_ = file.Close()
 		}
 	}
-	if len(files) == 0 {
+	if len(pathFiles) == 0 {
 		return "", nil, nil, ErrNoTracks
+	}
+
+	slices.SortFunc(pathFiles, func(a, b pathFile) int {
+		return cmp.Or(
+			cmp.Compare(a.DiscNumber(), b.DiscNumber()),
+			cmp.Compare(a.TrackNumber(), b.TrackNumber()),
+			cmp.Compare(a.path, b.path),
+		)
+	})
+
+	paths := make([]string, 0, len(pathFiles))
+	files := make([]tagcommon.File, 0, len(pathFiles))
+	for _, pf := range pathFiles {
+		paths = append(paths, pf.path)
+		files = append(files, pf.File)
 	}
 
 	return cover, paths, files, nil
