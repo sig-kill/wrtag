@@ -218,7 +218,7 @@ func ReadDir(tg tagcommon.Reader, path string) (string, []string, []tagcommon.Fi
 		return "", nil, nil, ErrNoTracks
 	}
 
-	slices.SortFunc(pathFiles, func(a, b pathFile) int {
+	slices.SortStableFunc(pathFiles, func(a, b pathFile) int {
 		return cmp.Or(
 			cmp.Compare(a.DiscNumber(), b.DiscNumber()),
 			cmp.Compare(a.TrackNumber(), b.TrackNumber()),
