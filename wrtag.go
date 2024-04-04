@@ -32,17 +32,35 @@ var (
 )
 
 const minScore = 92
-
 const rmAllSizeThreshold uint64 = 20 * 1e6 // 20 MB
 
 type FileSystemOperation interface {
-	ProcessFile(src, dest string) error
-	CleanDir(src string) error
+	ProcessFile(dc DirContext, src, dest string) error
+	CleanDir(dc DirContext, limit string, src string) error
+	ReadOnly() bool
 }
+
+type DirContext struct {
+	knownDestPaths map[string]struct{}
+}
+
+func NewDirContext() DirContext {
+	return DirContext{knownDestPaths: map[string]struct{}{}}
+}
+
+var _ FileSystemOperation = (*Move)(nil)
+var _ FileSystemOperation = (*Copy)(nil)
+var _ FileSystemOperation = (*DryRun)(nil)
 
 type Move struct{}
 
-func (m Move) ProcessFile(src, dest string) error {
+func (m Move) ReadOnly() bool {
+	return false
+}
+
+func (m Move) ProcessFile(dc DirContext, src, dest string) error {
+	dc.knownDestPaths[dest] = struct{}{}
+
 	if filepath.Clean(src) == filepath.Clean(dest) {
 		return nil
 	}
@@ -51,7 +69,7 @@ func (m Move) ProcessFile(src, dest string) error {
 		var errNo syscall.Errno
 		if errors.As(err, &errNo) && errNo == 18 /*  invalid cross-device link */ {
 			// we tried to rename across filesystems, copy and delete instead
-			if err := (Copy{}).ProcessFile(src, dest); err != nil {
+			if err := (Copy{}).ProcessFile(dc, src, dest); err != nil {
 				return fmt.Errorf("copy from move: %w", err)
 			}
 			if err := os.Remove(src); err != nil {
@@ -64,37 +82,38 @@ func (m Move) ProcessFile(src, dest string) error {
 	return nil
 }
 
-func (Move) CleanDir(src string) error {
-	entries, err := os.ReadDir(src)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		return fmt.Errorf("read dir: %w", err)
-	}
-	for _, entry := range entries {
-		// skip if we have any child directories
-		if entry.IsDir() {
-			return nil
-		}
+func (m Move) CleanDir(dc DirContext, limit string, src string) error {
+	if limit == "" {
+		panic("empty limit dir")
 	}
 
-	dirSize, err := dirSize(src)
-	if err != nil {
-		return fmt.Errorf("get dir size for sanity check: %w", err)
+	if err := safeRemoveAll(src); err != nil {
+		return fmt.Errorf("src dir: %w", err)
 	}
-	if dirSize > rmAllSizeThreshold {
-		return fmt.Errorf("folder was too big for clean up: %d/%d", dirSize, rmAllSizeThreshold)
+
+	if !strings.HasPrefix(src, limit) {
+		return nil
 	}
-	if err := os.RemoveAll(src); err != nil {
-		return fmt.Errorf("error cleaning up folder: %w", err)
+
+	// clean all src's parents if this path is in our control
+	cleanMu.Lock()
+	defer cleanMu.Unlock()
+
+	for d := filepath.Dir(src); d != filepath.Clean(limit); d = filepath.Dir(d) {
+		if err := safeRemoveAll(d); err != nil {
+			return fmt.Errorf("src dir parent: %w", err)
+		}
 	}
 	return nil
 }
 
 type Copy struct{}
 
-func (Copy) ProcessFile(src, dest string) error {
+func (Copy) ReadOnly() bool {
+	return true
+}
+
+func (Copy) ProcessFile(dc DirContext, src, dest string) error {
 	if filepath.Clean(src) == filepath.Clean(dest) {
 		return nil
 	}
@@ -117,25 +136,25 @@ func (Copy) ProcessFile(src, dest string) error {
 	return nil
 }
 
-func (Copy) CleanDir(src string) error {
+func (Copy) CleanDir(dc DirContext, limit string, src string) error {
 	return nil
 }
 
 type DryRun struct{}
 
-func (DryRun) ProcessFile(src, dest string) error {
+func (DryRun) ReadOnly() bool {
+	return true
+}
+
+func (DryRun) ProcessFile(dc DirContext, src, dest string) error {
 	log.Printf("[dry run] %q -> %q", src, dest)
 	return nil
 }
 
-func (DryRun) CleanDir(src string) error {
+func (DryRun) CleanDir(dc DirContext, limit string, src string) error {
 	log.Printf("[dry run] remove if empty %q", src)
 	return nil
 }
-
-var _ FileSystemOperation = (*Move)(nil)
-var _ FileSystemOperation = (*Copy)(nil)
-var _ FileSystemOperation = (*DryRun)(nil)
 
 func ReadDir(tg tagcommon.Reader, path string) (string, []string, []tagcommon.File, error) {
 	allPaths, err := fileutil.GlobBase(path, "*")
@@ -276,6 +295,8 @@ func ProcessDir(
 	labelInfo := musicbrainz.AnyLabelInfo(release)
 	genres := musicbrainz.AnyGenres(release)
 
+	dc := NewDirContext()
+
 	for i := range releaseTracks {
 		releaseTrack, path := releaseTracks[i], paths[i]
 
@@ -288,11 +309,11 @@ func ProcessDir(
 		if err := os.MkdirAll(filepath.Dir(destPath), os.ModePerm); err != nil {
 			return nil, fmt.Errorf("create dest path: %w", err)
 		}
-		if err := op.ProcessFile(path, destPath); err != nil {
+		if err := op.ProcessFile(dc, path, destPath); err != nil {
 			return nil, fmt.Errorf("op to dest %q: %w", destPath, err)
 		}
 
-		if _, ok := op.(DryRun); ok {
+		if op.ReadOnly() {
 			continue
 		}
 		tagFile, err := tg.Read(destPath)
@@ -308,7 +329,7 @@ func ProcessDir(
 	if cover != "" {
 		// use local cover
 		coverDest := filepath.Join(destDir, "cover"+filepath.Ext(cover))
-		if err := op.ProcessFile(cover, coverDest); err != nil {
+		if err := op.ProcessFile(dc, cover, coverDest); err != nil {
 			return nil, fmt.Errorf("move file to dest: %w", err)
 		}
 	} else {
@@ -336,32 +357,13 @@ func ProcessDir(
 	}
 
 	for kf := range keepFiles {
-		if err := op.ProcessFile(filepath.Join(srcDir, kf), filepath.Join(destDir, kf)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := op.ProcessFile(dc, filepath.Join(srcDir, kf), filepath.Join(destDir, kf)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("process keep file %q: %w", kf, err)
 		}
 	}
 
 	if srcDir != destDir {
-		err := func() error {
-			// always clean src
-			if err := op.CleanDir(srcDir); err != nil {
-				return fmt.Errorf("src dir: %w", err)
-			}
-
-			cleanMu.Lock()
-			defer cleanMu.Unlock()
-
-			// clean all src's parents if this path is in our control
-			if strings.HasPrefix(srcDir, pathFormat.Root()) {
-				for d := filepath.Dir(srcDir); d != pathFormat.Root(); d = filepath.Dir(d) {
-					if err := op.CleanDir(d); err != nil {
-						return fmt.Errorf("src dir parent: %w", err)
-					}
-				}
-			}
-			return nil
-		}()
-		if err != nil {
+		if err := op.CleanDir(dc, pathFormat.Root(), srcDir); err != nil {
 			return nil, fmt.Errorf("clean: %w", err)
 		}
 	}
@@ -395,6 +397,34 @@ func dirSize(path string) (uint64, error) {
 		return err
 	})
 	return size, err
+}
+
+func safeRemoveAll(src string) error {
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("read dir: %w", err)
+	}
+	for _, entry := range entries {
+		// skip if we have any child directories
+		if entry.IsDir() {
+			return nil
+		}
+	}
+
+	dirSize, err := dirSize(src)
+	if err != nil {
+		return fmt.Errorf("get dir size for sanity check: %w", err)
+	}
+	if dirSize > rmAllSizeThreshold {
+		return fmt.Errorf("folder was too big for clean up: %d/%d", dirSize, rmAllSizeThreshold)
+	}
+	if err := os.RemoveAll(src); err != nil {
+		return fmt.Errorf("error cleaning up folder: %w", err)
+	}
+	return nil
 }
 
 func first[T comparable](is []T) T {
