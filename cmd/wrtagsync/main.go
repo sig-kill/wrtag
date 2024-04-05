@@ -3,13 +3,16 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
 	"os/signal"
 	"path/filepath"
 	"sync"
 	"syscall"
+	"time"
 
 	"go.senan.xyz/flagconf"
 
@@ -33,6 +36,8 @@ func main() {
 	var keepFiles = map[string]struct{}{}
 	flag.Func("keep-file", "files to keep from source directories",
 		func(s string) error { keepFiles[s] = struct{}{}; return nil })
+
+	interval := flag.Duration("interval", 0, "max duration a release should be left unsynced")
 	dryRun := flag.Bool("dry-run", false, "dry run")
 
 	configPath := flag.String("config-path", flagparse.DefaultConfigPath, "path config file")
@@ -69,6 +74,25 @@ func main() {
 		cancel()
 	}()
 
+	processDir := func(ctx context.Context, dir string) error {
+		if *interval > 0 {
+			info, err := os.Stat(dir)
+			if err != nil {
+				return fmt.Errorf("stat dir: %w", err)
+			}
+			if time.Since(info.ModTime()) < *interval {
+				return nil
+			}
+			defer func() {
+				_ = os.Chtimes(dir, time.Time{}, time.Now())
+			}()
+		}
+		if _, err := wrtag.ProcessDir(ctx, mb, tg, &pathFormat, tagWeights, nil, keepFiles, wrtag.Move{DryRun: *dryRun}, dir, "", false); err != nil {
+			return fmt.Errorf("process: %v: %w", dir, err)
+		}
+		return nil
+	}
+
 	var wg sync.WaitGroup
 	for range 4 {
 		wg.Add(1)
@@ -79,11 +103,11 @@ func main() {
 				case <-ctx.Done():
 					return
 				case dir := <-todo:
-					if _, err := wrtag.ProcessDir(ctx, mb, tg, &pathFormat, tagWeights, nil, keepFiles, wrtag.Move{DryRun: *dryRun}, dir, "", false); err != nil {
+					if err := processDir(ctx, dir); err != nil {
 						log.Printf("error processing %q: %v", dir, err)
 						continue
 					}
-					log.Printf("done %s", dir)
+					log.Printf("done %q", dir)
 				}
 			}
 		}()
