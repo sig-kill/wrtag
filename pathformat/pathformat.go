@@ -133,6 +133,7 @@ var funcMap = texttemplate.FuncMap{
 	"sort":     func(strings []string) []string { sort.Strings(strings); return strings },
 	"safepath": func(p string) string { return fileutil.SafePath(p) },
 
-	"flatTracks": musicbrainz.FlatTracks,
-	"artists":    musicbrainz.ArtistsNames,
+	"flatTracks":   musicbrainz.FlatTracks,
+	"artists":      musicbrainz.ArtistsNames,
+	"artistCredit": musicbrainz.ArtistsCreditString,
 }
