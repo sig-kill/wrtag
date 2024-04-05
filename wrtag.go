@@ -53,12 +53,13 @@ func NewDirContext() DirContext {
 
 var _ FileSystemOperation = (*Move)(nil)
 var _ FileSystemOperation = (*Copy)(nil)
-var _ FileSystemOperation = (*DryRun)(nil)
 
-type Move struct{}
+type Move struct {
+	DryRun bool
+}
 
 func (m Move) ReadOnly() bool {
-	return false
+	return m.DryRun
 }
 
 func (m Move) ProcessFile(dc DirContext, src, dest string) error {
@@ -66,6 +67,11 @@ func (m Move) ProcessFile(dc DirContext, src, dest string) error {
 	dc.knownDestPaths[dest] = struct{}{}
 
 	if filepath.Clean(src) == filepath.Clean(dest) {
+		return nil
+	}
+
+	if m.DryRun {
+		log.Printf("[dry run] rename %q -> %q", src, dest)
 		return nil
 	}
 
@@ -94,6 +100,10 @@ func (m Move) TrimDir(dc DirContext, src string) error {
 	for _, entry := range entries {
 		path := filepath.Join(src, entry.Name())
 		if _, ok := dc.knownDestPaths[path]; !ok {
+			if m.DryRun {
+				log.Printf("[dry run] delete extra file %q", path)
+				continue
+			}
 			log.Printf("[warn] found extra file %q which may be deleted in future updates", path)
 			continue
 		}
@@ -106,7 +116,7 @@ func (m Move) CleanDir(dc DirContext, limit string, src string) error {
 		panic("empty limit dir")
 	}
 
-	if err := safeRemoveAll(src); err != nil {
+	if err := safeRemoveAll(src, m.DryRun); err != nil {
 		return fmt.Errorf("src dir: %w", err)
 	}
 
@@ -120,21 +130,28 @@ func (m Move) CleanDir(dc DirContext, limit string, src string) error {
 	defer cleanMu.Unlock()
 
 	for d := filepath.Dir(src); d != filepath.Clean(limit); d = filepath.Dir(d) {
-		if err := safeRemoveAll(d); err != nil {
+		if err := safeRemoveAll(d, m.DryRun); err != nil {
 			return fmt.Errorf("src dir parent: %w", err)
 		}
 	}
 	return nil
 }
 
-type Copy struct{}
+type Copy struct {
+	DryRun bool
+}
 
 func (Copy) ReadOnly() bool {
 	return true
 }
 
-func (Copy) ProcessFile(dc DirContext, src, dest string) error {
+func (c Copy) ProcessFile(dc DirContext, src, dest string) error {
 	if filepath.Clean(src) == filepath.Clean(dest) {
+		return nil
+	}
+
+	if c.DryRun {
+		log.Printf("[dry run] copy %q -> %q", src, dest)
 		return nil
 	}
 
@@ -161,27 +178,6 @@ func (Copy) TrimDir(dc DirContext, src string) error {
 }
 
 func (Copy) CleanDir(dc DirContext, limit string, src string) error {
-	return nil
-}
-
-type DryRun struct{}
-
-func (DryRun) ReadOnly() bool {
-	return true
-}
-
-func (DryRun) ProcessFile(dc DirContext, src, dest string) error {
-	log.Printf("[dry run] %q -> %q", src, dest)
-	return nil
-}
-
-func (DryRun) TrimDir(dc DirContext, src string) error {
-	log.Printf("[dry run] trim dir %q", src)
-	return nil
-}
-
-func (DryRun) CleanDir(dc DirContext, limit string, src string) error {
-	log.Printf("[dry run] if move, remove with parents %q", src)
 	return nil
 }
 
@@ -461,7 +457,7 @@ func dirSize(path string) (uint64, error) {
 	return size, err
 }
 
-func safeRemoveAll(src string) error {
+func safeRemoveAll(src string, dryRun bool) error {
 	entries, err := os.ReadDir(src)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -476,6 +472,11 @@ func safeRemoveAll(src string) error {
 		}
 	}
 
+	if dryRun {
+		log.Printf("[dry run] remove all %q", src)
+		return nil
+	}
+
 	dirSize, err := dirSize(src)
 	if err != nil {
 		return fmt.Errorf("get dir size for sanity check: %w", err)
@@ -483,6 +484,7 @@ func safeRemoveAll(src string) error {
 	if dirSize > rmAllSizeThreshold {
 		return fmt.Errorf("folder was too big for clean up: %d/%d", dirSize, rmAllSizeThreshold)
 	}
+
 	if err := os.RemoveAll(src); err != nil {
 		return fmt.Errorf("error cleaning up folder: %w", err)
 	}
