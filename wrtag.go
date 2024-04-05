@@ -13,6 +13,7 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -182,6 +183,44 @@ func (Copy) CleanDir(dc DirContext, limit string, src string) error {
 }
 
 func ReadDir(tg tagcommon.Reader, path string) (string, []string, []tagcommon.File, error) {
+	cover, paths, files, err := readDir(tg, path)
+	if err != nil && !errors.Is(err, ErrNoTracks) {
+		return "", nil, nil, err
+	}
+	if err == nil {
+		return cover, paths, files, nil
+	}
+
+	// we had an ErrNoTracks, try recurse one time for disc directories and append those
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	sort.SliceStable(entries, func(i, j int) bool {
+		return entries[i].Name() < entries[j].Name()
+	})
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		c, p, f, err := readDir(tg, filepath.Join(path, entry.Name()))
+		if err != nil {
+			return "", nil, nil, fmt.Errorf("recurse for potential disc: %w", err)
+		}
+		if cover == "" {
+			cover = c
+		}
+		paths = append(paths, p...)
+		files = append(files, f...)
+	}
+	if len(paths) == 0 {
+		return "", nil, nil, ErrNoTracks
+	}
+
+	return cover, paths, files, nil
+}
+
+func readDir(tg tagcommon.Reader, path string) (string, []string, []tagcommon.File, error) {
 	allPaths, err := fileutil.GlobBase(path, "*")
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("glob dir: %w", err)

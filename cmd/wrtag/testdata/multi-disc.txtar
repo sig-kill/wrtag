@@ -1,0 +1,23 @@
+exec tag-write 'a la sala/disc 1/01.flac' Title '"Fifteen Fifty‐Three"'
+exec tag-write 'a la sala/disc 1/02.flac' Title '"May Ninth"'
+exec tag-write 'a la sala/disc 1/03.flac' Title '"Ada Jean"'
+exec tag-write 'a la sala/disc 1/04.flac' Title '"Farolim de Felgueiras"'
+exec tag-write 'a la sala/disc 1/05.flac' Title '"Pon Pón"'
+exec tag-write 'a la sala/disc 1/06.flac' Title '"Todavía Viva"'
+exec tag-write 'a la sala/disc 2/01.flac' Title '"Juegos Y Nubes"'
+exec tag-write 'a la sala/disc 2/02.flac' Title '"Hold Me Up (Thank You)"'
+exec tag-write 'a la sala/disc 2/03.flac' Title '"Caja de La Sala"'
+exec tag-write 'a la sala/disc 2/14.flac' Title '"Three From Two"'
+exec tag-write 'a la sala/disc 2/15.flac' Title '"A Love International"'
+exec tag-write 'a la sala/disc 2/16.flac' Title '"Les Petits Gris"'
+
+exec tag-write 'a la sala/*/*.flac' MBReleaseID '"ef72b5f2-1bd6-4e0a-afd1-e97886fb47e7"'
+exec tag-write 'a la sala/*/*.flac' Album       '"A LA SALA"'
+exec tag-write 'a la sala/*/*.flac' AlbumArtist '"Khruangbin"'
+exec tag-write 'a la sala/*/*.flac' Artist      '"Khruangbin"'
+
+env WRTAG_TAG_WEIGHT='label 0, catalogue num 0, media format 0'
+env WRTAG_PATH_FORMAT='albums/{{ .Release.Title }}/{{ .Track.Title }}{{ .Ext }}'
+
+exec wrtag move 'a la sala'
+stderr 'matched 100.00%'
