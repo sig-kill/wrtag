@@ -72,7 +72,7 @@ func (m Move) ProcessFile(dc DirContext, src, dest string) error {
 	}
 
 	if m.DryRun {
-		log.Printf("[dry run] rename %q -> %q", src, dest)
+		log.Printf("[dry run] move %q -> %q", src, dest)
 		return nil
 	}
 
