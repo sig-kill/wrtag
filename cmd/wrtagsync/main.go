@@ -71,7 +71,7 @@ func main() {
 		for d := range leafDirs {
 			todo <- d
 		}
-		cancel()
+		close(todo)
 	}()
 
 	importTime := time.Now()
@@ -91,6 +91,7 @@ func main() {
 		if err := os.Chtimes(dir, time.Time{}, importTime); err != nil {
 			return fmt.Errorf("chtimes %q: %v", dir, err)
 		}
+		log.Printf("done %q", dir)
 		return nil
 	}
 
@@ -103,12 +104,14 @@ func main() {
 				select {
 				case <-ctx.Done():
 					return
-				case dir := <-todo:
+				case dir, ok := <-todo:
+					if !ok {
+						return
+					}
 					if err := processDir(ctx, dir); err != nil {
 						log.Printf("error processing %q: %v", dir, err)
 						continue
 					}
-					log.Printf("done %q", dir)
 				}
 			}
 		}()
