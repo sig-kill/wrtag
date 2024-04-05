@@ -34,7 +34,11 @@ var (
 )
 
 const minScore = 92
-const rmAllSizeThreshold uint64 = 20 * 1e6 // 20 MB
+
+const (
+	thresholdSizeClean uint64 = 20 * 1e6   // 20 MB
+	thresholdSizeTrim  uint64 = 1000 * 1e6 // 1000 MB
+)
 
 type FileSystemOperation interface {
 	ReadOnly() bool
@@ -97,17 +101,40 @@ func (m Move) TrimDir(dc DirContext, src string) error {
 	if err != nil {
 		return fmt.Errorf("read dir: %w", err)
 	}
+
+	var toDelete []string
+	var size uint64
 	for _, entry := range entries {
 		path := filepath.Join(src, entry.Name())
-		if _, ok := dc.knownDestPaths[path]; !ok {
-			if m.DryRun {
-				log.Printf("[dry run] delete extra file %q", path)
-				continue
-			}
-			log.Printf("[warn] found extra file %q which may be deleted in future updates", path)
+		if _, ok := dc.knownDestPaths[path]; ok {
 			continue
 		}
+		info, err := entry.Info()
+		if err != nil {
+			return fmt.Errorf("get info: %w", err)
+		}
+		size += uint64(info.Size())
+		toDelete = append(toDelete, path)
 	}
+	if size > thresholdSizeTrim {
+		return fmt.Errorf("extra files were too big remove: %d/%d", size, thresholdSizeClean)
+	}
+
+	var deleteErrs []error
+	for _, p := range toDelete {
+		if m.DryRun {
+			log.Printf("[dry run] delete extra file %q", p)
+			continue
+		}
+		log.Printf("deleting extra file %q", p)
+		if err := os.Remove(p); err != nil {
+			deleteErrs = append(deleteErrs, err)
+		}
+	}
+	if err := errors.Join(deleteErrs...); err != nil {
+		return fmt.Errorf("delete extra files: %w", err)
+	}
+
 	return nil
 }
 
@@ -482,12 +509,12 @@ func safeRemoveAll(src string, dryRun bool) error {
 		return nil
 	}
 
-	dirSize, err := dirSize(src)
+	size, err := dirSize(src)
 	if err != nil {
 		return fmt.Errorf("get dir size for sanity check: %w", err)
 	}
-	if dirSize > rmAllSizeThreshold {
-		return fmt.Errorf("folder was too big for clean up: %d/%d", dirSize, rmAllSizeThreshold)
+	if size > thresholdSizeClean {
+		return fmt.Errorf("folder was too big for clean up: %d/%d", size, thresholdSizeClean)
 	}
 
 	if err := os.RemoveAll(src); err != nil {
