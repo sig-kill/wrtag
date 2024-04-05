@@ -142,8 +142,8 @@ type Copy struct {
 	DryRun bool
 }
 
-func (Copy) ReadOnly() bool {
-	return true
+func (c Copy) ReadOnly() bool {
+	return c.DryRun
 }
 
 func (c Copy) ProcessFile(dc DirContext, src, dest string) error {
