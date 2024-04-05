@@ -74,6 +74,7 @@ func main() {
 		cancel()
 	}()
 
+	importTime := time.Now()
 	processDir := func(ctx context.Context, dir string) error {
 		if *interval > 0 {
 			info, err := os.Stat(dir)
@@ -87,7 +88,7 @@ func main() {
 		if _, err := wrtag.ProcessDir(ctx, mb, tg, &pathFormat, tagWeights, nil, keepFiles, wrtag.Move{DryRun: *dryRun}, dir, "", false); err != nil {
 			return fmt.Errorf("process: %v: %w", dir, err)
 		}
-		if err := os.Chtimes(dir, time.Time{}, time.Now()); err != nil {
+		if err := os.Chtimes(dir, time.Time{}, importTime); err != nil {
 			return fmt.Errorf("chtimes %q: %v", dir, err)
 		}
 		return nil
