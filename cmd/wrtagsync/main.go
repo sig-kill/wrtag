@@ -83,12 +83,12 @@ func main() {
 			if time.Since(info.ModTime()) < *interval {
 				return nil
 			}
-			defer func() {
-				_ = os.Chtimes(dir, time.Time{}, time.Now())
-			}()
 		}
 		if _, err := wrtag.ProcessDir(ctx, mb, tg, &pathFormat, tagWeights, nil, keepFiles, wrtag.Move{DryRun: *dryRun}, dir, "", false); err != nil {
 			return fmt.Errorf("process: %v: %w", dir, err)
+		}
+		if err := os.Chtimes(dir, time.Time{}, time.Now()); err != nil {
+			return fmt.Errorf("chtimes %q: %v", dir, err)
 		}
 		return nil
 	}
