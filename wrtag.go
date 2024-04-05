@@ -31,6 +31,7 @@ var (
 	ErrScoreTooLow        = errors.New("score too low")
 	ErrTrackCountMismatch = errors.New("track count mismatch")
 	ErrNoTracks           = errors.New("no tracks in dir")
+	ErrSelfCopy           = errors.New("can't copy self to self")
 )
 
 const minScore = 92
@@ -174,7 +175,7 @@ func (c Copy) ReadOnly() bool {
 
 func (c Copy) ProcessFile(dc DirContext, src, dest string) error {
 	if filepath.Clean(src) == filepath.Clean(dest) {
-		return nil
+		return ErrSelfCopy
 	}
 
 	if c.DryRun {
@@ -384,7 +385,7 @@ func ProcessDir(
 			return nil, fmt.Errorf("create dest path: %w", err)
 		}
 		if err := op.ProcessFile(dc, path, destPath); err != nil {
-			return nil, fmt.Errorf("op to dest %q: %w", destPath, err)
+			return nil, fmt.Errorf("process path %q: %w", filepath.Base(destPath), err)
 		}
 
 		if op.ReadOnly() {
