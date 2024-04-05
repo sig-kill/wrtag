@@ -86,7 +86,7 @@ func main() {
 			}
 		}
 		if _, err := wrtag.ProcessDir(ctx, mb, tg, &pathFormat, tagWeights, nil, keepFiles, wrtag.Move{DryRun: *dryRun}, dir, "", false); err != nil {
-			return fmt.Errorf("process: %v: %w", dir, err)
+			return err
 		}
 		if err := os.Chtimes(dir, time.Time{}, importTime); err != nil {
 			return fmt.Errorf("chtimes %q: %v", dir, err)
