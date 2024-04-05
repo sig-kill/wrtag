@@ -266,10 +266,10 @@ func ProcessDir(
 	searchFile := tagFiles[0]
 	query := musicbrainz.ReleaseQuery{
 		MBReleaseID:      searchFile.MBReleaseID(),
-		MBArtistID:       first(searchFile.MBArtistID()),
+		MBArtistID:       cmp.Or(searchFile.MBArtistID()...),
 		MBReleaseGroupID: searchFile.MBReleaseGroupID(),
 		Release:          searchFile.Album(),
-		Artist:           or(searchFile.AlbumArtist(), searchFile.Artist()),
+		Artist:           cmp.Or(searchFile.AlbumArtist(), searchFile.Artist()),
 		Date:             searchFile.Date(),
 		Format:           searchFile.MediaFormat(),
 		Label:            searchFile.Label(),
@@ -494,26 +494,6 @@ func safeRemoveAll(src string, dryRun bool) error {
 		return fmt.Errorf("error cleaning up folder: %w", err)
 	}
 	return nil
-}
-
-func first[T comparable](is []T) T {
-	var z T
-	for _, i := range is {
-		if i != z {
-			return i
-		}
-	}
-	return z
-}
-
-func or[T comparable](items ...T) T {
-	var zero T
-	for _, i := range items {
-		if i != zero {
-			return i
-		}
-	}
-	return zero
 }
 
 var cleanMu sync.Mutex

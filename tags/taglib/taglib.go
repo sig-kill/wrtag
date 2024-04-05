@@ -1,6 +1,7 @@
 package taglib
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -145,13 +146,7 @@ func (f *File) Close() error {
 }
 
 func first[T comparable](is []T) T {
-	var z T
-	for _, i := range is {
-		if i != z {
-			return i
-		}
-	}
-	return z
+	return cmp.Or(is...)
 }
 
 func intStr(v int) string {
