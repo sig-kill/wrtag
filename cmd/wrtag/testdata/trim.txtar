@@ -16,6 +16,6 @@ exec touch 'albums/Kat Moda/extra some other'
 
 # move files, make sure we only delete the 2 extra files. tracks, cover, and keep files remain
 exec wrtag -yes move 'albums/Kat Moda'
-stderr -count=2 '\[warn\]'
-stderr '\[warn\] .*\/extra some other'
-stderr '\[warn\] .*\/extra-file-1\.huh'
+stderr -count=2 '\bdeleting extra file\b'
+stderr '\bdeleting extra file .*\/extra some other'
+stderr '\bdeleting extra file .*\/extra-file-1\.huh'
