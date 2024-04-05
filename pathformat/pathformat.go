@@ -61,6 +61,10 @@ func (pf *Format) Execute(data Data) (string, error) {
 		return "", fmt.Errorf("not initialised yet")
 	}
 
+	// make sure these are not used
+	data.Track.Number = ""
+	data.Track.Position = -1
+
 	var buff strings.Builder
 	if err := pf.tt.Execute(&buff, data); err != nil {
 		return "", fmt.Errorf("create path: %w", err)
