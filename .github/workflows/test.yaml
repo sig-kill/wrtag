@@ -1,0 +1,27 @@
+name: Lint and test
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+jobs:
+  test:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install dependencies
+        run: |
+          sudo apt update -qq
+          sudo apt install -y -qq build-essential libtag1-dev
+      - name: Lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: v1.56
+      - name: Test
+        run: go test ./...
