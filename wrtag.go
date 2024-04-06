@@ -218,7 +218,6 @@ func ReadAlbumDir(tg tagcommon.Reader, path string) (string, []string, []tagcomm
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("glob dir for discs: %w", err)
 	}
-	mainPaths = append(mainPaths, discPaths...)
 
 	type pathFile struct {
 		path string
@@ -227,7 +226,7 @@ func ReadAlbumDir(tg tagcommon.Reader, path string) (string, []string, []tagcomm
 
 	var cover string
 	var pathFiles []pathFile
-	for _, path := range mainPaths {
+	for _, path := range append(mainPaths, discPaths...) {
 		switch strings.ToLower(filepath.Ext(path)) {
 		case ".jpg", ".jpeg", ".png", ".bmp", ".gif":
 			cover = path
