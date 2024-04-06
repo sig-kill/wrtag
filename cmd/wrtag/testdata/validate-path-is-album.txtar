@@ -1,0 +1,54 @@
+env WRTAG_TAG_WEIGHT='label 0, catalogue num 0, media format 0'
+env WRTAG_PATH_FORMAT='albums/{{ artistCredit .Release.Artists }}/{{ .Release.Title }}/{{ .Track.Title }}{{ .Ext }}'
+
+# set up files, already in correct place
+exec tag-write 'albums/Khruangbin/A LA SALA/Fifteen Fifty‐Three.flac'    TrackNumber  1 Title '"Fifteen Fifty‐Three"'
+exec tag-write 'albums/Khruangbin/A LA SALA/May Ninth.flac'              TrackNumber  2 Title '"May Ninth"'
+exec tag-write 'albums/Khruangbin/A LA SALA/Ada Jean.flac'               TrackNumber  3 Title '"Ada Jean"'
+exec tag-write 'albums/Khruangbin/A LA SALA/Farolim de Felgueiras.flac'  TrackNumber  4 Title '"Farolim de Felgueiras"'
+exec tag-write 'albums/Khruangbin/A LA SALA/Pon Pón.flac'                TrackNumber  5 Title '"Pon Pón"'
+exec tag-write 'albums/Khruangbin/A LA SALA/Todavía Viva.flac'           TrackNumber  6 Title '"Todavía Viva"'
+exec tag-write 'albums/Khruangbin/A LA SALA/Juegos Y Nubes.flac'         TrackNumber  7 Title '"Juegos Y Nubes"'
+exec tag-write 'albums/Khruangbin/A LA SALA/Hold Me Up (Thank You).flac' TrackNumber  8 Title '"Hold Me Up (Thank You)"'
+exec tag-write 'albums/Khruangbin/A LA SALA/Caja de La Sala.flac'        TrackNumber  9 Title '"Caja de La Sala"'
+exec tag-write 'albums/Khruangbin/A LA SALA/Three From Two.flac'         TrackNumber 10 Title '"Three From Two"'
+exec tag-write 'albums/Khruangbin/A LA SALA/A Love International.flac'   TrackNumber 11 Title '"A Love International"'
+exec tag-write 'albums/Khruangbin/A LA SALA/Les Petits Gris.flac'        TrackNumber 12 Title '"Les Petits Gris"'
+
+exec tag-write 'albums/Khruangbin/A LA SALA/*.flac' MBReleaseID '"ef72b5f2-1bd6-4e0a-afd1-e97886fb47e7"'
+exec tag-write 'albums/Khruangbin/A LA SALA/*.flac' Album       '"A LA SALA"'
+exec tag-write 'albums/Khruangbin/A LA SALA/*.flac' AlbumArtist '"Khruangbin"'
+exec tag-write 'albums/Khruangbin/A LA SALA/*.flac' Artist      '"Khruangbin"'
+
+exec touch 'albums/Khruangbin/A LA SALA/cover.png'
+
+exec find albums
+cp stdout layout-before
+
+# should be deleted
+exec touch 'albums/Khruangbin/A LA SALA/extra-file'
+
+exec wrtag move 'albums/Khruangbin/A LA SALA'
+stderr 'matched 100.00%'
+
+# move again to make sure we're in a consistent state
+exec wrtag move 'albums/Khruangbin/A LA SALA'
+stderr 'matched 100.00%'
+
+# compare to initial state
+exec find albums
+cp stdout layout-after
+cmp layout-before layout-after
+
+# move album up
+mv 'albums/Khruangbin/A LA SALA' albums/tmpkhruangbinsala
+exec wrtag move albums/tmpkhruangbinsala
+
+# compare to initial state
+exec find albums
+cp stdout layout-after
+cmp layout-before layout-after
+
+# oops, accidentally move the whole artist dir as if it were an album
+! exec wrtag move 'albums/Khruangbin'
+stderr '\bvalidate tree\b'
