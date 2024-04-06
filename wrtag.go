@@ -209,7 +209,7 @@ func (Copy) CleanDir(dc DirContext, limit string, src string) error {
 	return nil
 }
 
-func ReadDir(tg tagcommon.Reader, path string) (string, []string, []tagcommon.File, error) {
+func ReadAlbumDir(tg tagcommon.Reader, path string) (string, []string, []tagcommon.File, error) {
 	mainPaths, err := fileutil.GlobBase(path, "*")
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("glob dir: %w", err)
@@ -286,7 +286,7 @@ func ProcessDir(
 ) (*SearchResult, error) {
 	srcDir, _ = filepath.Abs(srcDir)
 
-	cover, paths, tagFiles, err := ReadDir(tg, srcDir)
+	cover, paths, tagFiles, err := ReadAlbumDir(tg, srcDir)
 	if err != nil {
 		return nil, fmt.Errorf("read dir: %w", err)
 	}
