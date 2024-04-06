@@ -122,8 +122,8 @@ func ProcessDir(
 	}
 
 	releaseTracks := musicbrainz.FlatTracks(release.Media)
-	if len(tagFiles) != len(releaseTracks) {
-		return &SearchResult{Release: release, ResearchLinks: researchLinks, OriginFile: originFile}, fmt.Errorf("%w: %d/%d", ErrTrackCountMismatch, len(tagFiles), len(releaseTracks))
+	if len(releaseTracks) != len(tagFiles) {
+		return &SearchResult{Release: release, ResearchLinks: researchLinks, OriginFile: originFile}, fmt.Errorf("%w: %d remote / %d local", ErrTrackCountMismatch, len(releaseTracks), len(tagFiles))
 	}
 
 	score, diff := tagmap.DiffRelease(tagWeights, release, tagFiles)
