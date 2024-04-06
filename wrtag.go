@@ -41,241 +41,6 @@ const (
 	thresholdSizeTrim  uint64 = 1000 * 1e6 // 1000 MB
 )
 
-type FileSystemOperation interface {
-	ReadOnly() bool
-	ProcessFile(dc DirContext, src, dest string) error
-	TrimDir(dc DirContext, src string) error                // remove unknown files
-	CleanDir(dc DirContext, limit string, src string) error // remove dir and its parents
-}
-
-type DirContext struct {
-	knownDestPaths map[string]struct{}
-}
-
-func NewDirContext() DirContext {
-	return DirContext{knownDestPaths: map[string]struct{}{}}
-}
-
-var _ FileSystemOperation = (*Move)(nil)
-var _ FileSystemOperation = (*Copy)(nil)
-
-type Move struct {
-	DryRun bool
-}
-
-func (m Move) ReadOnly() bool {
-	return m.DryRun
-}
-
-func (m Move) ProcessFile(dc DirContext, src, dest string) error {
-	dest, _ = filepath.Abs(dest)
-	dc.knownDestPaths[dest] = struct{}{}
-
-	if filepath.Clean(src) == filepath.Clean(dest) {
-		return nil
-	}
-
-	if m.DryRun {
-		log.Printf("[dry run] move %q -> %q", src, dest)
-		return nil
-	}
-
-	if err := os.Rename(src, dest); err != nil {
-		var errNo syscall.Errno
-		if errors.As(err, &errNo) && errNo == 18 /*  invalid cross-device link */ {
-			// we tried to rename across filesystems, copy and delete instead
-			if err := (Copy{}).ProcessFile(dc, src, dest); err != nil {
-				return fmt.Errorf("copy from move: %w", err)
-			}
-			if err := os.Remove(src); err != nil {
-				return fmt.Errorf("remove from move: %w", err)
-			}
-			return nil
-		}
-		return fmt.Errorf("rename: %w", err)
-	}
-	return nil
-}
-
-func (m Move) TrimDir(dc DirContext, src string) error {
-	entries, err := os.ReadDir(src)
-	if err != nil {
-		return fmt.Errorf("read dir: %w", err)
-	}
-
-	var toDelete []string
-	var size uint64
-	for _, entry := range entries {
-		path := filepath.Join(src, entry.Name())
-		if _, ok := dc.knownDestPaths[path]; ok {
-			continue
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return fmt.Errorf("get info: %w", err)
-		}
-		size += uint64(info.Size())
-		toDelete = append(toDelete, path)
-	}
-	if size > thresholdSizeTrim {
-		return fmt.Errorf("extra files were too big remove: %d/%d", size, thresholdSizeClean)
-	}
-
-	var deleteErrs []error
-	for _, p := range toDelete {
-		if m.DryRun {
-			log.Printf("[dry run] delete extra file %q", p)
-			continue
-		}
-		log.Printf("deleting extra file %q", p)
-		if err := os.Remove(p); err != nil {
-			deleteErrs = append(deleteErrs, err)
-		}
-	}
-	if err := errors.Join(deleteErrs...); err != nil {
-		return fmt.Errorf("delete extra files: %w", err)
-	}
-
-	return nil
-}
-
-func (m Move) CleanDir(dc DirContext, limit string, src string) error {
-	if limit == "" {
-		panic("empty limit dir")
-	}
-
-	if err := safeRemoveAll(src, m.DryRun); err != nil {
-		return fmt.Errorf("src dir: %w", err)
-	}
-
-	if !strings.HasPrefix(src, limit) {
-		return nil
-	}
-
-	// clean all src's parents if this path is in our control
-
-	cleanMu.Lock()
-	defer cleanMu.Unlock()
-
-	for d := filepath.Dir(src); d != filepath.Clean(limit); d = filepath.Dir(d) {
-		if err := safeRemoveAll(d, m.DryRun); err != nil {
-			return fmt.Errorf("src dir parent: %w", err)
-		}
-	}
-	return nil
-}
-
-type Copy struct {
-	DryRun bool
-}
-
-func (c Copy) ReadOnly() bool {
-	return c.DryRun
-}
-
-func (c Copy) ProcessFile(dc DirContext, src, dest string) error {
-	if filepath.Clean(src) == filepath.Clean(dest) {
-		return ErrSelfCopy
-	}
-
-	if c.DryRun {
-		log.Printf("[dry run] copy %q -> %q", src, dest)
-		return nil
-	}
-
-	srcf, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("open src: %w", err)
-	}
-	defer srcf.Close()
-
-	destf, err := os.Create(dest)
-	if err != nil {
-		return fmt.Errorf("open dest: %w", err)
-	}
-	defer destf.Close()
-
-	if _, err := io.Copy(destf, srcf); err != nil {
-		return fmt.Errorf("do copy: %w", err)
-	}
-	return nil
-}
-
-func (Copy) TrimDir(dc DirContext, src string) error {
-	return nil
-}
-
-func (Copy) CleanDir(dc DirContext, limit string, src string) error {
-	return nil
-}
-
-func ReadAlbumDir(tg tagcommon.Reader, path string) (string, []string, []tagcommon.File, error) {
-	mainPaths, err := fileutil.GlobBase(path, "*")
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("glob dir: %w", err)
-	}
-	discPaths, err := fileutil.GlobBase(path, "*/*") // recurse once for any disc1/ disc2/ dirs
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("glob dir for discs: %w", err)
-	}
-
-	type pathFile struct {
-		path string
-		tagcommon.File
-	}
-
-	var cover string
-	var pathFiles []pathFile
-	for _, path := range append(mainPaths, discPaths...) {
-		switch strings.ToLower(filepath.Ext(path)) {
-		case ".jpg", ".jpeg", ".png", ".bmp", ".gif":
-			cover = path
-			continue
-		}
-
-		if tg.CanRead(path) {
-			file, err := tg.Read(path)
-			if err != nil {
-				return "", nil, nil, fmt.Errorf("read track: %w", err)
-			}
-			pathFiles = append(pathFiles, pathFile{path, file})
-			_ = file.Close()
-		}
-	}
-	if len(pathFiles) == 0 {
-		return "", nil, nil, ErrNoTracks
-	}
-
-	{
-		// validate we aren't accidentally importing something like an artist folder, which may look
-		// like a multi disc album to us, but will have all its tracks in one subdirectory
-		discDirs := map[string]struct{}{}
-		for _, pf := range pathFiles {
-			discDirs[filepath.Dir(pf.path)] = struct{}{}
-		}
-		if len(discDirs) == 1 && filepath.Dir(pathFiles[0].path) != filepath.Clean(path) {
-			return "", nil, nil, fmt.Errorf("validate tree: %w", ErrNoTracks)
-		}
-	}
-
-	slices.SortStableFunc(pathFiles, func(a, b pathFile) int {
-		return cmp.Or(
-			cmp.Compare(a.DiscNumber(), b.DiscNumber()),
-			cmp.Compare(a.TrackNumber(), b.TrackNumber()),
-			cmp.Compare(a.path, b.path),
-		)
-	})
-
-	paths := make([]string, 0, len(pathFiles))
-	files := make([]tagcommon.File, 0, len(pathFiles))
-	for _, pf := range pathFiles {
-		paths = append(paths, pf.path)
-		files = append(files, pf.File)
-	}
-
-	return cover, paths, files, nil
-}
-
 type MusicbrainzClient interface {
 	SearchRelease(ctx context.Context, q musicbrainz.ReleaseQuery) (*musicbrainz.Release, error)
 	GetCoverURL(ctx context.Context, release *musicbrainz.Release) (string, error)
@@ -445,6 +210,73 @@ func ProcessDir(
 	return &SearchResult{Release: release, Score: score, Diff: diff, OriginFile: originFile}, nil
 }
 
+func ReadAlbumDir(tg tagcommon.Reader, path string) (string, []string, []tagcommon.File, error) {
+	mainPaths, err := fileutil.GlobBase(path, "*")
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("glob dir: %w", err)
+	}
+	discPaths, err := fileutil.GlobBase(path, "*/*") // recurse once for any disc1/ disc2/ dirs
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("glob dir for discs: %w", err)
+	}
+
+	type pathFile struct {
+		path string
+		tagcommon.File
+	}
+
+	var cover string
+	var pathFiles []pathFile
+	for _, path := range append(mainPaths, discPaths...) {
+		switch strings.ToLower(filepath.Ext(path)) {
+		case ".jpg", ".jpeg", ".png", ".bmp", ".gif":
+			cover = path
+			continue
+		}
+
+		if tg.CanRead(path) {
+			file, err := tg.Read(path)
+			if err != nil {
+				return "", nil, nil, fmt.Errorf("read track: %w", err)
+			}
+			pathFiles = append(pathFiles, pathFile{path, file})
+			_ = file.Close()
+		}
+	}
+	if len(pathFiles) == 0 {
+		return "", nil, nil, ErrNoTracks
+	}
+
+	{
+		// validate we aren't accidentally importing something like an artist folder, which may look
+		// like a multi disc album to us, but will have all its tracks in one subdirectory
+		discDirs := map[string]struct{}{}
+		for _, pf := range pathFiles {
+			discDirs[filepath.Dir(pf.path)] = struct{}{}
+		}
+		if len(discDirs) == 1 && filepath.Dir(pathFiles[0].path) != filepath.Clean(path) {
+			return "", nil, nil, fmt.Errorf("validate tree: %w", ErrNoTracks)
+		}
+	}
+
+	slices.SortStableFunc(pathFiles, func(a, b pathFile) int {
+		return cmp.Or(
+			cmp.Compare(a.DiscNumber(), b.DiscNumber()),
+			cmp.Compare(a.TrackNumber(), b.TrackNumber()),
+			cmp.Compare(a.path, b.path),
+		)
+	})
+
+	paths := make([]string, 0, len(pathFiles))
+	files := make([]tagcommon.File, 0, len(pathFiles))
+	for _, pf := range pathFiles {
+		paths = append(paths, pf.path)
+		files = append(files, pf.File)
+	}
+
+	return cover, paths, files, nil
+}
+
 func DestDir(pathFormat *pathformat.Format, release *musicbrainz.Release) (string, error) {
 	dummyTrack := musicbrainz.Track{Title: "track"}
 	path, err := pathFormat.Execute(pathformat.Data{Release: *release, Track: dummyTrack, TrackNum: 1, Ext: ".eg"})
@@ -453,6 +285,174 @@ func DestDir(pathFormat *pathformat.Format, release *musicbrainz.Release) (strin
 	}
 	dir := filepath.Dir(path)
 	return dir, nil
+}
+
+type FileSystemOperation interface {
+	ReadOnly() bool
+	ProcessFile(dc DirContext, src, dest string) error
+	TrimDir(dc DirContext, src string) error                // remove unknown files
+	CleanDir(dc DirContext, limit string, src string) error // remove dir and its parents
+}
+
+type DirContext struct {
+	knownDestPaths map[string]struct{}
+}
+
+func NewDirContext() DirContext {
+	return DirContext{knownDestPaths: map[string]struct{}{}}
+}
+
+var _ FileSystemOperation = (*Move)(nil)
+var _ FileSystemOperation = (*Copy)(nil)
+
+type Move struct {
+	DryRun bool
+}
+
+func (m Move) ReadOnly() bool {
+	return m.DryRun
+}
+
+func (m Move) ProcessFile(dc DirContext, src, dest string) error {
+	dest, _ = filepath.Abs(dest)
+	dc.knownDestPaths[dest] = struct{}{}
+
+	if filepath.Clean(src) == filepath.Clean(dest) {
+		return nil
+	}
+
+	if m.DryRun {
+		log.Printf("[dry run] move %q -> %q", src, dest)
+		return nil
+	}
+
+	if err := os.Rename(src, dest); err != nil {
+		var errNo syscall.Errno
+		if errors.As(err, &errNo) && errNo == 18 /*  invalid cross-device link */ {
+			// we tried to rename across filesystems, copy and delete instead
+			if err := (Copy{}).ProcessFile(dc, src, dest); err != nil {
+				return fmt.Errorf("copy from move: %w", err)
+			}
+			if err := os.Remove(src); err != nil {
+				return fmt.Errorf("remove from move: %w", err)
+			}
+			return nil
+		}
+		return fmt.Errorf("rename: %w", err)
+	}
+	return nil
+}
+
+func (m Move) TrimDir(dc DirContext, src string) error {
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return fmt.Errorf("read dir: %w", err)
+	}
+
+	var toDelete []string
+	var size uint64
+	for _, entry := range entries {
+		path := filepath.Join(src, entry.Name())
+		if _, ok := dc.knownDestPaths[path]; ok {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return fmt.Errorf("get info: %w", err)
+		}
+		size += uint64(info.Size())
+		toDelete = append(toDelete, path)
+	}
+	if size > thresholdSizeTrim {
+		return fmt.Errorf("extra files were too big remove: %d/%d", size, thresholdSizeClean)
+	}
+
+	var deleteErrs []error
+	for _, p := range toDelete {
+		if m.DryRun {
+			log.Printf("[dry run] delete extra file %q", p)
+			continue
+		}
+		log.Printf("deleting extra file %q", p)
+		if err := os.Remove(p); err != nil {
+			deleteErrs = append(deleteErrs, err)
+		}
+	}
+	if err := errors.Join(deleteErrs...); err != nil {
+		return fmt.Errorf("delete extra files: %w", err)
+	}
+
+	return nil
+}
+
+func (m Move) CleanDir(dc DirContext, limit string, src string) error {
+	if limit == "" {
+		panic("empty limit dir")
+	}
+
+	if err := safeRemoveAll(src, m.DryRun); err != nil {
+		return fmt.Errorf("src dir: %w", err)
+	}
+
+	if !strings.HasPrefix(src, limit) {
+		return nil
+	}
+
+	// clean all src's parents if this path is in our control
+
+	cleanMu.Lock()
+	defer cleanMu.Unlock()
+
+	for d := filepath.Dir(src); d != filepath.Clean(limit); d = filepath.Dir(d) {
+		if err := safeRemoveAll(d, m.DryRun); err != nil {
+			return fmt.Errorf("src dir parent: %w", err)
+		}
+	}
+	return nil
+}
+
+type Copy struct {
+	DryRun bool
+}
+
+func (c Copy) ReadOnly() bool {
+	return c.DryRun
+}
+
+func (c Copy) ProcessFile(dc DirContext, src, dest string) error {
+	if filepath.Clean(src) == filepath.Clean(dest) {
+		return ErrSelfCopy
+	}
+
+	if c.DryRun {
+		log.Printf("[dry run] copy %q -> %q", src, dest)
+		return nil
+	}
+
+	srcf, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("open src: %w", err)
+	}
+	defer srcf.Close()
+
+	destf, err := os.Create(dest)
+	if err != nil {
+		return fmt.Errorf("open dest: %w", err)
+	}
+	defer destf.Close()
+
+	if _, err := io.Copy(destf, srcf); err != nil {
+		return fmt.Errorf("do copy: %w", err)
+	}
+	return nil
+}
+
+func (Copy) TrimDir(dc DirContext, src string) error {
+	return nil
+}
+
+func (Copy) CleanDir(dc DirContext, limit string, src string) error {
+	return nil
 }
 
 func tryDownloadMusicbrainzCover(ctx context.Context, mb MusicbrainzClient, release *musicbrainz.Release) (string, error) {
