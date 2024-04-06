@@ -246,6 +246,18 @@ func ReadAlbumDir(tg tagcommon.Reader, path string) (string, []string, []tagcomm
 		return "", nil, nil, ErrNoTracks
 	}
 
+	{
+		// validate we aren't accidentally importing something like an artist folder, which may look
+		// like a multi disc album to us, but will have all its tracks in one subdirectory
+		discDirs := map[string]struct{}{}
+		for _, pf := range pathFiles {
+			discDirs[filepath.Dir(pf.path)] = struct{}{}
+		}
+		if len(discDirs) == 1 && filepath.Dir(pathFiles[0].path) != filepath.Clean(path) {
+			return "", nil, nil, fmt.Errorf("validate tree: %w", ErrNoTracks)
+		}
+	}
+
 	slices.SortStableFunc(pathFiles, func(a, b pathFile) int {
 		return cmp.Or(
 			cmp.Compare(a.DiscNumber(), b.DiscNumber()),
