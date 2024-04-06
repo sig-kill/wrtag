@@ -223,6 +223,7 @@ type Media struct {
 	TrackOffset int     `json:"track-offset"`
 	TrackCount  int     `json:"track-count"`
 	Tracks      []Track `json:"tracks"`
+	Pregap      *Track  `json:"pregap,omitempty"`
 	Format      string  `json:"format"`
 	FormatID    string  `json:"format-id"`
 	Title       string  `json:"title"`
@@ -334,6 +335,9 @@ func ArtistsCreditString(credits []ArtistCredit) string {
 func FlatTracks(media []Media) []Track {
 	var tracks []Track
 	for _, media := range media {
+		if media.Pregap != nil {
+			tracks = append(tracks, *media.Pregap)
+		}
 		tracks = append(tracks, media.Tracks...)
 	}
 	return tracks
