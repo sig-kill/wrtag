@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -101,7 +102,7 @@ type ReleaseQuery struct {
 }
 
 func (c *Client) SearchRelease(ctx context.Context, q ReleaseQuery) (*Release, error) {
-	if q.MBReleaseID != "" {
+	if uuidExpr.MatchString(q.MBReleaseID) {
 		release, err := c.GetRelease(ctx, q.MBReleaseID)
 		if err != nil {
 			return nil, fmt.Errorf("get direct release: %w", err)
@@ -439,3 +440,5 @@ func joinPath(base string, p ...string) string {
 	r, _ := url.JoinPath(base, p...)
 	return r
 }
+
+var uuidExpr = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
