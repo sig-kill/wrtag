@@ -46,21 +46,30 @@ func main() {
 	flagconf.ParseEnv()
 	flagconf.ParseConfig(*configPath)
 
+	// walk the whole root dir by default, or some user provided dirs
+	var dirs = []string{pathFormat.Root()}
+	if flag.NArg() > 0 {
+		dirs = flag.Args()
+	}
+
 	leafDirs := map[string]struct{}{}
-	err := filepath.WalkDir(pathFormat.Root(), func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !d.IsDir() {
+	for _, dir := range dirs {
+		dir, _ := filepath.Abs(dir)
+		err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if !d.IsDir() {
+				return nil
+			}
+			path = filepath.Clean(path)
+			leafDirs[path] = struct{}{}
+			delete(leafDirs, filepath.Dir(path)) // parent is not a leaf anymore
 			return nil
+		})
+		if err != nil {
+			log.Fatalf("error walking: %v", err)
 		}
-		path = filepath.Clean(path)
-		leafDirs[path] = struct{}{}
-		delete(leafDirs, filepath.Dir(path)) // parent is not a leaf anymore
-		return nil
-	})
-	if err != nil {
-		log.Fatalf("error walking: %v", err)
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
