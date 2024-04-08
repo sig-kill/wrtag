@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/sergi/go-diff/diffmatchpatch"
 
@@ -79,7 +80,7 @@ func Differ(weights TagWeights, score *float64) func(field string, a, b string) 
 	var diff float64
 
 	return func(field, a, b string) Diff {
-		diffs := dmp.DiffMain(a, b, false)
+		diffs := dmp.DiffMain(norm(a), norm(b), false)
 		dist := float64(dmp.DiffLevenshtein(diffs))
 		distWeighted := dist * weights.For(field)
 
@@ -88,11 +89,13 @@ func Differ(weights TagWeights, score *float64) func(field string, a, b string) 
 
 		*score = 100 - (diff * 100 / total)
 
+		diffsPresented := dmp.DiffMain(a, b, false)
+		distPresented := float64(dmp.DiffLevenshtein(diffsPresented))
 		return Diff{
 			Field:  field,
-			Before: filterDiff(diffs, func(d diffmatchpatch.Diff) bool { return d.Type <= diffmatchpatch.DiffEqual }),
-			After:  filterDiff(diffs, func(d diffmatchpatch.Diff) bool { return d.Type >= diffmatchpatch.DiffEqual }),
-			Equal:  dist == 0,
+			Before: filterDiff(diffsPresented, func(d diffmatchpatch.Diff) bool { return d.Type <= diffmatchpatch.DiffEqual }),
+			After:  filterDiff(diffsPresented, func(d diffmatchpatch.Diff) bool { return d.Type >= diffmatchpatch.DiffEqual }),
+			Equal:  distPresented == 0,
 		}
 	}
 }
@@ -166,4 +169,19 @@ func filterDiff(diffs []diffmatchpatch.Diff, f func(diffmatchpatch.Diff) bool) [
 		}
 	}
 	return r
+}
+
+func norm(input string) string {
+	input = strings.ToLower(input)
+	input = stripNonAlphaNum(input)
+	return input
+}
+
+func stripNonAlphaNum(input string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+			return r
+		}
+		return -1
+	}, input)
 }

@@ -58,6 +58,6 @@ func TestDiffWeightsUpperBound(t *testing.T) {
 	diff("track 4", "Family of Noise", "Family of Noise")
 	diff("track 5", "Digital Tenderness", "Digital Tenderness")
 
-	// terrible score since we really care about label / catalogue num
-	assert.InDelta(t, 31.0, score, 1)
+	// bad score since we really care about label / catalogue num
+	assert.InDelta(t, 41.0, score, 1)
 }
