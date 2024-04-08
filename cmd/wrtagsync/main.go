@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -97,7 +98,7 @@ func main() {
 		if _, err := wrtag.ProcessDir(ctx, mb, tg, &pathFormat, tagWeights, nil, keepFiles, wrtag.Move{DryRun: *dryRun}, dir, "", false); err != nil {
 			return err
 		}
-		if err := os.Chtimes(dir, time.Time{}, importTime); err != nil {
+		if err := os.Chtimes(dir, time.Time{}, importTime); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("chtimes %q: %v", dir, err)
 		}
 		log.Printf("done %q", dir)
