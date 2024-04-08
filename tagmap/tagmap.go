@@ -44,7 +44,7 @@ func DiffRelease(weights TagWeights, release *musicbrainz.Release, files []tagco
 	first := files[0]
 
 	var score float64
-	diff := Differ(weights, &score)
+	diff := differ(weights, &score)
 
 	var diffs []Diff
 	diffs = append(diffs,
@@ -73,31 +73,6 @@ func DiffRelease(weights TagWeights, release *musicbrainz.Release, files []tagco
 	}
 
 	return score, diffs
-}
-
-func Differ(weights TagWeights, score *float64) func(field string, a, b string) Diff {
-	var total float64
-	var diff float64
-
-	return func(field, a, b string) Diff {
-		diffs := dmp.DiffMain(norm(a), norm(b), false)
-		dist := float64(dmp.DiffLevenshtein(diffs))
-		distWeighted := dist * weights.For(field)
-
-		diff += distWeighted
-		total += float64(len([]rune(b)))
-
-		*score = 100 - (diff * 100 / total)
-
-		diffsPresented := dmp.DiffMain(a, b, false)
-		distPresented := float64(dmp.DiffLevenshtein(diffsPresented))
-		return Diff{
-			Field:  field,
-			Before: filterDiff(diffsPresented, func(d diffmatchpatch.Diff) bool { return d.Type <= diffmatchpatch.DiffEqual }),
-			After:  filterDiff(diffsPresented, func(d diffmatchpatch.Diff) bool { return d.Type >= diffmatchpatch.DiffEqual }),
-			Equal:  distPresented == 0,
-		}
-	}
 }
 
 func WriteFile(
@@ -146,6 +121,43 @@ func WriteFile(
 	f.WriteMBArtistID(mapp(releaseTrack.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID }))
 }
 
+func differ(weights TagWeights, score *float64) func(field string, a, b string) Diff {
+	var total float64
+	var diff float64
+
+	return func(field, a, b string) Diff {
+		diffs := dmp.DiffMain(norm(a), norm(b), false)
+		dist := float64(dmp.DiffLevenshtein(diffs))
+		distWeighted := dist * weights.For(field)
+
+		diff += distWeighted
+		total += float64(len([]rune(b)))
+
+		*score = 100 - (diff * 100 / total)
+
+		diffsPresented := dmp.DiffMain(a, b, false)
+		distPresented := float64(dmp.DiffLevenshtein(diffsPresented))
+		return Diff{
+			Field:  field,
+			Before: filterDiff(diffsPresented, func(d diffmatchpatch.Diff) bool { return d.Type <= diffmatchpatch.DiffEqual }),
+			After:  filterDiff(diffsPresented, func(d diffmatchpatch.Diff) bool { return d.Type >= diffmatchpatch.DiffEqual }),
+			Equal:  distPresented == 0,
+		}
+	}
+}
+
+func norm(input string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsLetter(r) {
+			return unicode.ToLower(r)
+		}
+		if unicode.IsNumber(r) {
+			return r
+		}
+		return -1
+	}, input)
+}
+
 func filter[T comparable](elms ...T) []T {
 	var zero T
 	return slices.DeleteFunc(elms, func(t T) bool {
@@ -169,19 +181,4 @@ func filterDiff(diffs []diffmatchpatch.Diff, f func(diffmatchpatch.Diff) bool) [
 		}
 	}
 	return r
-}
-
-func norm(input string) string {
-	input = strings.ToLower(input)
-	input = stripNonAlphaNum(input)
-	return input
-}
-
-func stripNonAlphaNum(input string) string {
-	return strings.Map(func(r rune) rune {
-		if unicode.IsLetter(r) || unicode.IsNumber(r) {
-			return r
-		}
-		return -1
-	}, input)
 }
