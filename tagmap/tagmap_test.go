@@ -1,15 +1,14 @@
-package tagmap_test
+package tagmap
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"go.senan.xyz/wrtag/tagmap"
 )
 
 func TestDiffer(t *testing.T) {
 	var score float64
-	diff := tagmap.Differ(tagmap.TagWeights{}, &score)
+	diff := differ(TagWeights{}, &score)
 
 	diff("x", ".....", ".....")
 	diff("x", ".....", "....X")
@@ -17,13 +16,13 @@ func TestDiffer(t *testing.T) {
 }
 
 func TestDiffWeightsLowerBound(t *testing.T) {
-	weights := tagmap.TagWeights{
+	weights := TagWeights{
 		"label":         0,
 		"catalogue num": 0,
 	}
 
 	var score float64
-	diff := tagmap.Differ(weights, &score)
+	diff := differ(weights, &score)
 
 	// all the same, but label/catalogue num mismatch
 	diff("label", "Columbia", "uh some other label")
@@ -40,13 +39,13 @@ func TestDiffWeightsLowerBound(t *testing.T) {
 }
 
 func TestDiffWeightsUpperBound(t *testing.T) {
-	weights := tagmap.TagWeights{
+	weights := TagWeights{
 		"label":         2,
 		"catalogue num": 2,
 	}
 
 	var score float64
-	diff := tagmap.Differ(weights, &score)
+	diff := differ(weights, &score)
 
 	// all the same, but label/catalogue num mismatch
 	diff("label", "Columbia", "uh some other label")
@@ -60,4 +59,12 @@ func TestDiffWeightsUpperBound(t *testing.T) {
 
 	// bad score since we really care about label / catalogue num
 	assert.InDelta(t, 41.0, score, 1)
+}
+
+func TestNorm(t *testing.T) {
+	assert.Equal(t, "", norm(""))
+	assert.Equal(t, "", norm(" "))
+	assert.Equal(t, "123", norm(" 1!2!3 "))
+	assert.Equal(t, "séan", norm("SÉan"))
+	assert.Equal(t, "hello世界", norm("~~ 【 Hello, 世界。 】~~ 😉"))
 }
