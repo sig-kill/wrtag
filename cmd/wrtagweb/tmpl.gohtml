@@ -154,15 +154,15 @@ origin file info
       {{ end }}
     </form>
     <hr class="w-full border border-b-gray-400" />
-    <p>found {{ len . }} jobs, {{ len . }} active</p>
-    <div class="flex gap-3 items-center">
-      <span class="text-gray-600">filter jobs</span>
-      <input id="job-search" type="search" name="search" placeholder="filter jobs" class="border px-3 py-1 w-full sm:w-auto shadow-sm" />
-    </div>
     {{ block "jobs" . }}
     <div hx-get="/jobs" hx-trigger="sse:jobs, input changed from:#job-search throttle:500ms, every 5s" hx-include="#job-search" hx-swap="outerHTML" class="contents">
-      {{ if eq (len .) 0 }}<p class="text-gray-600">no jobs yet ...</p>{{ end }}
-      {{ range . }}
+      <p>found {{ len .Jobs }} jobs, {{ .Total }} total</p>
+      <div class="flex gap-3 items-center">
+        <span class="text-gray-600">filter jobs</span>
+        <input id="job-search" type="search" name="search" value="{{ .Search }}" placeholder="filter jobs" class="border px-3 py-1 w-full sm:w-auto shadow-sm" />
+      </div>
+      {{ if eq (len .Jobs) 0 }}<p class="text-gray-600">no jobs yet ...</p>{{ end }}
+      {{ range .Jobs }}
         <div class="p-3 cursor {{ template "job-colour" . }}">
           <button hx-delete="/jobs/{{ .ID }}" hx-swap="none">[x]</button>
           <span>{{ .Operation }} path <a class="italic break-all" href="#{{ .ID }}">{{ .SourcePath }}</a></span>

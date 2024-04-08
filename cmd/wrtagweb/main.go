@@ -178,7 +178,8 @@ func main() {
 
 	mux.Handle("GET /jobs", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := &bolthold.Query{}
-		if search := r.URL.Query().Get("search"); search != "" {
+		search := r.URL.Query().Get("search")
+		if search != "" {
 			q = q.And("SourcePath").MatchFunc(func(path string) (bool, error) {
 				return strings.Contains(strings.ToLower(path), strings.ToLower(search)), nil
 			})
@@ -186,12 +187,18 @@ func main() {
 		q = q.SortBy("Time")
 		q = q.Reverse()
 
-		var jobs []*Job
-		if err := db.Find(&jobs, q); err != nil {
+		var d struct {
+			Total  int
+			Jobs   []*Job
+			Search string
+		}
+		if err := db.Find(&d.Jobs, q); err != nil {
 			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
 			return
 		}
-		respTmpl(w, "jobs", jobs)
+		d.Total, _ = db.Count(&Job{}, &bolthold.Query{})
+		d.Search = search
+		respTmpl(w, "jobs", d)
 	})))
 
 	mux.Handle("POST /jobs", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -272,12 +279,17 @@ func main() {
 	})))
 
 	mux.Handle("/{$}", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var jobs []*Job
-		if err := db.Find(&jobs, (&bolthold.Query{}).SortBy("Time").Reverse()); err != nil {
+		var d struct {
+			Total  int
+			Jobs   []*Job
+			Search string
+		}
+		if err := db.Find(&d.Jobs, (&bolthold.Query{}).SortBy("Time").Reverse()); err != nil {
 			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
 			return
 		}
-		respTmpl(w, "index", jobs)
+		d.Total = len(d.Jobs)
+		respTmpl(w, "index", d)
 	})))
 
 	mux.Handle("/", http.FileServer(http.FS(ui)))
