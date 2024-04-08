@@ -3,7 +3,6 @@ package tagmap
 import (
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -66,8 +65,8 @@ func TestDiffNorm(t *testing.T) {
 	var score float64
 	diff := differ(TagWeights{}, &score)
 
-	spew.Dump(diff("label", "Columbia", "COLUMBIA"))
-	spew.Dump(diff("catalogue num", "CLO LP 3", "CLOLP3"))
+	diff("label", "Columbia", "COLUMBIA")
+	diff("catalogue num", "CLO LP 3", "CLOLP3")
 
 	assert.Equal(t, 100.0, score) // we don't care about case or spaces
 }
