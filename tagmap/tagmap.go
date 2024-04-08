@@ -56,15 +56,11 @@ func DiffRelease(weights TagWeights, release *musicbrainz.Release, files []tagco
 	)
 
 	rtracks := musicbrainz.FlatTracks(release.Media)
+	if len(rtracks) != len(files) {
+		panic(fmt.Errorf("len(rtracks) != len(files)"))
+	}
+
 	for i, f := range files {
-		if i > len(rtracks)-1 {
-			diffs = append(diffs, diff(
-				fmt.Sprintf("track %d", i+1),
-				strings.Join(filter(f.Artist(), f.Title()), " – "),
-				"",
-			))
-			continue
-		}
 		diffs = append(diffs, diff(
 			fmt.Sprintf("track %d", i+1),
 			strings.Join(filter(f.Artist(), f.Title()), " – "),
