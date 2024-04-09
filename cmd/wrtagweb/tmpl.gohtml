@@ -155,7 +155,7 @@ origin file info
     </form>
     <hr class="w-full border border-b-gray-400" />
     {{ block "jobs" . }}
-    <div hx-get="/jobs" hx-trigger="sse:jobs, input changed from:#job-search throttle:500ms, every 5s" hx-include="#job-search" hx-swap="outerHTML" class="contents">
+    <div hx-get="/jobs" hx-trigger="sse:jobs, input changed from:#job-search delay:500ms, every 5s" hx-include="#job-search" hx-swap="outerHTML" class="contents">
       <p>found {{ len .Jobs }} jobs, {{ .Total }} total</p>
       <div class="flex gap-3 items-center">
         <span class="text-gray-600">filter jobs</span>
