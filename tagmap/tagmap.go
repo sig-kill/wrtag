@@ -127,7 +127,7 @@ func differ(weights TagWeights, score *float64) func(field string, a, b string) 
 		distWeighted := dist * weights.For(field)
 
 		diff += distWeighted
-		total += float64(len([]rune(b)))
+		total += float64(len([]rune(norm(b))))
 
 		*score = 100 - (diff * 100 / total)
 

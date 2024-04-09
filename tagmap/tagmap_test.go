@@ -10,8 +10,8 @@ func TestDiffer(t *testing.T) {
 	var score float64
 	diff := differ(TagWeights{}, &score)
 
-	diff("x", ".....", ".....")
-	diff("x", ".....", "....X")
+	diff("x", "aaaaa", "aaaaa")
+	diff("x", "aaaaa", "aaaaX")
 	assert.Equal(t, 90.0, score) // 9 of 10 chars the same
 }
 
@@ -58,7 +58,7 @@ func TestDiffWeightsUpperBound(t *testing.T) {
 	diff("track 5", "Digital Tenderness", "Digital Tenderness")
 
 	// bad score since we really care about label / catalogue num
-	assert.InDelta(t, 41.0, score, 1)
+	assert.InDelta(t, 32.0, score, 1)
 }
 
 func TestDiffNorm(t *testing.T) {
