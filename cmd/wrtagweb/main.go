@@ -162,14 +162,22 @@ func main() {
 	}
 
 	mw := func(next http.Handler) http.Handler {
+		const cookieKey = "api-key"
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if _, key, _ := r.BasicAuth(); subtle.ConstantTimeCompare([]byte(key), []byte(*confAPIKey)) != 1 {
-				w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
-				http.Error(w, "unauthorised", http.StatusUnauthorized)
+			log.Printf("req for %s", r.URL)
+
+			// exchange a valid basic basic auth request for a cookie that lasts 30 days
+			if cookie, _ := r.Cookie(cookieKey); cookie != nil && subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(*confAPIKey)) == 1 {
+				next.ServeHTTP(w, r)
 				return
 			}
-			log.Printf("req for %s", r.URL)
-			next.ServeHTTP(w, r)
+			if _, key, _ := r.BasicAuth(); subtle.ConstantTimeCompare([]byte(key), []byte(*confAPIKey)) == 1 {
+				http.SetCookie(w, &http.Cookie{Name: cookieKey, Value: *confAPIKey, HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode, Path: "/", Expires: time.Now().Add(30 * 24 * time.Hour)})
+				next.ServeHTTP(w, r)
+				return
+			}
+			w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
+			http.Error(w, "unauthorised", http.StatusUnauthorized)
 		})
 	}
 
