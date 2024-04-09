@@ -19,11 +19,11 @@ COPY --from=builder-taglib /pkgs/*/*.apk /pkgs/
 RUN apk add --no-cache --allow-untrusted /pkgs/*
 
 WORKDIR /src
-COPY go.mod .
-COPY go.sum .
-RUN go mod download
 COPY . .
-RUN GOOS=linux go build -o /usr/local/bin/ ./cmd/...
+RUN  \
+    --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    GOOS=linux go build -o /usr/local/bin/ ./cmd/...
 
 FROM alpine:3.19
 LABEL org.opencontainers.image.source https://github.com/sentriz/wrtag
