@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -105,6 +106,13 @@ func main() {
 		return nil
 	}
 
+	start := time.Now()
+	var numDone, numError atomic.Uint32
+	defer func() {
+		log.Printf("finished in %s with %d/%d dirs, %d err",
+			time.Since(start).Truncate(time.Millisecond), numDone.Load(), len(leafDirs), numError.Load())
+	}()
+
 	var wg sync.WaitGroup
 	for range 4 {
 		wg.Add(1)
@@ -120,8 +128,10 @@ func main() {
 					}
 					if err := processDir(ctx, dir); err != nil {
 						log.Printf("error processing %q: %v", dir, err)
+						numError.Add(1)
 						continue
 					}
+					numDone.Add(1)
 				}
 			}
 		}()
