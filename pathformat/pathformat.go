@@ -1,7 +1,6 @@
 package pathformat
 
 import (
-	"cmp"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -138,9 +137,13 @@ var funcMap = texttemplate.FuncMap{
 	"artists":      musicbrainz.ArtistsNames,
 	"artistCredit": musicbrainz.ArtistsCreditString,
 	"disambig": func(r musicbrainz.Release) string {
-		return cmp.Or(
-			r.ReleaseGroup.Disambiguation,
-			r.Disambiguation,
-		)
+		var parts []string
+		if r.ReleaseGroup.Disambiguation != "" {
+			parts = append(parts, r.ReleaseGroup.Disambiguation)
+		}
+		if r.Disambiguation != "" {
+			parts = append(parts, r.Disambiguation)
+		}
+		return strings.Join(parts, ", ")
 	},
 }
