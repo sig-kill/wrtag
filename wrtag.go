@@ -353,6 +353,7 @@ func (m Move) TrimDir(dc DirContext, src string) error {
 	var size uint64
 	for _, entry := range entries {
 		path := filepath.Join(src, entry.Name())
+		path, _ = filepath.Abs(path)
 		if _, ok := dc.knownDestPaths[path]; ok {
 			continue
 		}
