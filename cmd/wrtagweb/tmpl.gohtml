@@ -3,7 +3,7 @@
 {{ end }}
 
 {{ define "job" }}
-<div id="job-{{ .ID }}" hx-get="/jobs/{{ .ID }}" hx-trigger="sse:job-{{ .ID }}" hx-include="">
+<div id="job-{{ .ID }}" hx-get="/jobs/{{ .ID }}" hx-trigger="sse:job-{{ .ID }}" hx-swap="outerHTML" hx-include="">
 <div class="fixed inset-0 flex justify-center items-center bg-gray-200 bg-opacity-75">
 <form
   hx-put="/jobs/{{ .ID }}"
