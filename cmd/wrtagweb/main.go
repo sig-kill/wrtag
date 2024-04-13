@@ -14,10 +14,12 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/r3labs/sse/v2"
@@ -31,6 +33,7 @@ import (
 	"go.senan.xyz/wrtag/researchlink"
 	"go.senan.xyz/wrtag/tagmap"
 	"go.senan.xyz/wrtag/tags/taglib"
+	"golang.org/x/sync/errgroup"
 )
 
 var tg = &taglib.TagLib{}
@@ -110,36 +113,6 @@ func main() {
 
 		return nil
 	}
-
-	go func() {
-		tick := func() error {
-			var job Job
-			switch err := db.FindOne(&job, bolthold.Where("Status").Eq(StatusIncomplete)); {
-			case errors.Is(err, bolthold.ErrNotFound):
-				return nil
-			case err != nil:
-				return fmt.Errorf("find next job: %w", err)
-			}
-
-			emit(eventUpdateJob(job.ID))
-			defer func() {
-				_ = db.Update(job.ID, &job)
-				emit(eventUpdateJob(job.ID))
-			}()
-
-			if err := processJob(context.Background(), &job, false); err != nil {
-				return fmt.Errorf("process job: %w", err)
-			}
-			return nil
-		}
-
-		for {
-			if err := tick(); err != nil {
-				log.Printf("error in job: %v", err)
-			}
-			time.Sleep(2 * time.Second)
-		}
-	}()
 
 	var buffPool = sync.Pool{New: func() any { return new(bytes.Buffer) }}
 	respTmpl := func(w http.ResponseWriter, name string, data any) {
@@ -322,8 +295,58 @@ func main() {
 		emit(eventAllJobs)
 	})
 
-	log.Printf("starting on %s", *confListenAddr)
-	log.Panicln(http.ListenAndServe(*confListenAddr, mux))
+	tick := func(ctx context.Context) error {
+		var job Job
+		switch err := db.FindOne(&job, bolthold.Where("Status").Eq(StatusIncomplete)); {
+		case errors.Is(err, bolthold.ErrNotFound):
+			return nil
+		case err != nil:
+			return fmt.Errorf("find next job: %w", err)
+		}
+
+		emit(eventUpdateJob(job.ID))
+		defer func() {
+			_ = db.Update(job.ID, &job)
+			emit(eventUpdateJob(job.ID))
+		}()
+
+		if err := processJob(ctx, &job, false); err != nil {
+			return fmt.Errorf("process job: %w", err)
+		}
+		return nil
+	}
+
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+	errgrp, ctx := errgroup.WithContext(ctx)
+
+	errgrp.Go(func() error {
+		defer logJob("process jobs")()
+
+		ctxTick(ctx, 2*time.Second, func() {
+			if err := tick(ctx); err != nil {
+				log.Printf("error in job: %v", err)
+			}
+		})
+		return nil
+	})
+
+	errgrp.Go(func() error {
+		defer logJob("http")()
+
+		server := &http.Server{Addr: *confListenAddr, Handler: mux}
+		errgrp.Go(func() error { <-ctx.Done(); return server.Shutdown(context.Background()) })
+		errgrp.Go(func() error { <-ctx.Done(); sseServ.Close(); return nil })
+
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+		return nil
+	})
+
+	if err := errgrp.Wait(); err != nil {
+		log.Panic(err)
+	}
 }
 
 type JobStatus string
@@ -409,4 +432,23 @@ var funcMap = htmltemplate.FuncMap{
 	"url":  func(u string) htmltemplate.URL { return htmltemplate.URL(u) },
 	"join": func(delim string, items []string) string { return strings.Join(items, delim) },
 	"pad0": func(amount, n int) string { return fmt.Sprintf("%0*d", amount, n) },
+}
+
+func logJob(jobName string) func() {
+	log.Printf("starting job %q", jobName)
+	return func() { log.Printf("stopped job %q", jobName) }
+}
+
+func ctxTick(ctx context.Context, interval time.Duration, f func()) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			f()
+		}
+	}
 }
