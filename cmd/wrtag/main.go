@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"go.senan.xyz/flagconf"
@@ -64,7 +66,10 @@ func main() {
 		log.Fatalf("need a dir")
 	}
 
-	r, err := wrtag.ProcessDir(context.Background(), mb, tg, &pathFormat, tagWeights, &researchLinkQuerier, keepFiles, op, dir, *useMBID, *yes)
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
+	r, err := wrtag.ProcessDir(ctx, mb, tg, &pathFormat, tagWeights, &researchLinkQuerier, keepFiles, op, dir, *useMBID, *yes)
 	if err != nil && !errors.Is(err, wrtag.ErrScoreTooLow) {
 		log.Fatalf("error processing %q: %v", dir, err)
 	}
