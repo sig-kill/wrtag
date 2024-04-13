@@ -14,6 +14,7 @@ require (
 	github.com/timshannon/bolthold v0.0.0-20240314194003-30aac6950928
 	go.senan.xyz/flagconf v0.1.7
 	go.senan.xyz/table v0.0.0-20240227175247-cf2c834b4c23
+	golang.org/x/sync v0.7.0
 	golang.org/x/text v0.14.0
 	golang.org/x/time v0.5.0
 	gopkg.in/yaml.v2 v2.4.0
