@@ -134,30 +134,10 @@ func main() {
 		respTmpl(w, "error", fmt.Sprintf(f, a...))
 	}
 
-	mw := func(next http.Handler) http.Handler {
-		const cookieKey = "api-key"
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Printf("req for %s", r.URL)
-
-			// exchange a valid basic basic auth request for a cookie that lasts 30 days
-			if cookie, _ := r.Cookie(cookieKey); cookie != nil && subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(*confAPIKey)) == 1 {
-				next.ServeHTTP(w, r)
-				return
-			}
-			if _, key, _ := r.BasicAuth(); subtle.ConstantTimeCompare([]byte(key), []byte(*confAPIKey)) == 1 {
-				http.SetCookie(w, &http.Cookie{Name: cookieKey, Value: *confAPIKey, HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode, Path: "/", Expires: time.Now().Add(30 * 24 * time.Hour)})
-				next.ServeHTTP(w, r)
-				return
-			}
-			w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
-			http.Error(w, "unauthorised", http.StatusUnauthorized)
-		})
-	}
-
 	mux := http.NewServeMux()
 	mux.Handle("GET /events", sseServ)
 
-	mux.Handle("GET /jobs", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /jobs", func(w http.ResponseWriter, r *http.Request) {
 		q := &bolthold.Query{}
 		search := r.URL.Query().Get("search")
 		if search != "" {
@@ -180,9 +160,9 @@ func main() {
 		d.Total, _ = db.Count(&Job{}, &bolthold.Query{})
 		d.Search = search
 		respTmpl(w, "jobs", d)
-	})))
+	})
 
-	mux.Handle("POST /jobs", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /jobs", func(w http.ResponseWriter, r *http.Request) {
 		operation, err := parseOperation(r.FormValue("operation"))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -200,9 +180,9 @@ func main() {
 		}
 		respTmpl(w, "job-import", nil)
 		emit(eventAllJobs)
-	})))
+	})
 
-	mux.Handle("GET /jobs/{id}", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(r.PathValue("id"))
 		var job Job
 		if err := db.Get(uint64(id), &job); err != nil {
@@ -210,9 +190,9 @@ func main() {
 			return
 		}
 		respTmpl(w, "job", job)
-	})))
+	})
 
-	mux.Handle("PUT /jobs/{id}", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(r.PathValue("id"))
 		confirm, _ := strconv.ParseBool(r.FormValue("confirm"))
 		useMBID := r.FormValue("mbid")
@@ -236,18 +216,18 @@ func main() {
 		}
 		respTmpl(w, "job", job)
 		emit(eventAllJobs)
-	})))
+	})
 
-	mux.Handle("DELETE /jobs/{id}", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(r.PathValue("id"))
 		if err := db.Delete(uint64(id), &Job{}); err != nil {
 			respErr(w, http.StatusInternalServerError, "error getting job")
 			return
 		}
 		emit(eventAllJobs)
-	})))
+	})
 
-	mux.Handle("GET /dump", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /dump", func(w http.ResponseWriter, r *http.Request) {
 		var jobs []*Job
 		if err := db.Find(&jobs, nil); err != nil {
 			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
@@ -257,9 +237,9 @@ func main() {
 			respErr(w, http.StatusInternalServerError, "error encoding jobs")
 			return
 		}
-	})))
+	})
 
-	mux.Handle("/{$}", mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/{$}", func(w http.ResponseWriter, r *http.Request) {
 		var d struct {
 			Total  int
 			Jobs   []*Job
@@ -271,7 +251,7 @@ func main() {
 		}
 		d.Total = len(d.Jobs)
 		respTmpl(w, "index", d)
-	})))
+	})
 
 	mux.Handle("/", http.FileServer(http.FS(ui)))
 
@@ -295,52 +275,48 @@ func main() {
 		emit(eventAllJobs)
 	})
 
-	tick := func(ctx context.Context) error {
-		var job Job
-		switch err := db.FindOne(&job, bolthold.Where("Status").Eq(StatusIncomplete)); {
-		case errors.Is(err, bolthold.ErrNotFound):
-			return nil
-		case err != nil:
-			return fmt.Errorf("find next job: %w", err)
-		}
-
-		emit(eventUpdateJob(job.ID))
-		defer func() {
-			_ = db.Update(job.ID, &job)
-			emit(eventUpdateJob(job.ID))
-		}()
-
-		if err := processJob(ctx, &job, false); err != nil {
-			return fmt.Errorf("process job: %w", err)
-		}
-		return nil
-	}
-
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	errgrp, ctx := errgroup.WithContext(ctx)
 
 	errgrp.Go(func() error {
-		defer logJob("process jobs")()
-
-		ctxTick(ctx, 2*time.Second, func() {
-			if err := tick(ctx); err != nil {
-				log.Printf("error in job: %v", err)
-			}
-		})
-		return nil
-	})
-
-	errgrp.Go(func() error {
 		defer logJob("http")()
 
-		server := &http.Server{Addr: *confListenAddr, Handler: mux}
+		mw := authMiddleware(*confAPIKey)
+		server := &http.Server{Addr: *confListenAddr, Handler: mw(mux)}
 		errgrp.Go(func() error { <-ctx.Done(); return server.Shutdown(context.Background()) })
 		errgrp.Go(func() error { <-ctx.Done(); sseServ.Close(); return nil })
 
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return err
 		}
+		return nil
+	})
+
+	errgrp.Go(func() error {
+		defer logJob("process jobs")()
+
+		tick := func(ctx context.Context) error {
+			var job Job
+			switch err := db.FindOne(&job, bolthold.Where("Status").Eq(StatusIncomplete)); {
+			case errors.Is(err, bolthold.ErrNotFound):
+				return nil
+			case err != nil:
+				return fmt.Errorf("find next job: %w", err)
+			}
+			emit(eventUpdateJob(job.ID))
+			defer func() {
+				_ = db.Update(job.ID, &job)
+				emit(eventUpdateJob(job.ID))
+			}()
+			return processJob(ctx, &job, false)
+		}
+
+		ctxTick(ctx, 2*time.Second, func() {
+			if err := tick(ctx); err != nil {
+				log.Printf("error in job: %v", err)
+			}
+		})
 		return nil
 	})
 
@@ -437,6 +413,28 @@ var funcMap = htmltemplate.FuncMap{
 func logJob(jobName string) func() {
 	log.Printf("starting job %q", jobName)
 	return func() { log.Printf("stopped job %q", jobName) }
+}
+
+func authMiddleware(apiKey string) func(next http.Handler) http.Handler {
+	const cookieKey = "api-key"
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("req for %s", r.URL)
+
+			// exchange a valid basic basic auth request for a cookie that lasts 30 days
+			if cookie, _ := r.Cookie(cookieKey); cookie != nil && subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(apiKey)) == 1 {
+				next.ServeHTTP(w, r)
+				return
+			}
+			if _, key, _ := r.BasicAuth(); subtle.ConstantTimeCompare([]byte(key), []byte(apiKey)) == 1 {
+				http.SetCookie(w, &http.Cookie{Name: cookieKey, Value: apiKey, HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode, Path: "/", Expires: time.Now().Add(30 * 24 * time.Hour)})
+				next.ServeHTTP(w, r)
+				return
+			}
+			w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
+			http.Error(w, "unauthorised", http.StatusUnauthorized)
+		})
+	}
 }
 
 func ctxTick(ctx context.Context, interval time.Duration, f func()) {
