@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -66,7 +67,7 @@ func main() {
 		log.Fatalf("need a dir")
 	}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	r, err := wrtag.ProcessDir(ctx, mb, tg, &pathFormat, tagWeights, &researchLinkQuerier, keepFiles, op, dir, *useMBID, *yes)

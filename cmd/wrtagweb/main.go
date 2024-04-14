@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"os/signal"
 	"path/filepath"
 	"strconv"
@@ -275,7 +276,7 @@ func main() {
 		emit(eventAllJobs)
 	})
 
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	errgrp, ctx := errgroup.WithContext(ctx)
 
