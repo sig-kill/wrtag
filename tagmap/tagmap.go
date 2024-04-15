@@ -119,25 +119,27 @@ func WriteFile(
 
 func differ(weights TagWeights, score *float64) func(field string, a, b string) Diff {
 	var total float64
-	var diff float64
+	var dist float64
 
 	return func(field, a, b string) Diff {
-		diffs := dmp.DiffMain(norm(a), norm(b), false)
+		// separate, normalised diff only for score. if we have both fields
+		if a != "" && b != "" {
+			a, b := norm(a), norm(b)
+
+			diffs := dmp.DiffMain(a, b, false)
+			dist += float64(dmp.DiffLevenshtein(diffs)) * weights.For(field)
+			total += float64(len([]rune(b)))
+
+			*score = 100 - (dist * 100 / total)
+		}
+
+		diffs := dmp.DiffMain(a, b, false)
 		dist := float64(dmp.DiffLevenshtein(diffs))
-		distWeighted := dist * weights.For(field)
-
-		diff += distWeighted
-		total += float64(len([]rune(norm(b))))
-
-		*score = 100 - (diff * 100 / total)
-
-		diffsPresented := dmp.DiffMain(a, b, false)
-		distPresented := float64(dmp.DiffLevenshtein(diffsPresented))
 		return Diff{
 			Field:  field,
-			Before: filterDiff(diffsPresented, func(d diffmatchpatch.Diff) bool { return d.Type <= diffmatchpatch.DiffEqual }),
-			After:  filterDiff(diffsPresented, func(d diffmatchpatch.Diff) bool { return d.Type >= diffmatchpatch.DiffEqual }),
-			Equal:  distPresented == 0,
+			Before: filterDiff(diffs, func(d diffmatchpatch.Diff) bool { return d.Type <= diffmatchpatch.DiffEqual }),
+			After:  filterDiff(diffs, func(d diffmatchpatch.Diff) bool { return d.Type >= diffmatchpatch.DiffEqual }),
+			Equal:  dist == 0,
 		}
 	}
 }

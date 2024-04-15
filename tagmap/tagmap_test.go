@@ -71,6 +71,16 @@ func TestDiffNorm(t *testing.T) {
 	assert.Equal(t, 100.0, score) // we don't care about case or spaces
 }
 
+func TestDiffIgnoreMissing(t *testing.T) {
+	var score float64
+	diff := differ(TagWeights{}, &score)
+
+	diff("label", "", "COLUMBIA")
+	diff("catalogue num", "CLO LP 3", "CLOLP3")
+
+	assert.Equal(t, 100.0, score)
+}
+
 func TestNorm(t *testing.T) {
 	assert.Equal(t, "", norm(""))
 	assert.Equal(t, "", norm(" "))
