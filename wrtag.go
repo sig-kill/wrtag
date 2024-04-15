@@ -10,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -465,7 +464,7 @@ func tryDownloadMusicbrainzCover(ctx context.Context, mb MusicbrainzClient, tmpD
 		return "", nil
 	}
 
-	tmpf, err := os.CreateTemp(tmpDir, ".wrtag-cover-tmp-*"+path.Ext(coverURL))
+	tmpf, err := os.CreateTemp(tmpDir, ".wrtag-cover-tmp-*"+filepath.Ext(coverURL))
 	if err != nil {
 		return "", err
 	}
