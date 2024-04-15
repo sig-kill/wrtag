@@ -74,9 +74,6 @@ func main() {
 		}
 	}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-
 	todo := make(chan string)
 	go func() {
 		for d := range leafDirs {
@@ -112,6 +109,9 @@ func main() {
 		log.Printf("finished in %s with %d/%d dirs, %d err",
 			time.Since(start).Truncate(time.Millisecond), numDone.Load(), len(leafDirs), numError.Load())
 	}()
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
 
 	var wg sync.WaitGroup
 	for range 4 {
