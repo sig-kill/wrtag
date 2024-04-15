@@ -33,7 +33,7 @@ var (
 	ErrSelfCopy           = errors.New("can't copy self to self")
 )
 
-const minScore = 92
+const minScore = 95
 
 const (
 	thresholdSizeClean uint64 = 20 * 1e6   // 20 MB
