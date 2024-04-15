@@ -85,10 +85,10 @@ func (c *mockMB) GetCoverURL(ctx context.Context, release *musicbrainz.Release) 
 	exts, _ := mime.ExtensionsByType(contentType)
 	ext := cmp.Or(exts...)
 
-	done := make(chan struct{}, 1)
+	done := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.Copy(w, bytes.NewReader(cover))
-		done <- struct{}{}
+		close(done)
 	}))
 	go func() {
 		<-done
