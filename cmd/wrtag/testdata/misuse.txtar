@@ -1,0 +1,17 @@
+! exec wrtag
+stderr 'unknown command'
+
+! exec wrtag f
+stderr 'unknown command "f"'
+
+! exec wrtag move
+stderr 'need a dir'
+
+! exec wrtag copy
+stderr 'need a dir'
+
+! exec wrtag move no-exist
+stderr 'read dir: no tracks in dir'
+
+! exec wrtag copy no-exist
+stderr 'read dir: no tracks in dir'
