@@ -178,7 +178,7 @@ func ProcessDir(
 	}
 
 	if cover == "" {
-		cover, err = tryDownloadMusicbrainzCover(ctx, mb, release)
+		cover, err = tryDownloadMusicbrainzCover(ctx, mb, destDir, release)
 		if err != nil {
 			return nil, fmt.Errorf("try download mb cover: %w", err)
 		}
@@ -456,7 +456,7 @@ func (Copy) CleanDir(dc DirContext, limit string, src string) error {
 	return nil
 }
 
-func tryDownloadMusicbrainzCover(ctx context.Context, mb MusicbrainzClient, release *musicbrainz.Release) (string, error) {
+func tryDownloadMusicbrainzCover(ctx context.Context, mb MusicbrainzClient, tmpDir string, release *musicbrainz.Release) (string, error) {
 	coverURL, err := mb.GetCoverURL(ctx, release)
 	if err != nil {
 		return "", fmt.Errorf("request cover url: %w", err)
@@ -465,8 +465,7 @@ func tryDownloadMusicbrainzCover(ctx context.Context, mb MusicbrainzClient, rele
 		return "", nil
 	}
 
-	// TODO: make sure we put this on the same filesystem as the dest dir?
-	tmpf, err := os.CreateTemp("", "wrtag-cover-*"+path.Ext(coverURL))
+	tmpf, err := os.CreateTemp(tmpDir, ".wrtag-cover-tmp-*"+path.Ext(coverURL))
 	if err != nil {
 		return "", err
 	}
