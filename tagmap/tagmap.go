@@ -1,6 +1,7 @@
 package tagmap
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"strings"
@@ -83,10 +84,6 @@ func WriteFile(
 	for _, g := range genres[:min(6, len(genres))] { // top 6 genre strings
 		genreNames = append(genreNames, g.Name)
 	}
-	var anyGenre string
-	if len(genreNames) > 0 {
-		anyGenre = genreNames[0]
-	}
 
 	f.WriteAlbum(release.Title)
 	f.WriteAlbumArtist(musicbrainz.ArtistsString(release.Artists))
@@ -108,7 +105,7 @@ func WriteFile(
 	f.WriteArtists(musicbrainz.ArtistsNames(releaseTrack.Artists))
 	f.WriteArtistCredit(musicbrainz.ArtistsCreditString(releaseTrack.Artists))
 	f.WriteArtistsCredit(musicbrainz.ArtistsCreditNames(releaseTrack.Artists))
-	f.WriteGenre(anyGenre)
+	f.WriteGenre(cmp.Or(genreNames...))
 	f.WriteGenres(genreNames)
 	f.WriteTrackNumber(i + 1)
 	f.WriteDiscNumber(1)
@@ -164,9 +161,9 @@ func filter[T comparable](elms ...T) []T {
 }
 
 func mapp[F, T any](s []F, f func(int, F) T) []T {
-	res := make([]T, len(s))
+	res := make([]T, 0, len(s))
 	for i, v := range s {
-		res[i] = f(i, v)
+		res = append(res, f(i, v))
 	}
 	return res
 }
