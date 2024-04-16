@@ -1,5 +1,5 @@
 ! exec wrtag
-stderr 'unknown command'
+stderr 'unknown command ""'
 
 ! exec wrtag f
 stderr 'unknown command "f"'

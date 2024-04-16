@@ -36,15 +36,14 @@ func main() {
 	tagWeights := flagcommon.TagWeights()
 	configPath := flagcommon.ConfigPath()
 
-	yes := flag.Bool("yes", false, "use the found release anyway despite a low score")
-	useMBID := flag.String("mbid", "", "overwrite matched mbid")
 	dryRun := flag.Bool("dry-run", false, "dry run")
 
 	flag.Parse()
 	flagconf.ParseEnv()
 	flagconf.ParseConfig(*configPath)
 
-	command, dir := flag.Arg(0), flag.Arg(1)
+	command := flag.Arg(0)
+
 	var op wrtag.FileSystemOperation
 	switch command {
 	case "move":
@@ -54,6 +53,13 @@ func main() {
 	default:
 		log.Fatalf("unknown command %q", command)
 	}
+
+	flagop := flag.NewFlagSet(command, flag.ExitOnError)
+	yes := flagop.Bool("yes", false, "use the found release anyway despite a low score")
+	useMBID := flagop.String("mbid", "", "overwrite matched mbid")
+	flagop.Parse(flag.Args()[1:])
+
+	dir := flagop.Arg(0)
 	if dir == "" {
 		log.Fatalf("need a dir")
 	}
