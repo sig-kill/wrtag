@@ -1,6 +1,4 @@
 issues:
-  exclude-rules:
-    - text: "struct literal uses unkeyed fields"
-      path: ".*"
-    - text: "Error return value of `flagconf"
-      path: ".*"
+  exclude:
+    - "struct literal uses unkeyed fields"
+    - "Error return value of `.*flag.*Parse.*` is not checked"
