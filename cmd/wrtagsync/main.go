@@ -96,15 +96,15 @@ func main() {
 		return nil
 	}
 
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
 	start := time.Now()
 	var numDone, numError atomic.Uint32
 	defer func() {
 		log.Printf("finished in %s with %d/%d dirs, %d err",
 			time.Since(start).Truncate(time.Millisecond), numDone.Load(), len(leafDirs), numError.Load())
 	}()
-
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
 
 	var wg sync.WaitGroup
 	for range 4 {
