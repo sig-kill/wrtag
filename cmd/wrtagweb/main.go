@@ -27,12 +27,9 @@ import (
 	"github.com/timshannon/bolthold"
 	"go.senan.xyz/flagconf"
 	"go.senan.xyz/wrtag"
-	"go.senan.xyz/wrtag/cmd/internal/flagparse"
+	"go.senan.xyz/wrtag/cmd/internal/flagcommon"
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/notifications"
-	"go.senan.xyz/wrtag/pathformat"
-	"go.senan.xyz/wrtag/researchlink"
-	"go.senan.xyz/wrtag/tagmap"
 	"go.senan.xyz/wrtag/tags/taglib"
 	"golang.org/x/sync/errgroup"
 )
@@ -41,33 +38,27 @@ var tg = &taglib.TagLib{}
 var mb = musicbrainz.NewClient(http.DefaultClient)
 
 func main() {
-	var pathFormat pathformat.Format
-	flag.Var(flagparse.PathFormat{&pathFormat}, "path-format", "path-format")
-	var tagWeights tagmap.TagWeights
-	flag.Var(flagparse.TagWeights{&tagWeights}, "tag-weight", "tag weight")
-	var researchLinkQuerier researchlink.Querier
-	flag.Var(flagparse.Querier{&researchLinkQuerier}, "research-link", "research link")
-	var keepFiles = map[string]struct{}{}
-	flag.Func("keep-file", "files to keep from source directories",
-		func(s string) error { keepFiles[s] = struct{}{}; return nil })
-	var notifs notifications.Notifications
-	flag.Var(flagparse.Notifications{&notifs}, "notification-uri", "shoutrrr notification uri")
-	configPath := flag.String("config-path", flagparse.DefaultConfigPath, "path config file")
+	pathFormat := flagcommon.PathFormat()
+	researchLinkQuerier := flagcommon.Querier()
+	keepFiles := flagcommon.KeepFiles()
+	tagWeights := flagcommon.TagWeights()
+	notifs := flagcommon.Notifications()
+	configPath := flagcommon.ConfigPath()
 
-	confListenAddr := flag.String("listen-addr", "", "listen addr")
-	confPublicURL := flag.String("public-url", "", "public url")
-	confAPIKey := flag.String("api-key", "", "api key")
-	confDBPath := flag.String("db-path", "wrtag.db", "db path")
+	listenAddr := flag.String("listen-addr", "", "listen addr")
+	publicURL := flag.String("public-url", "", "public url")
+	apiKey := flag.String("api-key", "", "api key")
+	dbPath := flag.String("db-path", "wrtag.db", "db path")
 
 	flag.Parse()
 	flagconf.ParseEnv()
 	flagconf.ParseConfig(*configPath)
 
-	if *confAPIKey == "" {
+	if *apiKey == "" {
 		log.Fatal("need api key")
 	}
 
-	db, err := bolthold.Open(*confDBPath, 0600, nil)
+	db, err := bolthold.Open(*dbPath, 0600, nil)
 	if err != nil {
 		log.Fatalf("error parsing path format template: %v", err)
 	}
@@ -90,23 +81,23 @@ func main() {
 		job.Status = StatusComplete
 
 		var err error
-		job.SearchResult, err = wrtag.ProcessDir(ctx, mb, tg, &pathFormat, tagWeights, &researchLinkQuerier, keepFiles, wrtagOperation(job.Operation), job.SourcePath, job.UseMBID, yes)
+		job.SearchResult, err = wrtag.ProcessDir(ctx, mb, tg, pathFormat, tagWeights, researchLinkQuerier, keepFiles, wrtagOperation(job.Operation), job.SourcePath, job.UseMBID, yes)
 		if err != nil {
 			if errors.Is(err, wrtag.ErrScoreTooLow) {
 				job.Error = string(JobErrorNeedsInput)
-				notifs.Send(notifications.NeedsInput, jobNotificationMessage(*confPublicURL, job))
+				notifs.Send(notifications.NeedsInput, jobNotificationMessage(*publicURL, job))
 				return nil
 			}
 			job.Error = err.Error()
 			return nil
 		}
 
-		job.DestPath, err = wrtag.DestDir(&pathFormat, job.SearchResult.Release)
+		job.DestPath, err = wrtag.DestDir(pathFormat, job.SearchResult.Release)
 		if err != nil {
 			return fmt.Errorf("gen dest dir: %w", err)
 		}
 
-		notifs.Send(notifications.Complete, jobNotificationMessage(*confPublicURL, job))
+		notifs.Send(notifications.Complete, jobNotificationMessage(*publicURL, job))
 
 		// either if this was a copy or move job, subsequent re-imports should just be a move so we can retag
 		job.Operation = OperationMove
@@ -283,8 +274,8 @@ func main() {
 	errgrp.Go(func() error {
 		defer logJob("http")()
 
-		mw := authMiddleware(*confAPIKey)
-		server := &http.Server{Addr: *confListenAddr, Handler: mw(mux)}
+		mw := authMiddleware(*apiKey)
+		server := &http.Server{Addr: *listenAddr, Handler: mw(mux)}
 		errgrp.Go(func() error { <-ctx.Done(); return server.Shutdown(context.Background()) })
 		errgrp.Go(func() error { <-ctx.Done(); sseServ.Close(); return nil })
 

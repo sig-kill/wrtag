@@ -19,10 +19,8 @@ import (
 	"go.senan.xyz/flagconf"
 
 	"go.senan.xyz/wrtag"
-	"go.senan.xyz/wrtag/cmd/internal/flagparse"
+	"go.senan.xyz/wrtag/cmd/internal/flagcommon"
 	"go.senan.xyz/wrtag/musicbrainz"
-	"go.senan.xyz/wrtag/pathformat"
-	"go.senan.xyz/wrtag/tagmap"
 	"go.senan.xyz/wrtag/tags/tagcommon"
 	"go.senan.xyz/wrtag/tags/taglib"
 )
@@ -31,18 +29,13 @@ var mb wrtag.MusicbrainzClient = musicbrainz.NewClient(http.DefaultClient)
 var tg tagcommon.Reader = taglib.TagLib{}
 
 func main() {
-	var pathFormat pathformat.Format
-	flag.Var(flagparse.PathFormat{&pathFormat}, "path-format", "path format")
-	var tagWeights tagmap.TagWeights
-	flag.Var(flagparse.TagWeights{&tagWeights}, "tag-weight", "tag weight")
-	var keepFiles = map[string]struct{}{}
-	flag.Func("keep-file", "files to keep from source directories",
-		func(s string) error { keepFiles[s] = struct{}{}; return nil })
+	pathFormat := flagcommon.PathFormat()
+	tagWeights := flagcommon.TagWeights()
+	keepFiles := flagcommon.KeepFiles()
+	configPath := flagcommon.ConfigPath()
 
 	interval := flag.Duration("interval", 0, "max duration a release should be left unsynced")
 	dryRun := flag.Bool("dry-run", false, "dry run")
-
-	configPath := flag.String("config-path", flagparse.DefaultConfigPath, "path config file")
 
 	flag.Parse()
 	flagconf.ParseEnv()
@@ -93,7 +86,7 @@ func main() {
 				return nil
 			}
 		}
-		if _, err := wrtag.ProcessDir(ctx, mb, tg, &pathFormat, tagWeights, nil, keepFiles, wrtag.Move{DryRun: *dryRun}, dir, "", false); err != nil {
+		if _, err := wrtag.ProcessDir(ctx, mb, tg, pathFormat, tagWeights, nil, keepFiles, wrtag.Move{DryRun: *dryRun}, dir, "", false); err != nil {
 			return err
 		}
 		if err := os.Chtimes(dir, time.Time{}, importTime); err != nil && !errors.Is(err, os.ErrNotExist) {
