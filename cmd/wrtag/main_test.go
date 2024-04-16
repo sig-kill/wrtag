@@ -146,22 +146,30 @@ func mainTagCheck() {
 		log.Fatalf("no paths to match pattern")
 	}
 
-	field, jsonValue := flag.Arg(1), flag.Arg(2)
+	pairs := flag.Args()[1:]
+	if len(pairs)%2 != 0 {
+		log.Fatalf("invalid field/value pairs")
+	}
+
 	for _, p := range paths {
 		f, err := tg.Read(p)
 		if err != nil {
 			log.Fatalf("open tag file: %v", err)
 		}
 
-		method := reflect.ValueOf(f).MethodByName(field)
-		dest := reflect.New(method.Type().Out(0))
-		if err := json.Unmarshal([]byte(jsonValue), dest.Interface()); err != nil {
-			log.Fatalf("unmarshal json to arg: %v", err)
-		}
-		result := method.Call(nil)
-		exp, act := dest.Elem().Interface(), result[0].Interface()
-		if !reflect.DeepEqual(exp, act) {
-			log.Fatalf("exp %q got %q", exp, act)
+		for i := 0; i < len(pairs)-1; i += 2 {
+			field, jsonValue := pairs[i], pairs[i+1]
+
+			method := reflect.ValueOf(f).MethodByName(field)
+			dest := reflect.New(method.Type().Out(0))
+			if err := json.Unmarshal([]byte(jsonValue), dest.Interface()); err != nil {
+				log.Fatalf("unmarshal json to arg: %v", err)
+			}
+			result := method.Call(nil)
+			exp, act := dest.Elem().Interface(), result[0].Interface()
+			if !reflect.DeepEqual(exp, act) {
+				log.Fatalf("exp %q got %q", exp, act)
+			}
 		}
 
 		f.Close()
