@@ -30,9 +30,9 @@ var tg tagcommon.Reader = taglib.TagLib{}
 var dmp = diffmatchpatch.New()
 
 func main() {
+	keepFiles := flagcommon.KeepFiles()
 	pathFormat := flagcommon.PathFormat()
 	researchLinkQuerier := flagcommon.Querier()
-	keepFiles := flagcommon.KeepFiles()
 	tagWeights := flagcommon.TagWeights()
 	configPath := flagcommon.ConfigPath()
 
