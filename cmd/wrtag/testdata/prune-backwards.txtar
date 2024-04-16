@@ -9,7 +9,7 @@ exec tag-write albums/deep/down/inside/kat_moda/*.flac MBReleaseID '"e47d04a4-74
 exec touch albums/deep/down/inside/extra.txt
 
 # move deepest in tree
-exec wrtag -yes move albums/deep/down/inside/kat_moda
+exec wrtag move -yes albums/deep/down/inside/kat_moda
 
 # we deleted the whole tree all the way up until the root
 ! exists albums/deep

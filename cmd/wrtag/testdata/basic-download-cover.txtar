@@ -18,7 +18,7 @@ stderr 'matched \d\d.\d\d% with'
 stderr 'score too low'
 
 # but can overwrite with -yes
-exec wrtag -yes move kat_moda/
+exec wrtag move -yes kat_moda/
 
 # make sure dest dir looks ok according to format
 exec find albums/
