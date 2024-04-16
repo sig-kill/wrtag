@@ -46,7 +46,10 @@ func (pf *Format) Parse(str string) error {
 	if err := validate(Format{*tmpl, ""}); err != nil {
 		return fmt.Errorf("validate: %w", err)
 	}
-	root, _, _ := strings.Cut(str, "{")
+	root, _, ok := strings.Cut(str, "{")
+	if !ok {
+		return fmt.Errorf("find root: %w", ErrInvalidFormat)
+	}
 	root, _ = filepath.Abs(root)
 	*pf = Format{*tmpl, root}
 	return nil
