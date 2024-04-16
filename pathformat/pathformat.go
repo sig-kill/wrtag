@@ -16,6 +16,8 @@ var ErrInvalidFormat = errors.New("invalid format")
 var ErrAmbiguousFormat = errors.New("ambiguous format")
 var ErrBadData = errors.New("bad data")
 
+const delimL, delimR = "{{", "}}"
+
 type Data struct {
 	Release  musicbrainz.Release
 	Track    musicbrainz.Track
@@ -39,6 +41,7 @@ func (pf *Format) Parse(str string) error {
 	tmpl, err := texttemplate.
 		New("template").
 		Funcs(funcMap).
+		Delims(delimL, delimR).
 		Parse(str)
 	if err != nil {
 		return fmt.Errorf("%w: %w", err, ErrInvalidFormat)
@@ -46,7 +49,7 @@ func (pf *Format) Parse(str string) error {
 	if err := validate(Format{*tmpl, ""}); err != nil {
 		return fmt.Errorf("validate: %w", err)
 	}
-	root, _, ok := strings.Cut(str, "{")
+	root, _, ok := strings.Cut(str, delimL)
 	if !ok {
 		return fmt.Errorf("find root: %w", ErrInvalidFormat)
 	}
