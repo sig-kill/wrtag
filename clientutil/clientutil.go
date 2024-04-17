@@ -23,17 +23,6 @@ func Chain(middlewares ...Middleware) Middleware {
 
 func WithCache() Middleware {
 	cache := NewMemoryCache()
-
-	// TODO: cancellation, smarter invalidation
-	go func() {
-		t := time.NewTicker(45 * time.Second)
-		defer t.Stop()
-
-		for range t.C {
-			cache.Wipe()
-		}
-	}()
-
 	return func(next http.RoundTripper) http.RoundTripper {
 		transport := httpcache.NewTransport(cache)
 		transport.Transport = next
@@ -88,7 +77,17 @@ type MemoryCache struct {
 }
 
 func NewMemoryCache() *MemoryCache {
-	return &MemoryCache{items: map[string][]byte{}}
+	cache := &MemoryCache{items: map[string][]byte{}}
+	go func() {
+		t := time.NewTicker(45 * time.Second)
+		defer t.Stop()
+		for range t.C {
+			cache.mu.Lock()
+			clear(cache.items)
+			cache.mu.Unlock()
+		}
+	}()
+	return cache
 }
 
 func (c *MemoryCache) Get(key string) ([]byte, bool) {
@@ -98,20 +97,14 @@ func (c *MemoryCache) Get(key string) ([]byte, bool) {
 	return resp, ok
 }
 
-func (c *MemoryCache) Set(key string, resp []byte) {
+func (c *MemoryCache) Set(key string, data []byte) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.items[key] = resp
+	c.items[key] = data
 }
 
 func (c *MemoryCache) Delete(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.items, key)
-}
-
-func (c *MemoryCache) Wipe() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	clear(c.items)
 }
