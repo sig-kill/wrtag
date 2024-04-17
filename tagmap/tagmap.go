@@ -64,8 +64,8 @@ func DiffRelease(weights TagWeights, release *musicbrainz.Release, files []tagco
 	for i, f := range files {
 		diffs = append(diffs, diff(
 			fmt.Sprintf("track %d", i+1),
-			strings.Join(filter(f.Artist(), f.Title()), " – "),
-			strings.Join(filter(musicbrainz.ArtistsString(rtracks[i].Artists), rtracks[i].Title), " – "),
+			strings.Join(filterZero(f.Artist(), f.Title()), " – "),
+			strings.Join(filterZero(musicbrainz.ArtistsString(rtracks[i].Artists), rtracks[i].Title), " – "),
 		))
 	}
 
@@ -98,7 +98,7 @@ func WriteFile(
 
 	f.WriteMBReleaseID(release.ID)
 	f.WriteMBReleaseGroupID(release.ReleaseGroup.ID)
-	f.WriteMBAlbumArtistID(mapp(release.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID }))
+	f.WriteMBAlbumArtistID(mapFunc(release.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID }))
 
 	f.WriteTitle(releaseTrack.Title)
 	f.WriteArtist(musicbrainz.ArtistsString(releaseTrack.Artists))
@@ -111,7 +111,7 @@ func WriteFile(
 	f.WriteDiscNumber(1)
 
 	f.WriteMBRecordingID(releaseTrack.Recording.ID)
-	f.WriteMBArtistID(mapp(releaseTrack.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID }))
+	f.WriteMBArtistID(mapFunc(releaseTrack.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID }))
 }
 
 func differ(weights TagWeights, score *float64) func(field string, a, b string) Diff {
@@ -134,8 +134,8 @@ func differ(weights TagWeights, score *float64) func(field string, a, b string) 
 		dist := float64(dmp.DiffLevenshtein(diffs))
 		return Diff{
 			Field:  field,
-			Before: filterDiff(diffs, func(d diffmatchpatch.Diff) bool { return d.Type <= diffmatchpatch.DiffEqual }),
-			After:  filterDiff(diffs, func(d diffmatchpatch.Diff) bool { return d.Type >= diffmatchpatch.DiffEqual }),
+			Before: filterFunc(diffs, func(d diffmatchpatch.Diff) bool { return d.Type <= diffmatchpatch.DiffEqual }),
+			After:  filterFunc(diffs, func(d diffmatchpatch.Diff) bool { return d.Type >= diffmatchpatch.DiffEqual }),
 			Equal:  dist == 0,
 		}
 	}
@@ -153,27 +153,27 @@ func norm(input string) string {
 	}, input)
 }
 
-func filter[T comparable](elms ...T) []T {
+func filterZero[T comparable](elms ...T) []T {
 	var zero T
 	return slices.DeleteFunc(elms, func(t T) bool {
 		return t == zero
 	})
 }
 
-func mapp[F, T any](s []F, f func(int, F) T) []T {
-	res := make([]T, 0, len(s))
-	for i, v := range s {
-		res = append(res, f(i, v))
-	}
-	return res
-}
-
-func filterDiff(diffs []diffmatchpatch.Diff, f func(diffmatchpatch.Diff) bool) []diffmatchpatch.Diff {
-	var r []diffmatchpatch.Diff
+func filterFunc[T any](diffs []T, f func(T) bool) []T {
+	var r []T
 	for _, diff := range diffs {
 		if f(diff) {
 			r = append(r, diff)
 		}
 	}
 	return r
+}
+
+func mapFunc[F, T any](s []F, f func(int, F) T) []T {
+	res := make([]T, 0, len(s))
+	for i, v := range s {
+		res = append(res, f(i, v))
+	}
+	return res
 }
