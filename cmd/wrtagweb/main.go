@@ -35,7 +35,7 @@ import (
 )
 
 var tg = &taglib.TagLib{}
-var mb = musicbrainz.NewClient(http.DefaultClient)
+var mb = musicbrainz.DefaultClient()
 
 func main() {
 	keepFiles := flagcommon.KeepFiles()

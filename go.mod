@@ -5,6 +5,7 @@ go 1.22
 require (
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/containrrr/shoutrrr v0.8.0
+	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
 	github.com/r3labs/sse/v2 v2.10.0
 	github.com/rainycape/unidecode v0.0.0-20150907023854-cb7f23ec59be
 	github.com/rogpeppe/go-internal v1.12.0

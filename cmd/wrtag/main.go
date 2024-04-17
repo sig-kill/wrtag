@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -24,7 +23,7 @@ import (
 )
 
 // replaced while testing
-var mb wrtag.MusicbrainzClient = musicbrainz.NewClient(http.DefaultClient)
+var mb wrtag.MusicbrainzClient = musicbrainz.DefaultClient()
 
 var tg tagcommon.Reader = taglib.TagLib{}
 var dmp = diffmatchpatch.New()
