@@ -26,16 +26,17 @@ import (
 	"github.com/r3labs/sse/v2"
 	"github.com/timshannon/bolthold"
 	"go.senan.xyz/flagconf"
+	"golang.org/x/sync/errgroup"
+
 	"go.senan.xyz/wrtag"
 	"go.senan.xyz/wrtag/cmd/internal/flagcommon"
-	"go.senan.xyz/wrtag/musicbrainz"
+	"go.senan.xyz/wrtag/cmd/internal/httpclient"
 	"go.senan.xyz/wrtag/notifications"
 	"go.senan.xyz/wrtag/tags/taglib"
-	"golang.org/x/sync/errgroup"
 )
 
 var tg = &taglib.TagLib{}
-var mb = musicbrainz.DefaultClient()
+var mb = httpclient.DefaultMusicBrainz()
 
 func main() {
 	keepFiles := flagcommon.KeepFiles()

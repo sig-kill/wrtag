@@ -19,12 +19,12 @@ import (
 
 	"go.senan.xyz/wrtag"
 	"go.senan.xyz/wrtag/cmd/internal/flagcommon"
-	"go.senan.xyz/wrtag/musicbrainz"
+	"go.senan.xyz/wrtag/cmd/internal/httpclient"
 	"go.senan.xyz/wrtag/tags/tagcommon"
 	"go.senan.xyz/wrtag/tags/taglib"
 )
 
-var mb wrtag.MusicbrainzClient = musicbrainz.DefaultClient()
+var mb = httpclient.DefaultMusicBrainz()
 var tg tagcommon.Reader = taglib.TagLib{}
 
 func main() {
