@@ -24,6 +24,7 @@ func Chain(middlewares ...Middleware) Middleware {
 func WithCache() Middleware {
 	cache := NewMemoryCache()
 
+	// TODO: cancellation, smarter invalidation
 	go func() {
 		t := time.NewTicker(45 * time.Second)
 		defer t.Stop()
