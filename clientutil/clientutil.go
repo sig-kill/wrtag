@@ -67,6 +67,15 @@ func WithLogging() Middleware {
 	}
 }
 
+func WithUserAgent(userAgent string) Middleware {
+	return func(next http.RoundTripper) http.RoundTripper {
+		return RoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			r.Header.Add("User-Agent", userAgent)
+			return next.RoundTrip(r)
+		})
+	}
+}
+
 type RoundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f RoundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {

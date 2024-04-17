@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +16,12 @@ import (
 )
 
 var ErrNoResults = fmt.Errorf("no results")
+
+type StatusError int
+
+func (se StatusError) Error() string {
+	return strconv.Itoa(int(se))
+}
 
 type MBClient struct {
 	baseURL    string
@@ -26,8 +33,6 @@ func NewMBClient(baseURL string, httpClient *http.Client) *MBClient {
 }
 
 func (c *MBClient) request(ctx context.Context, r *http.Request, dest any) error {
-	r.Header.Set("User-Agent", userAgent)
-
 	r = r.WithContext(ctx)
 	resp, err := c.httpClient.Do(r)
 	if err != nil {
