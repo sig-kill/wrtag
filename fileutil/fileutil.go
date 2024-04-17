@@ -51,13 +51,10 @@ func SafePath(path string) string {
 	return path
 }
 
-// normUnidecode tries to be compatible with beets.io, but isn't completely the same as of today.
-//
-// beets has
+// normUnidecode tries to be compatible with beets.io's version, though there are some slight differences.
+// see https://github.com/beetbox/beets/blob/master/beets/library.py
 //   - unicodedata.normalize('NFC', path) (from https://docs.python.org/3/library/unicodedata.html)
 //   - unidecode(path)                    (from https://pypi.org/project/unicode/)
-//
-// see https://github.com/beetbox/beets/blob/master/beets/library.py
 func normUnidecode(text string) string {
 	text = norm.NFC.String(text)
 	text = unidecode.Unidecode(text)
