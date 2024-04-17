@@ -5,31 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
-
-	"golang.org/x/time/rate"
 )
 
 type CAAClient struct {
+	baseURL    string
 	httpClient *http.Client
-	limiter    *rate.Limiter
 }
 
-func NewCAAClient(httpClient *http.Client) *CAAClient {
-	return &CAAClient{
-		httpClient: httpClient,
-		limiter:    rate.NewLimiter(rate.Inf, 1), // https://wiki.musicbrainz.org/Cover_Art_Archive/API#Rate_limiting_rules
-	}
+func NewCAAClient(baseURL string, httpClient *http.Client) *CAAClient {
+	return &CAAClient{baseURL: baseURL, httpClient: httpClient}
 }
 
 func (c *CAAClient) request(ctx context.Context, r *http.Request, dest any) error {
-	if err := c.limiter.Wait(ctx); err != nil {
-		return fmt.Errorf("wait: %w", err)
-	}
-
-	log.Printf("making caa request %s", r.URL)
-
 	r = r.WithContext(ctx)
 	resp, err := c.httpClient.Do(r)
 	if err != nil {
@@ -49,7 +37,7 @@ func (c *CAAClient) request(ctx context.Context, r *http.Request, dest any) erro
 func (c *CAAClient) GetCoverURL(ctx context.Context, release *Release) (string, error) {
 	// try release first
 	if release.CoverArtArchive.Front {
-		url, err := c.getCoverURL(ctx, joinPath(caaBase, "release", release.ID))
+		url, err := c.getCoverURL(ctx, joinPath(c.baseURL, "release", release.ID))
 		if err != nil {
 			return "", fmt.Errorf("try release: %w", err)
 		}
@@ -59,7 +47,7 @@ func (c *CAAClient) GetCoverURL(ctx context.Context, release *Release) (string, 
 	}
 
 	// fall back to release group
-	url, err := c.getCoverURL(ctx, joinPath(caaBase, "release-group", release.ReleaseGroup.ID))
+	url, err := c.getCoverURL(ctx, joinPath(c.baseURL, "release-group", release.ReleaseGroup.ID))
 	if err != nil {
 		return "", fmt.Errorf("try release group: %w", err)
 	}

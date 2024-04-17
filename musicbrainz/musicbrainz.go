@@ -4,54 +4,28 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/araddon/dateparse"
-	"golang.org/x/time/rate"
 )
-
-const mbBase = "https://musicbrainz.org/ws/2/"
-const caaBase = "https://coverartarchive.org/"
-const userAgent = `wrtag/0.0.0-alpha ( https://go.senan.xyz/wrtag )`
 
 var ErrNoResults = fmt.Errorf("no results")
 
-type StatusError int
-
-func (se StatusError) Error() string {
-	return strconv.Itoa(int(se))
-}
-
-type Client struct {
+type MBClient struct {
+	baseURL    string
 	httpClient *http.Client
-	limiter    *rate.Limiter
-
-	*CAAClient
 }
 
-func NewClient(httpClient *http.Client) *Client {
-	return &Client{
-		httpClient: httpClient,
-		limiter:    rate.NewLimiter(rate.Every(time.Second), 1), // https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting
-
-		CAAClient: NewCAAClient(httpClient),
-	}
+func NewMBClient(baseURL string, httpClient *http.Client) *MBClient {
+	return &MBClient{baseURL: baseURL, httpClient: httpClient}
 }
 
-func (c *Client) request(ctx context.Context, r *http.Request, dest any) error {
-	if err := c.limiter.Wait(ctx); err != nil {
-		return fmt.Errorf("wait: %w", err)
-	}
-
-	log.Printf("making mb request %s", r.URL)
-
+func (c *MBClient) request(ctx context.Context, r *http.Request, dest any) error {
 	r.Header.Set("User-Agent", userAgent)
 
 	r = r.WithContext(ctx)
@@ -69,12 +43,12 @@ func (c *Client) request(ctx context.Context, r *http.Request, dest any) error {
 	return nil
 }
 
-func (c *Client) GetRelease(ctx context.Context, mbid string) (*Release, error) {
+func (c *MBClient) GetRelease(ctx context.Context, mbid string) (*Release, error) {
 	urlV := url.Values{}
 	urlV.Set("fmt", "json")
 	urlV.Set("inc", "recordings+artist-credits+labels+release-groups+genres")
 
-	url, _ := url.Parse(joinPath(mbBase, "release", mbid))
+	url, _ := url.Parse(joinPath(c.baseURL, "release", mbid))
 	url.RawQuery = urlV.Encode()
 
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
@@ -101,7 +75,7 @@ type ReleaseQuery struct {
 	NumTracks    int
 }
 
-func (c *Client) SearchRelease(ctx context.Context, q ReleaseQuery) (*Release, error) {
+func (c *MBClient) SearchRelease(ctx context.Context, q ReleaseQuery) (*Release, error) {
 	if uuidExpr.MatchString(q.MBReleaseID) {
 		release, err := c.GetRelease(ctx, q.MBReleaseID)
 		if err != nil {
@@ -151,7 +125,7 @@ func (c *Client) SearchRelease(ctx context.Context, q ReleaseQuery) (*Release, e
 	urlV.Set("limit", "1")
 	urlV.Set("query", queryStr)
 
-	url, _ := url.Parse(joinPath(mbBase, "release"))
+	url, _ := url.Parse(joinPath(c.baseURL, "release"))
 	url.RawQuery = urlV.Encode()
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
 
