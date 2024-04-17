@@ -54,12 +54,12 @@ func main() {
 		log.Fatalf("unknown command %q", command)
 	}
 
-	flagop := flag.NewFlagSet(command, flag.ExitOnError)
-	yes := flagop.Bool("yes", false, "use the found release anyway despite a low score")
-	useMBID := flagop.String("mbid", "", "overwrite matched mbid")
-	flagop.Parse(flag.Args()[1:])
+	subflag := flag.NewFlagSet(command, flag.ExitOnError)
+	yes := subflag.Bool("yes", false, "use the found release anyway despite a low score")
+	useMBID := subflag.String("mbid", "", "overwrite matched mbid")
+	subflag.Parse(flag.Args()[1:])
 
-	dir := flagop.Arg(0)
+	dir := subflag.Arg(0)
 	if dir == "" {
 		log.Fatalf("need a dir")
 	}
