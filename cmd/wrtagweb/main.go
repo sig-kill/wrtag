@@ -38,11 +38,11 @@ var tg = &taglib.TagLib{}
 var mb = musicbrainz.NewClient(http.DefaultClient)
 
 func main() {
+	keepFiles := flagcommon.KeepFiles()
+	notifs := flagcommon.Notifications()
 	pathFormat := flagcommon.PathFormat()
 	researchLinkQuerier := flagcommon.Querier()
-	keepFiles := flagcommon.KeepFiles()
 	tagWeights := flagcommon.TagWeights()
-	notifs := flagcommon.Notifications()
 	configPath := flagcommon.ConfigPath()
 
 	listenAddr := flag.String("listen-addr", "", "listen addr")
