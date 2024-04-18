@@ -24,10 +24,10 @@ type CAAClient struct {
 func (c *CAAClient) request(ctx context.Context, r *http.Request, dest any) error {
 	c.initOnce.Do(func() {
 		c.HTTPClient = wrapClient(c.HTTPClient, clientutil.Chain(
-			sharedCached,
+			clientutil.WithCache(),
 			clientutil.WithUserAgent(c.UserAgent),
 			clientutil.WithRateLimit(c.RateLimit),
-			sharedLogging,
+			clientutil.WithLogging(),
 		))
 	})
 

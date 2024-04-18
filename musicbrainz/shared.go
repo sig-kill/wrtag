@@ -7,11 +7,6 @@ import (
 	"go.senan.xyz/wrtag/clientutil"
 )
 
-var (
-	sharedCached  = clientutil.WithCache()
-	sharedLogging = clientutil.WithLogging()
-)
-
 type StatusError int
 
 func (se StatusError) Error() string {
