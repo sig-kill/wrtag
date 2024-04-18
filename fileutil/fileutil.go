@@ -47,6 +47,7 @@ var safePathReplacer = strings.NewReplacer(
 func SafePath(path string) string {
 	path = safePathReplacer.Replace(path)
 	path = normUnidecode(path)
+	path = safePathReplacer.Replace(path) // some unidecode replaces can result in slashes
 	path = strings.Join(strings.Fields(path), " ")
 	return path
 }
