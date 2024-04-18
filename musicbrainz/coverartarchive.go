@@ -6,20 +6,33 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
+	"time"
+
+	"go.senan.xyz/wrtag/clientutil"
 )
 
 type CAAClient struct {
-	baseURL    string
-	httpClient *http.Client
-}
+	BaseURL   string
+	RateLimit time.Duration
+	UserAgent string
 
-func NewCAAClient(baseURL string, httpClient *http.Client) *CAAClient {
-	return &CAAClient{baseURL: baseURL, httpClient: httpClient}
+	initOnce   sync.Once
+	HTTPClient *http.Client
 }
 
 func (c *CAAClient) request(ctx context.Context, r *http.Request, dest any) error {
+	c.initOnce.Do(func() {
+		c.HTTPClient = wrapClient(c.HTTPClient, clientutil.Chain(
+			sharedCached,
+			clientutil.WithUserAgent(c.UserAgent),
+			clientutil.WithRateLimit(c.RateLimit),
+			sharedLogging,
+		))
+	})
+
 	r = r.WithContext(ctx)
-	resp, err := c.httpClient.Do(r)
+	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
 		return fmt.Errorf("make caa request: %w", err)
 	}
@@ -37,7 +50,7 @@ func (c *CAAClient) request(ctx context.Context, r *http.Request, dest any) erro
 func (c *CAAClient) GetCoverURL(ctx context.Context, release *Release) (string, error) {
 	// try release first
 	if release.CoverArtArchive.Front {
-		url, err := c.getCoverURL(ctx, joinPath(c.baseURL, "release", release.ID))
+		url, err := c.getCoverURL(ctx, joinPath(c.BaseURL, "release", release.ID))
 		if err != nil {
 			return "", fmt.Errorf("try release: %w", err)
 		}
@@ -47,7 +60,7 @@ func (c *CAAClient) GetCoverURL(ctx context.Context, release *Release) (string, 
 	}
 
 	// fall back to release group
-	url, err := c.getCoverURL(ctx, joinPath(c.baseURL, "release-group", release.ReleaseGroup.ID))
+	url, err := c.getCoverURL(ctx, joinPath(c.BaseURL, "release-group", release.ReleaseGroup.ID))
 	if err != nil {
 		return "", fmt.Errorf("try release group: %w", err)
 	}

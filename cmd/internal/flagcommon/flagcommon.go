@@ -4,7 +4,9 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"time"
 
+	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/notifications"
 	"go.senan.xyz/wrtag/pathformat"
 	"go.senan.xyz/wrtag/researchlink"
@@ -51,6 +53,27 @@ func Notifications() *notifications.Notifications {
 	var r notifications.Notifications
 	flag.Var(notificationsParser{&r}, "notification-uri", "add a shoutrrr notification uri for an event")
 	return &r
+}
+
+type MusicBrainzClient struct {
+	*musicbrainz.MBClient
+	*musicbrainz.CAAClient
+}
+
+func MusicBrainz() MusicBrainzClient {
+	const defaultUserAgent = `wrtag/v0.0.0-alpha ( https://go.senan.xyz/wrtag )`
+
+	var mb musicbrainz.MBClient
+	flag.StringVar(&mb.UserAgent, "mb-user-agent", defaultUserAgent, "")
+	flag.StringVar(&mb.BaseURL, "mb-base-url", `https://musicbrainz.org/ws/2/`, "")
+	flag.DurationVar(&mb.RateLimit, "mb-rate-limit", 1*time.Second, "")
+
+	var caa musicbrainz.CAAClient
+	flag.StringVar(&caa.UserAgent, "caa-user-agent", defaultUserAgent, "")
+	flag.StringVar(&caa.BaseURL, "caa-base-url", `https://coverartarchive.org/`, "")
+	flag.DurationVar(&caa.RateLimit, "caa-rate-limit", 0, "")
+
+	return MusicBrainzClient{&mb, &caa}
 }
 
 func ConfigPath() *string {
