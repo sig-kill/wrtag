@@ -45,7 +45,7 @@ func DiffRelease(weights TagWeights, release *musicbrainz.Release, files []tagco
 	first := files[0]
 
 	var score float64
-	diff := differ(weights, &score)
+	diff := Differ(weights, &score)
 
 	var diffs []Diff
 	diffs = append(diffs,
@@ -114,7 +114,7 @@ func WriteFile(
 	f.WriteMBArtistID(mapFunc(releaseTrack.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID }))
 }
 
-func differ(weights TagWeights, score *float64) func(field string, a, b string) Diff {
+func Differ(weights TagWeights, score *float64) func(field string, a, b string) Diff {
 	var total float64
 	var dist float64
 
