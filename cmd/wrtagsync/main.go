@@ -23,18 +23,18 @@ import (
 	"go.senan.xyz/wrtag/tags/taglib"
 )
 
-var mb = flagcommon.MusicBrainz()
 var tg tagcommon.Reader = taglib.TagLib{}
 
+var mb = flagcommon.MusicBrainz()
+var pathFormat = flagcommon.PathFormat()
+var tagWeights = flagcommon.TagWeights()
+var keepFiles = flagcommon.KeepFiles()
+var configPath = flagcommon.ConfigPath()
+
+var interval = flag.Duration("interval", 0, "max duration a release should be left unsynced")
+var dryRun = flag.Bool("dry-run", false, "dry run")
+
 func main() {
-	pathFormat := flagcommon.PathFormat()
-	tagWeights := flagcommon.TagWeights()
-	keepFiles := flagcommon.KeepFiles()
-	configPath := flagcommon.ConfigPath()
-
-	interval := flag.Duration("interval", 0, "max duration a release should be left unsynced")
-	dryRun := flag.Bool("dry-run", false, "dry run")
-
 	flag.Parse()
 	flagconf.ParseEnv()
 	flagconf.ParseConfig(*configPath)
