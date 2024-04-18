@@ -17,13 +17,12 @@ import (
 
 	"go.senan.xyz/wrtag"
 	"go.senan.xyz/wrtag/cmd/internal/flagcommon"
-	"go.senan.xyz/wrtag/cmd/internal/httpclient"
 	"go.senan.xyz/wrtag/tags/tagcommon"
 	"go.senan.xyz/wrtag/tags/taglib"
 )
 
 // replaced while testing
-var mb wrtag.MusicbrainzClient = httpclient.DefaultMusicBrainz()
+var mb wrtag.MusicbrainzClient = flagcommon.MusicBrainz()
 
 var tg tagcommon.Reader = taglib.TagLib{}
 var dmp = diffmatchpatch.New()

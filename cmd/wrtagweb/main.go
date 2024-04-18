@@ -30,13 +30,12 @@ import (
 
 	"go.senan.xyz/wrtag"
 	"go.senan.xyz/wrtag/cmd/internal/flagcommon"
-	"go.senan.xyz/wrtag/cmd/internal/httpclient"
 	"go.senan.xyz/wrtag/notifications"
 	"go.senan.xyz/wrtag/tags/taglib"
 )
 
 var tg = &taglib.TagLib{}
-var mb = httpclient.DefaultMusicBrainz()
+var mb = flagcommon.MusicBrainz()
 
 func main() {
 	keepFiles := flagcommon.KeepFiles()

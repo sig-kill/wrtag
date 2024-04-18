@@ -8,33 +8,37 @@ import (
 	"net/url"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/araddon/dateparse"
+	"go.senan.xyz/wrtag/clientutil"
 )
 
 var ErrNoResults = fmt.Errorf("no results")
 
-type StatusError int
-
-func (se StatusError) Error() string {
-	return strconv.Itoa(int(se))
-}
-
 type MBClient struct {
-	baseURL    string
-	httpClient *http.Client
-}
+	BaseURL   string
+	RateLimit time.Duration
+	UserAgent string
 
-func NewMBClient(baseURL string, httpClient *http.Client) *MBClient {
-	return &MBClient{baseURL: baseURL, httpClient: httpClient}
+	initOnce   sync.Once
+	HTTPClient *http.Client
 }
 
 func (c *MBClient) request(ctx context.Context, r *http.Request, dest any) error {
+	c.initOnce.Do(func() {
+		c.HTTPClient = wrapClient(c.HTTPClient, clientutil.Chain(
+			sharedCached,
+			clientutil.WithUserAgent(c.UserAgent),
+			clientutil.WithRateLimit(c.RateLimit),
+			sharedLogging,
+		))
+	})
+
 	r = r.WithContext(ctx)
-	resp, err := c.httpClient.Do(r)
+	resp, err := c.HTTPClient.Do(r)
 	if err != nil {
 		return fmt.Errorf("search: %w", err)
 	}
@@ -53,7 +57,7 @@ func (c *MBClient) GetRelease(ctx context.Context, mbid string) (*Release, error
 	urlV.Set("fmt", "json")
 	urlV.Set("inc", "recordings+artist-credits+labels+release-groups+genres")
 
-	url, _ := url.Parse(joinPath(c.baseURL, "release", mbid))
+	url, _ := url.Parse(joinPath(c.BaseURL, "release", mbid))
 	url.RawQuery = urlV.Encode()
 
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
@@ -130,7 +134,7 @@ func (c *MBClient) SearchRelease(ctx context.Context, q ReleaseQuery) (*Release,
 	urlV.Set("limit", "1")
 	urlV.Set("query", queryStr)
 
-	url, _ := url.Parse(joinPath(c.baseURL, "release"))
+	url, _ := url.Parse(joinPath(c.BaseURL, "release"))
 	url.RawQuery = urlV.Encode()
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
 
