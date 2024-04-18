@@ -321,7 +321,12 @@ func FlatTracks(media []Media) []Track {
 		if media.Pregap != nil {
 			tracks = append(tracks, *media.Pregap)
 		}
-		tracks = append(tracks, media.Tracks...)
+		for _, track := range media.Tracks {
+			if track.Recording.Video {
+				continue
+			}
+			tracks = append(tracks, track)
+		}
 	}
 	return tracks
 }
