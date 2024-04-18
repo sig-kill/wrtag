@@ -150,7 +150,7 @@ func ProcessDir(
 	for i := range releaseTracks {
 		releaseTrack, path := releaseTracks[i], paths[i]
 
-		pathFormatData := pathformat.Data{Release: *release, Track: releaseTrack, TrackNum: i + 1, Ext: filepath.Ext(path)}
+		pathFormatData := pathformat.Data{Release: *release, Track: releaseTrack, TrackNum: i + 1, Ext: strings.ToLower(filepath.Ext(path))}
 		destPath, err := pathFormat.Execute(pathFormatData)
 		if err != nil {
 			return nil, fmt.Errorf("create path: %w", err)
