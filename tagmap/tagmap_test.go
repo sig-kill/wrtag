@@ -8,7 +8,7 @@ import (
 
 func TestDiffer(t *testing.T) {
 	var score float64
-	diff := differ(TagWeights{}, &score)
+	diff := Differ(TagWeights{}, &score)
 
 	diff("x", "aaaaa", "aaaaa")
 	diff("x", "aaaaa", "aaaaX")
@@ -22,7 +22,7 @@ func TestDiffWeightsLowerBound(t *testing.T) {
 	}
 
 	var score float64
-	diff := differ(weights, &score)
+	diff := Differ(weights, &score)
 
 	// all the same, but label/catalogue num mismatch
 	diff("label", "Columbia", "uh some other label")
@@ -45,7 +45,7 @@ func TestDiffWeightsUpperBound(t *testing.T) {
 	}
 
 	var score float64
-	diff := differ(weights, &score)
+	diff := Differ(weights, &score)
 
 	// all the same, but label/catalogue num mismatch
 	diff("label", "Columbia", "uh some other label")
@@ -63,7 +63,7 @@ func TestDiffWeightsUpperBound(t *testing.T) {
 
 func TestDiffNorm(t *testing.T) {
 	var score float64
-	diff := differ(TagWeights{}, &score)
+	diff := Differ(TagWeights{}, &score)
 
 	diff("label", "Columbia", "COLUMBIA")
 	diff("catalogue num", "CLO LP 3", "CLOLP3")
@@ -73,7 +73,7 @@ func TestDiffNorm(t *testing.T) {
 
 func TestDiffIgnoreMissing(t *testing.T) {
 	var score float64
-	diff := differ(TagWeights{}, &score)
+	diff := Differ(TagWeights{}, &score)
 
 	diff("label", "", "COLUMBIA")
 	diff("catalogue num", "CLO LP 3", "CLOLP3")
