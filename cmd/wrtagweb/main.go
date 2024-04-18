@@ -35,21 +35,21 @@ import (
 )
 
 var tg = &taglib.TagLib{}
+
 var mb = flagcommon.MusicBrainz()
+var keepFiles = flagcommon.KeepFiles()
+var notifs = flagcommon.Notifications()
+var pathFormat = flagcommon.PathFormat()
+var researchLinkQuerier = flagcommon.Querier()
+var tagWeights = flagcommon.TagWeights()
+var configPath = flagcommon.ConfigPath()
+
+var listenAddr = flag.String("listen-addr", "", "listen addr")
+var publicURL = flag.String("public-url", "", "public url")
+var apiKey = flag.String("api-key", "", "api key")
+var dbPath = flag.String("db-path", "wrtag.db", "db path")
 
 func main() {
-	keepFiles := flagcommon.KeepFiles()
-	notifs := flagcommon.Notifications()
-	pathFormat := flagcommon.PathFormat()
-	researchLinkQuerier := flagcommon.Querier()
-	tagWeights := flagcommon.TagWeights()
-	configPath := flagcommon.ConfigPath()
-
-	listenAddr := flag.String("listen-addr", "", "listen addr")
-	publicURL := flag.String("public-url", "", "public url")
-	apiKey := flag.String("api-key", "", "api key")
-	dbPath := flag.String("db-path", "wrtag.db", "db path")
-
 	flag.Parse()
 	flagconf.ParseEnv()
 	flagconf.ParseConfig(*configPath)

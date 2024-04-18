@@ -21,27 +21,26 @@ import (
 	"go.senan.xyz/wrtag/tags/taglib"
 )
 
-// replaced while testing
-var mb wrtag.MusicbrainzClient = flagcommon.MusicBrainz()
-
 var tg tagcommon.Reader = taglib.TagLib{}
 var dmp = diffmatchpatch.New()
 
+// replaced while testing
+var mb wrtag.MusicbrainzClient = flagcommon.MusicBrainz()
+
+var keepFiles = flagcommon.KeepFiles()
+var pathFormat = flagcommon.PathFormat()
+var researchLinkQuerier = flagcommon.Querier()
+var tagWeights = flagcommon.TagWeights()
+var configPath = flagcommon.ConfigPath()
+
+var dryRun = flag.Bool("dry-run", false, "dry run")
+
 func main() {
-	keepFiles := flagcommon.KeepFiles()
-	pathFormat := flagcommon.PathFormat()
-	researchLinkQuerier := flagcommon.Querier()
-	tagWeights := flagcommon.TagWeights()
-	configPath := flagcommon.ConfigPath()
-
-	dryRun := flag.Bool("dry-run", false, "dry run")
-
 	flag.Parse()
 	flagconf.ParseEnv()
 	flagconf.ParseConfig(*configPath)
 
 	command := flag.Arg(0)
-
 	var op wrtag.FileSystemOperation
 	switch command {
 	case "move":
