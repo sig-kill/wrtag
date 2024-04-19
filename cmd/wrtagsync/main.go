@@ -96,22 +96,20 @@ func main() {
 		return nil
 	}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-
 	start := time.Now()
 	var numDone, numError atomic.Uint32
 	defer func() {
 		message := fmt.Sprintf("sync finished in %s with %d/%d dirs, %d err",
 			time.Since(start).Truncate(time.Millisecond), numDone.Load(), len(leafDirs), numError.Load())
-
 		log.Print(message)
-
 		notifs.Send(notifications.SyncComplete, message)
 		if numError.Load() > 0 {
 			notifs.Send(notifications.SyncError, message)
 		}
 	}()
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
 
 	var wg sync.WaitGroup
 	for range 4 {
@@ -127,6 +125,9 @@ func main() {
 						return
 					}
 					if err := processDir(ctx, dir); err != nil {
+						if errors.Is(err, context.Canceled) {
+							return
+						}
 						log.Printf("error processing %q: %v", dir, err)
 						numError.Add(1)
 						continue
