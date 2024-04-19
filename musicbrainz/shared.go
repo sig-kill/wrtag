@@ -15,7 +15,7 @@ func (se StatusError) Error() string {
 
 func wrapClient(c *http.Client, mw clientutil.Middleware) *http.Client {
 	if c == nil {
-		c = http.DefaultClient
+		c = &http.Client{}
 	}
 	if c.Transport == nil {
 		c.Transport = http.DefaultTransport
