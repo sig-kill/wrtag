@@ -19,6 +19,7 @@ import (
 
 	"go.senan.xyz/wrtag"
 	"go.senan.xyz/wrtag/cmd/internal/flagcommon"
+	"go.senan.xyz/wrtag/notifications"
 	"go.senan.xyz/wrtag/tags/tagcommon"
 	"go.senan.xyz/wrtag/tags/taglib"
 )
@@ -26,9 +27,10 @@ import (
 var tg tagcommon.Reader = taglib.TagLib{}
 
 var mb = flagcommon.MusicBrainz()
+var keepFiles = flagcommon.KeepFiles()
+var notifs = flagcommon.Notifications()
 var pathFormat = flagcommon.PathFormat()
 var tagWeights = flagcommon.TagWeights()
-var keepFiles = flagcommon.KeepFiles()
 var configPath = flagcommon.ConfigPath()
 
 var interval = flag.Duration("interval", 0, "max duration a release should be left unsynced")
@@ -100,8 +102,15 @@ func main() {
 	start := time.Now()
 	var numDone, numError atomic.Uint32
 	defer func() {
-		log.Printf("finished in %s with %d/%d dirs, %d err",
+		message := fmt.Sprintf("sync finished in %s with %d/%d dirs, %d err",
 			time.Since(start).Truncate(time.Millisecond), numDone.Load(), len(leafDirs), numError.Load())
+
+		log.Print(message)
+
+		notifs.Send(notifications.SyncComplete, message)
+		if numError.Load() > 0 {
+			notifs.Send(notifications.SyncError, message)
+		}
 	}()
 
 	var wg sync.WaitGroup

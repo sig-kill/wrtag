@@ -14,9 +14,19 @@ var ErrUnknownEvent = errors.New("unknown event")
 type Event string
 
 const (
-	Complete   Event = "complete"
-	NeedsInput Event = "needs-input"
+	Complete     Event = "complete"
+	NeedsInput   Event = "needs-input"
+	SyncComplete Event = "sync-complete"
+	SyncError    Event = "sync-error"
 )
+
+func (e Event) IsValid() bool {
+	switch e {
+	case Complete, NeedsInput, SyncComplete, SyncError:
+		return true
+	}
+	return false
+}
 
 type Notifications struct {
 	mappings map[Event][]string
@@ -26,12 +36,11 @@ func (n *Notifications) AddURI(event Event, uri string) error {
 	if n.mappings == nil {
 		n.mappings = map[Event][]string{}
 	}
-	switch event {
-	case Complete, NeedsInput:
-		n.mappings[event] = append(n.mappings[event], uri)
-		return nil
+	if !event.IsValid() {
+		return fmt.Errorf("%w: %q", ErrUnknownEvent, event)
 	}
-	return fmt.Errorf("%w: %q", ErrUnknownEvent, event)
+	n.mappings[event] = append(n.mappings[event], uri)
+	return nil
 }
 
 // Send a simple string for now, maybe later message could instead be be a type which
