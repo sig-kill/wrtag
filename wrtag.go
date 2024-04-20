@@ -326,8 +326,7 @@ func (m Move) ProcessFile(dc DirContext, src, dest string) error {
 	}
 
 	if err := os.Rename(src, dest); err != nil {
-		var errNo syscall.Errno
-		if errors.As(err, &errNo) && errNo == 18 /*  invalid cross-device link */ {
+		if errNo := syscall.Errno(0); errors.As(err, &errNo) && errNo == 18 /*  invalid cross-device link */ {
 			// we tried to rename across filesystems, copy and delete instead
 			if err := (Copy{}).ProcessFile(dc, src, dest); err != nil {
 				return fmt.Errorf("copy from move: %w", err)
