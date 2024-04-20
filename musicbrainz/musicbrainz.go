@@ -347,6 +347,8 @@ func AnyGenres(release *Release) (genres []Genre) {
 	for _, t := range FlatTracks(release.Media) {
 		genres = append(genres, t.Recording.Genres...)
 	}
+
+	// add some artist genres too
 	for _, a := range release.Artists {
 		genres = append(genres, a.Artist.Genres...)
 	}
