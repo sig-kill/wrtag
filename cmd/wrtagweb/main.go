@@ -385,7 +385,7 @@ func jobNotificationMessage(publicURL string, job *Job) string {
 		job.Operation, status, job.SourcePath, url)
 }
 
-//go:embed *.gohtml *.ico dist/*
+//go:embed *.gohtml dist/*
 var ui embed.FS
 var uiTmpl = htmltemplate.Must(
 	htmltemplate.
