@@ -21,10 +21,10 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
-	"strings"
 	"testing"
 
 	"github.com/rogpeppe/go-internal/testscript"
+	"go.senan.xyz/wrtag/fileutil"
 	"go.senan.xyz/wrtag/musicbrainz"
 )
 
@@ -251,7 +251,8 @@ func mustDecode[T any](data []byte) *T {
 }
 
 func parsePattern(pat string) []string {
-	if !strings.ContainsAny(pat, `*?[`) {
+	// assume the file exists if the pattern doesn't look like a glob
+	if fileutil.GlobEscape(pat) == pat {
 		return []string{pat}
 	}
 	paths, _ := filepath.Glob(pat)
