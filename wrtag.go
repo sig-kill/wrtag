@@ -37,7 +37,7 @@ const minScore = 95
 
 const (
 	thresholdSizeClean uint64 = 20 * 1e6   // 20 MB
-	thresholdSizeTrim  uint64 = 1000 * 1e6 // 1000 MB
+	thresholdSizeTrim  uint64 = 3000 * 1e6 // 3000 MB
 )
 
 type MusicbrainzClient interface {
@@ -289,7 +289,7 @@ func DestDir(pathFormat *pathformat.Format, release *musicbrainz.Release) (strin
 type FileSystemOperation interface {
 	ReadOnly() bool
 	ProcessFile(dc DirContext, src, dest string) error
-	TrimDir(dc DirContext, src string) error                // remove unknown files
+	TrimDir(dc DirContext, dest string) error               // remove unknown files
 	CleanDir(dc DirContext, limit string, src string) error // remove dir and its parents
 }
 
@@ -341,47 +341,8 @@ func (m Move) ProcessFile(dc DirContext, src, dest string) error {
 	return nil
 }
 
-func (m Move) TrimDir(dc DirContext, src string) error {
-	entries, err := os.ReadDir(src)
-	if err != nil {
-		return fmt.Errorf("read dir: %w", err)
-	}
-
-	var toDelete []string
-	var size uint64
-	for _, entry := range entries {
-		path := filepath.Join(src, entry.Name())
-		path, _ = filepath.Abs(path)
-		if _, ok := dc.knownDestPaths[path]; ok {
-			continue
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return fmt.Errorf("get info: %w", err)
-		}
-		size += uint64(info.Size())
-		toDelete = append(toDelete, path)
-	}
-	if size > thresholdSizeTrim {
-		return fmt.Errorf("extra files were too big remove: %d/%d", size, thresholdSizeClean)
-	}
-
-	var deleteErrs []error
-	for _, p := range toDelete {
-		if m.DryRun {
-			log.Printf("[dry run] delete extra file %q", p)
-			continue
-		}
-		log.Printf("deleting extra file %q", p)
-		if err := os.Remove(p); err != nil {
-			deleteErrs = append(deleteErrs, err)
-		}
-	}
-	if err := errors.Join(deleteErrs...); err != nil {
-		return fmt.Errorf("delete extra files: %w", err)
-	}
-
-	return nil
+func (m Move) TrimDir(dc DirContext, dest string) error {
+	return trimDir(dc, m.DryRun, dest)
 }
 
 func (m Move) CleanDir(dc DirContext, limit string, src string) error {
@@ -419,6 +380,9 @@ func (c Copy) ReadOnly() bool {
 }
 
 func (c Copy) ProcessFile(dc DirContext, src, dest string) error {
+	dest, _ = filepath.Abs(dest)
+	dc.knownDestPaths[dest] = struct{}{}
+
 	if filepath.Clean(src) == filepath.Clean(dest) {
 		return ErrSelfCopy
 	}
@@ -446,11 +410,54 @@ func (c Copy) ProcessFile(dc DirContext, src, dest string) error {
 	return nil
 }
 
-func (Copy) TrimDir(dc DirContext, src string) error {
-	return nil
+func (c Copy) TrimDir(dc DirContext, dest string) error {
+	return trimDir(dc, c.DryRun, dest)
 }
 
 func (Copy) CleanDir(dc DirContext, limit string, src string) error {
+	return nil
+}
+
+func trimDir(dc DirContext, dryRun bool, dest string) error {
+	entries, err := os.ReadDir(dest)
+	if err != nil {
+		return fmt.Errorf("read dir: %w", err)
+	}
+
+	var toDelete []string
+	var size uint64
+	for _, entry := range entries {
+		path := filepath.Join(dest, entry.Name())
+		path, _ = filepath.Abs(path)
+		if _, ok := dc.knownDestPaths[path]; ok {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return fmt.Errorf("get info: %w", err)
+		}
+		size += uint64(info.Size())
+		toDelete = append(toDelete, path)
+	}
+	if size > thresholdSizeTrim {
+		return fmt.Errorf("extra files were too big remove: %d/%d", size, thresholdSizeTrim)
+	}
+
+	var deleteErrs []error
+	for _, p := range toDelete {
+		if dryRun {
+			log.Printf("[dry run] delete extra file %q", p)
+			continue
+		}
+		log.Printf("deleting extra file %q", p)
+		if err := os.Remove(p); err != nil {
+			deleteErrs = append(deleteErrs, err)
+		}
+	}
+	if err := errors.Join(deleteErrs...); err != nil {
+		return fmt.Errorf("delete extra files: %w", err)
+	}
+
 	return nil
 }
 
