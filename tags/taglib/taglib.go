@@ -113,8 +113,6 @@ func (f *File) set(k string, vs ...string) {
 func (f *File) Length() int  { return f.props.Length }
 func (f *File) Bitrate() int { return f.props.Bitrate }
 
-func (f *File) Raw() map[string][]string { return f.raw }
-
 func (f *File) String() string {
 	var buf strings.Builder
 	for k, v := range f.raw {
