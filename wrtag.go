@@ -196,7 +196,7 @@ func ProcessDir(
 		}
 	}
 
-	if err := op.TrimDir(dc, destDir); err != nil {
+	if err := trimDir(dc, destDir, op.ReadOnly()); err != nil {
 		return nil, fmt.Errorf("trim: %w", err)
 	}
 
@@ -286,11 +286,13 @@ func DestDir(pathFormat *pathformat.Format, release *musicbrainz.Release) (strin
 	return dir, nil
 }
 
+var _ FileSystemOperation = (*Move)(nil)
+var _ FileSystemOperation = (*Copy)(nil)
+
 type FileSystemOperation interface {
 	ReadOnly() bool
 	ProcessFile(dc DirContext, src, dest string) error
-	TrimDir(dc DirContext, dest string) error               // remove unknown files
-	CleanDir(dc DirContext, limit string, src string) error // remove dir and its parents
+	CleanDir(dc DirContext, limit string, src string) error
 }
 
 type DirContext struct {
@@ -300,9 +302,6 @@ type DirContext struct {
 func NewDirContext() DirContext {
 	return DirContext{knownDestPaths: map[string]struct{}{}}
 }
-
-var _ FileSystemOperation = (*Move)(nil)
-var _ FileSystemOperation = (*Copy)(nil)
 
 type Move struct {
 	DryRun bool
@@ -339,10 +338,6 @@ func (m Move) ProcessFile(dc DirContext, src, dest string) error {
 		return fmt.Errorf("rename: %w", err)
 	}
 	return nil
-}
-
-func (m Move) TrimDir(dc DirContext, dest string) error {
-	return trimDir(dc, m.DryRun, dest)
 }
 
 func (m Move) CleanDir(dc DirContext, limit string, src string) error {
@@ -410,15 +405,11 @@ func (c Copy) ProcessFile(dc DirContext, src, dest string) error {
 	return nil
 }
 
-func (c Copy) TrimDir(dc DirContext, dest string) error {
-	return trimDir(dc, c.DryRun, dest)
-}
-
 func (Copy) CleanDir(dc DirContext, limit string, src string) error {
 	return nil
 }
 
-func trimDir(dc DirContext, dryRun bool, dest string) error {
+func trimDir(dc DirContext, dest string, dryRun bool) error {
 	entries, err := os.ReadDir(dest)
 	if err != nil {
 		return fmt.Errorf("read dir: %w", err)
