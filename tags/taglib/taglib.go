@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -99,13 +100,20 @@ func (f *File) WriteArtistCredit(v string)    { f.set("artist_credit", v) }
 func (f *File) WriteArtistsCredit(v []string) { f.set("artists_credit", v...) }
 func (f *File) WriteGenre(v string)           { f.set("genre", v) }
 func (f *File) WriteGenres(v []string)        { f.set("genres", v...) }
-func (f *File) WriteTrackNumber(v int)        { f.set("track", intStr(v)) }
+func (f *File) WriteTrackNumber(v int)        { f.set("tracknumber", intStr(v)) }
 func (f *File) WriteDiscNumber(v int)         { f.set("discnumber", intStr(v)) }
 
 func (f *File) WriteMBRecordingID(v string) { f.set("musicbrainz_trackid", v) }
 func (f *File) WriteMBArtistID(v []string)  { f.set("musicbrainz_artistid", v...) }
 
 func (f *File) set(k string, vs ...string) {
+	// avoid doing any writes if nothing has changed
+	if len(vs) == 1 && vs[0] == "" {
+		vs = nil
+	}
+	if slices.Equal(f.raw[k], vs) {
+		return
+	}
 	f.didWrite = true
 	f.raw[k] = vs
 }
@@ -125,7 +133,7 @@ func (f *File) RemoveUnknown() {
 	for k := range f.raw {
 		switch strings.ToLower(k) {
 		// TODO: re use from above somehow
-		case "title", "artist", "artists", "artist_credit", "artists_credit", "album", "albumartist", "albumartists", "albumartist_credit", "albumartists_credit", "genre", "genres", "track", "discnumber", "media", "date", "originaldate", "label", "catalognumber",
+		case "title", "artist", "artists", "artist_credit", "artists_credit", "album", "albumartist", "albumartists", "albumartist_credit", "albumartists_credit", "genre", "genres", "tracknumber", "discnumber", "media", "date", "originaldate", "label", "catalognumber",
 			"musicbrainz_trackid", "musicbrainz_albumid", "musicbrainz_releasegroupid", "musicbrainz_artistid", "musicbrainz_albumartistid":
 		default:
 			delete(f.raw, k)

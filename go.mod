@@ -9,7 +9,7 @@ require (
 	github.com/r3labs/sse/v2 v2.10.0
 	github.com/rainycape/unidecode v0.0.0-20150907023854-cb7f23ec59be
 	github.com/rogpeppe/go-internal v1.12.0
-	github.com/sentriz/audiotags v0.0.0-20240401192409-5a8ac2a2974f
+	github.com/sentriz/audiotags v0.0.0-20240423000144-355d2146ad88
 	github.com/sergi/go-diff v1.3.1
 	github.com/stretchr/testify v1.9.0
 	github.com/timshannon/bolthold v0.0.0-20240314194003-30aac6950928
