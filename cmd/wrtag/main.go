@@ -24,9 +24,7 @@ import (
 var tg tagcommon.Reader = taglib.TagLib{}
 var dmp = diffmatchpatch.New()
 
-// replaced while testing
-var mb wrtag.MusicbrainzClient = flagcommon.MusicBrainz()
-
+var mb = flagcommon.MusicBrainz()
 var keepFiles = flagcommon.KeepFiles()
 var pathFormat = flagcommon.PathFormat()
 var researchLinkQuerier = flagcommon.Querier()

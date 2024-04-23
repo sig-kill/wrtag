@@ -1,6 +1,7 @@
 package wrtag
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"errors"
@@ -8,7 +9,6 @@ import (
 	"io"
 	"io/fs"
 	"log"
-	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
@@ -42,7 +42,7 @@ const (
 
 type MusicbrainzClient interface {
 	SearchRelease(ctx context.Context, q musicbrainz.ReleaseQuery) (*musicbrainz.Release, error)
-	GetCoverURL(ctx context.Context, release *musicbrainz.Release) (string, error)
+	GetCover(ctx context.Context, release *musicbrainz.Release) ([]byte, string, error)
 }
 
 type SearchResult struct {
@@ -453,27 +453,21 @@ func trimDir(dc DirContext, dest string, dryRun bool) error {
 }
 
 func tryDownloadMusicbrainzCover(ctx context.Context, mb MusicbrainzClient, tmpDir string, release *musicbrainz.Release) (string, error) {
-	coverURL, err := mb.GetCoverURL(ctx, release)
+	cover, ext, err := mb.GetCover(ctx, release)
 	if err != nil {
 		return "", fmt.Errorf("request cover url: %w", err)
 	}
-	if coverURL == "" {
+	if len(cover) == 0 {
 		return "", nil
 	}
 
-	tmpf, err := os.CreateTemp(tmpDir, ".wrtag-cover-tmp-*"+filepath.Ext(coverURL))
+	tmpf, err := os.CreateTemp(tmpDir, ".wrtag-cover-tmp-*"+ext)
 	if err != nil {
 		return "", err
 	}
 	defer tmpf.Close()
 
-	resp, err := http.Get(coverURL)
-	if err != nil {
-		return "", fmt.Errorf("create cover destination file: %w", err)
-	}
-	defer resp.Body.Close()
-
-	n, _ := io.Copy(tmpf, resp.Body)
+	n, _ := io.Copy(tmpf, bytes.NewReader(cover))
 	log.Printf("wrote cover to tmp (%d bytes)", n)
 
 	return tmpf.Name(), nil
