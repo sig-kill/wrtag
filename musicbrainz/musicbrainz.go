@@ -1,13 +1,14 @@
 package musicbrainz
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -395,20 +396,25 @@ func (at *AnyTime) UnmarshalJSON(data []byte) error {
 }
 
 func mergeAndSortGenres(genres []Genre) []Genre {
-	genreIDs := map[string]*Genre{}
+	genreIDs := map[string]Genre{}
 	for _, g := range genres {
 		if _, ok := genreIDs[g.ID]; !ok {
-			genreIDs[g.ID] = &g
+			genreIDs[g.ID] = g
 			continue
 		}
-		genreIDs[g.ID].Count += g.Count
+		f := genreIDs[g.ID]
+		f.Count += g.Count
+		genreIDs[g.ID] = f
 	}
 	var out []Genre
 	for _, g := range genreIDs {
-		out = append(out, *g)
+		out = append(out, g)
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		return out[i].Count > out[j].Count
+	slices.SortFunc(out, func(a, b Genre) int {
+		return cmp.Or(
+			cmp.Compare(b.Count, a.Count),
+			cmp.Compare(a.Name, b.Name),
+		)
 	})
 	return out
 }
