@@ -258,7 +258,7 @@ func ReadAlbumDir(tg tagcommon.Reader, path string) (string, []string, []tagcomm
 		}
 	}
 
-	slices.SortStableFunc(pathFiles, func(a, b pathFile) int {
+	slices.SortFunc(pathFiles, func(a, b pathFile) int {
 		return cmp.Or(
 			cmp.Compare(a.DiscNumber(), b.DiscNumber()),
 			cmp.Compare(a.TrackNumber(), b.TrackNumber()),
