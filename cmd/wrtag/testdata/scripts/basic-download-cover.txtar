@@ -61,8 +61,8 @@ cp 'albums/Jeff Mills/(1997) Kat Moda/01.03 Alarms.flac' tr-1-copy
 exec wrtag move 'albums/Jeff Mills/(1997) Kat Moda/'
 stderr 'matched 100.00%'
 
-exec mime 'albums/Jeff Mills/(1997) Kat Moda/cover.png'
-stdout image/png
+exec mime 'albums/Jeff Mills/(1997) Kat Moda/cover.jpg'
+stdout image/jpeg
 
 exec find albums/
 cmp stdout exp-layout
@@ -76,4 +76,4 @@ albums/Jeff Mills/(1997) Kat Moda
 albums/Jeff Mills/(1997) Kat Moda/01.03 Alarms.flac
 albums/Jeff Mills/(1997) Kat Moda/02.03 The Bells.flac
 albums/Jeff Mills/(1997) Kat Moda/03.03 The Bells (Festival mix).flac
-albums/Jeff Mills/(1997) Kat Moda/cover.png
+albums/Jeff Mills/(1997) Kat Moda/cover.jpg

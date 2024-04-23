@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -44,48 +46,56 @@ func (c *CAAClient) request(ctx context.Context, r *http.Request, dest any) erro
 	return nil
 }
 
-func (c *CAAClient) GetCoverURL(ctx context.Context, release *Release) (string, error) {
-	// try release first
-	if release.CoverArtArchive.Front {
-		url, err := c.getCoverURL(ctx, joinPath(c.BaseURL, "release", release.ID))
-		if err != nil {
-			return "", fmt.Errorf("try release: %w", err)
-		}
-		if url != "" {
-			return url, nil
-		}
+func (c *CAAClient) GetCover(ctx context.Context, release *Release) ([]byte, string, error) {
+	coverURL, err := c.getCoverURL(ctx, release)
+	if err != nil {
+		return nil, "", err
+	}
+	if coverURL == "" {
+		return nil, "", nil
 	}
 
-	// fall back to release group
-	url, err := c.getCoverURL(ctx, joinPath(c.BaseURL, "release-group", release.ReleaseGroup.ID))
+	resp, err := c.HTTPClient.Get(coverURL)
 	if err != nil {
-		return "", fmt.Errorf("try release group: %w", err)
+		return nil, "", fmt.Errorf("download cover: %w", err)
 	}
-	if url != "" {
-		return url, nil
+	defer resp.Body.Close()
+
+	cover, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", fmt.Errorf("read cover")
 	}
-	return "", nil
+	return cover, filepath.Ext(coverURL), nil
 }
 
-func (c *CAAClient) getCoverURL(ctx context.Context, url string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
+func (c *CAAClient) getCoverURL(ctx context.Context, release *Release) (string, error) {
+	var candidateURLs []string
+	if release.CoverArtArchive.Front {
+		candidateURLs = append(candidateURLs, joinPath(c.BaseURL, "release", release.ID))
 	}
+	candidateURLs = append(candidateURLs, joinPath(c.BaseURL, "release-group", release.ReleaseGroup.ID))
 
-	var caa caaResponse
-	err = c.request(ctx, req, &caa)
-	if se := StatusError(0); errors.As(err, &se) && se == http.StatusNotFound {
-		return "", nil
-	}
-	if err != nil {
-		return "", fmt.Errorf("make caa release request: %w", err)
-	}
-
-	for _, img := range caa.Images {
-		if img.Front {
-			return img.Image, nil
+	for _, candidate := range candidateURLs {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, candidate, nil)
+		if err != nil {
+			return "", fmt.Errorf("create request: %w", err)
 		}
+
+		var caa caaResponse
+		err = c.request(ctx, req, &caa)
+		if se := StatusError(0); errors.As(err, &se) && se == http.StatusNotFound {
+			continue
+		}
+		if err != nil {
+			return "", fmt.Errorf("make caa release request: %w", err)
+		}
+
+		for _, img := range caa.Images {
+			if img.Front {
+				return img.Image, nil
+			}
+		}
+		return "", nil
 	}
 	return "", nil
 }
