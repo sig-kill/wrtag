@@ -21,10 +21,12 @@ func init() {
 	flag.CommandLine.Init(name, flag.ExitOnError)
 }
 
+const defaultUserAgent = `wrtag/v0.0.0-alpha ( https://go.senan.xyz/wrtag )`
+
 func init() {
-	// global HTTP logging
 	chain := clientutil.Chain(
 		clientutil.WithLogging(),
+		clientutil.WithUserAgent(defaultUserAgent),
 	)
 	http.DefaultClient.Transport = chain(http.DefaultTransport)
 }
@@ -66,17 +68,13 @@ type MusicBrainzClient struct {
 }
 
 func MusicBrainz() MusicBrainzClient {
-	const defaultUserAgent = `wrtag/v0.0.0-alpha ( https://go.senan.xyz/wrtag )`
-
 	var mb musicbrainz.MBClient
 	mb.HTTPClient = http.DefaultClient
-	flag.StringVar(&mb.UserAgent, "mb-user-agent", defaultUserAgent, "")
 	flag.StringVar(&mb.BaseURL, "mb-base-url", `https://musicbrainz.org/ws/2/`, "")
 	flag.DurationVar(&mb.RateLimit, "mb-rate-limit", 1*time.Second, "")
 
 	var caa musicbrainz.CAAClient
 	caa.HTTPClient = http.DefaultClient
-	flag.StringVar(&caa.UserAgent, "caa-user-agent", defaultUserAgent, "")
 	flag.StringVar(&caa.BaseURL, "caa-base-url", `https://coverartarchive.org/`, "")
 	flag.DurationVar(&caa.RateLimit, "caa-rate-limit", 0, "")
 
