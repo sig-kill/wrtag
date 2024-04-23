@@ -13,7 +13,7 @@ import (
 const dirPat = "origin.y*ml"
 
 func Find(dir string) (*OriginFile, error) {
-	matches, err := fileutil.GlobBase(dir, dirPat)
+	matches, err := fileutil.GlobDir(dir, dirPat)
 	if err != nil {
 		return nil, fmt.Errorf("glob for origin file: %w", err)
 	}
