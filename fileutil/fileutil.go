@@ -23,7 +23,7 @@ func GlobEscape(path string) string {
 	return r.String()
 }
 
-func GlobBase(dir, pattern string) ([]string, error) {
+func GlobDir(dir, pattern string) ([]string, error) {
 	return filepath.Glob(filepath.Join(GlobEscape(dir), pattern))
 }
 

@@ -210,11 +210,11 @@ func ProcessDir(
 }
 
 func ReadAlbumDir(tg tagcommon.Reader, path string) (string, []string, []tagcommon.File, error) {
-	mainPaths, err := fileutil.GlobBase(path, "*")
+	mainPaths, err := fileutil.GlobDir(path, "*")
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("glob dir: %w", err)
 	}
-	discPaths, err := fileutil.GlobBase(path, "*/*") // recurse once for any disc1/ disc2/ dirs
+	discPaths, err := fileutil.GlobDir(path, "*/*") // recurse once for any disc1/ disc2/ dirs
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("glob dir for discs: %w", err)
 	}
