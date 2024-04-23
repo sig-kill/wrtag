@@ -2,10 +2,12 @@ package flagcommon
 
 import (
 	"flag"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 
+	"go.senan.xyz/wrtag/clientutil"
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/notifications"
 	"go.senan.xyz/wrtag/pathformat"
@@ -19,10 +21,13 @@ func init() {
 	flag.CommandLine.Init(name, flag.ExitOnError)
 }
 
-var (
-	userConfig, _     = os.UserConfigDir()
-	DefaultConfigPath = filepath.Join(userConfig, name, "config")
-)
+func init() {
+	// global HTTP logging
+	chain := clientutil.Chain(
+		clientutil.WithLogging(),
+	)
+	http.DefaultClient.Transport = chain(http.DefaultTransport)
+}
 
 func PathFormat() *pathformat.Format {
 	var r pathformat.Format
@@ -64,17 +69,24 @@ func MusicBrainz() MusicBrainzClient {
 	const defaultUserAgent = `wrtag/v0.0.0-alpha ( https://go.senan.xyz/wrtag )`
 
 	var mb musicbrainz.MBClient
+	mb.HTTPClient = http.DefaultClient
 	flag.StringVar(&mb.UserAgent, "mb-user-agent", defaultUserAgent, "")
 	flag.StringVar(&mb.BaseURL, "mb-base-url", `https://musicbrainz.org/ws/2/`, "")
 	flag.DurationVar(&mb.RateLimit, "mb-rate-limit", 1*time.Second, "")
 
 	var caa musicbrainz.CAAClient
+	caa.HTTPClient = http.DefaultClient
 	flag.StringVar(&caa.UserAgent, "caa-user-agent", defaultUserAgent, "")
 	flag.StringVar(&caa.BaseURL, "caa-base-url", `https://coverartarchive.org/`, "")
 	flag.DurationVar(&caa.RateLimit, "caa-rate-limit", 0, "")
 
 	return MusicBrainzClient{&mb, &caa}
 }
+
+var (
+	userConfig, _     = os.UserConfigDir()
+	DefaultConfigPath = filepath.Join(userConfig, name, "config")
+)
 
 func ConfigPath() *string {
 	return flag.String("config-path", DefaultConfigPath, "path config file")

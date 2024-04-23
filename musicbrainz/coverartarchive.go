@@ -27,7 +27,6 @@ func (c *CAAClient) request(ctx context.Context, r *http.Request, dest any) erro
 			clientutil.WithCache(),
 			clientutil.WithUserAgent(c.UserAgent),
 			clientutil.WithRateLimit(c.RateLimit),
-			clientutil.WithLogging(),
 		))
 	})
 
