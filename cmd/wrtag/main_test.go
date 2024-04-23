@@ -53,6 +53,7 @@ func TestMain(m *testing.M) {
 		"find":      func() int { mainFind(); return 0 },
 		"touch":     func() int { mainTouch(); return 0 },
 		"mime":      func() int { mainMIME(); return 0 },
+		"mod-time":  func() int { mainModTime(); return 0 },
 	}))
 }
 
@@ -240,6 +241,23 @@ func mainMIME() {
 
 	mime := http.DetectContentType(data)
 	fmt.Println(mime)
+}
+
+func mainModTime() {
+	flag.Parse()
+
+	paths := parsePattern(flag.Arg(0))
+	if len(paths) == 0 {
+		log.Fatalf("no paths to match pattern")
+	}
+
+	for _, p := range paths {
+		info, err := os.Stat(p)
+		if err != nil {
+			log.Fatalf("error stating: %v", err)
+		}
+		fmt.Println(info.ModTime().UnixNano())
+	}
 }
 
 func mustDecode[T any](data []byte) *T {
