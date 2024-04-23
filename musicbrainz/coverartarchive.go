@@ -15,7 +15,6 @@ import (
 type CAAClient struct {
 	BaseURL   string
 	RateLimit time.Duration
-	UserAgent string
 
 	initOnce   sync.Once
 	HTTPClient *http.Client
@@ -25,7 +24,6 @@ func (c *CAAClient) request(ctx context.Context, r *http.Request, dest any) erro
 	c.initOnce.Do(func() {
 		c.HTTPClient = wrapClient(c.HTTPClient, clientutil.Chain(
 			clientutil.WithCache(),
-			clientutil.WithUserAgent(c.UserAgent),
 			clientutil.WithRateLimit(c.RateLimit),
 		))
 	})

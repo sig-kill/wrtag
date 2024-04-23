@@ -22,7 +22,6 @@ var ErrNoResults = fmt.Errorf("no results")
 type MBClient struct {
 	BaseURL   string
 	RateLimit time.Duration
-	UserAgent string
 
 	initOnce   sync.Once
 	HTTPClient *http.Client
@@ -31,7 +30,6 @@ type MBClient struct {
 func (c *MBClient) request(ctx context.Context, r *http.Request, dest any) error {
 	c.initOnce.Do(func() {
 		c.HTTPClient = wrapClient(c.HTTPClient, clientutil.Chain(
-			clientutil.WithUserAgent(c.UserAgent),
 			clientutil.WithRateLimit(c.RateLimit),
 		))
 	})
