@@ -9,7 +9,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -19,6 +18,7 @@ import (
 
 	"go.senan.xyz/wrtag"
 	"go.senan.xyz/wrtag/cmd/internal/flagcommon"
+	"go.senan.xyz/wrtag/fileutil"
 	"go.senan.xyz/wrtag/notifications"
 	"go.senan.xyz/wrtag/tags/tagcommon"
 	"go.senan.xyz/wrtag/tags/taglib"
@@ -47,32 +47,19 @@ func main() {
 		dirs = flag.Args()
 	}
 
-	leafDirs := map[string]struct{}{}
-	for _, dir := range dirs {
-		dir, _ := filepath.Abs(dir)
-		err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if !d.IsDir() {
-				return nil
-			}
-			path = filepath.Clean(path)
-			leafDirs[path] = struct{}{}
-			delete(leafDirs, filepath.Dir(path)) // parent is not a leaf anymore
-			return nil
-		})
-		if err != nil {
-			log.Fatalf("error walking: %v", err)
-		}
-	}
-
-	todo := make(chan string)
+	leaves := make(chan string)
 	go func() {
-		for d := range leafDirs {
-			todo <- d
+		for _, d := range dirs {
+			err := fileutil.WalkLeaves(d, func(path string, _ fs.DirEntry) error {
+				leaves <- path
+				return nil
+			})
+			if err != nil {
+				log.Printf("error walking leaves: %v", err)
+				continue
+			}
 		}
-		close(todo)
+		close(leaves)
 	}()
 
 	importTime := time.Now()
@@ -96,20 +83,11 @@ func main() {
 		return nil
 	}
 
-	start := time.Now()
-	var numDone, numError atomic.Uint32
-	defer func() {
-		message := fmt.Sprintf("sync finished in %s with %d/%d dirs, %d err",
-			time.Since(start).Truncate(time.Millisecond), numDone.Load(), len(leafDirs), numError.Load())
-		log.Print(message)
-		notifs.Send(notifications.SyncComplete, message)
-		if numError.Load() > 0 {
-			notifs.Send(notifications.SyncError, message)
-		}
-	}()
-
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
+
+	var start = time.Now()
+	var numDone, numError atomic.Uint32
 
 	var wg sync.WaitGroup
 	for range 4 {
@@ -120,7 +98,7 @@ func main() {
 				select {
 				case <-ctx.Done():
 					return
-				case dir, ok := <-todo:
+				case dir, ok := <-leaves:
 					if !ok {
 						return
 					}
@@ -139,4 +117,11 @@ func main() {
 	}
 
 	wg.Wait()
+
+	message := fmt.Sprintf("sync finished in %s with %d dirs, %d err", time.Since(start).Truncate(time.Millisecond), numDone.Load(), numError.Load())
+	log.Print(message)
+	notifs.Send(notifications.SyncComplete, message)
+	if numError.Load() > 0 {
+		notifs.Send(notifications.SyncError, message)
+	}
 }
