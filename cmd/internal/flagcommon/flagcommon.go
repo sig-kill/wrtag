@@ -83,10 +83,15 @@ func MusicBrainz() MusicBrainzClient {
 }
 
 func Lyrics() lyrics.Source {
-	var source lyrics.Musixmatch
-	source.HTTPClient = http.DefaultClient
-	source.RateLimit = 500 * time.Millisecond
-	return &source
+	var musixmatch lyrics.Musixmatch
+	musixmatch.HTTPClient = http.DefaultClient
+	musixmatch.RateLimit = 500 * time.Millisecond
+
+	var genius lyrics.Genius
+	genius.HTTPClient = http.DefaultClient
+	genius.RateLimit = 500 * time.Millisecond
+
+	return lyrics.ChainSource{&genius, &musixmatch}
 }
 
 var (
