@@ -19,7 +19,7 @@ var ErrLyricsNotFound = errors.New("lyrics not found")
 
 var musixmatchBaseURL = `https://www.musixmatch.com/lyrics`
 var musixmatchEsc = strings.NewReplacer(" ", "-")
-var musixmatchSelectContent = cascadia.MustCompile(`h2[role="heading"][style="color:var(--mxm-contentSecondary);padding-bottom:24px"] + div`)
+var musixmatchSelectContent = cascadia.MustCompile(`div.r-1v1z2uz:nth-child(1)`)
 var musixmatchIgnore = []string{"Still no lyrics here"}
 
 type Source interface {
