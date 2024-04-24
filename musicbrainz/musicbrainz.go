@@ -29,7 +29,7 @@ type MBClient struct {
 
 func (c *MBClient) request(ctx context.Context, r *http.Request, dest any) error {
 	c.initOnce.Do(func() {
-		c.HTTPClient = wrapClient(c.HTTPClient, clientutil.Chain(
+		c.HTTPClient = clientutil.WrapClient(c.HTTPClient, clientutil.Chain(
 			clientutil.WithRateLimit(c.RateLimit),
 		))
 	})
