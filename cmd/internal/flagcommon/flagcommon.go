@@ -22,14 +22,16 @@ func init() {
 	flag.CommandLine.Init(name, flag.ExitOnError)
 }
 
-const defaultUserAgent = `wrtag/v0.0.0-alpha ( https://go.senan.xyz/wrtag )`
+var mw = clientutil.Chain(
+	clientutil.WithLogging(),
+	clientutil.WithUserAgent(`wrtag/v0.0.0-alpha ( https://go.senan.xyz/wrtag )`),
+)
+var defaultClient = &http.Client{
+	Transport: mw(http.DefaultTransport),
+}
 
 func init() {
-	chain := clientutil.Chain(
-		clientutil.WithLogging(),
-		clientutil.WithUserAgent(defaultUserAgent),
-	)
-	http.DefaultClient.Transport = chain(http.DefaultTransport)
+	http.DefaultClient = defaultClient
 }
 
 func PathFormat() *pathformat.Format {
@@ -70,12 +72,12 @@ type MusicBrainzClient struct {
 
 func MusicBrainz() MusicBrainzClient {
 	var mb musicbrainz.MBClient
-	mb.HTTPClient = http.DefaultClient
+	mb.HTTPClient = defaultClient
 	flag.StringVar(&mb.BaseURL, "mb-base-url", `https://musicbrainz.org/ws/2/`, "")
 	flag.DurationVar(&mb.RateLimit, "mb-rate-limit", 1*time.Second, "")
 
 	var caa musicbrainz.CAAClient
-	caa.HTTPClient = http.DefaultClient
+	caa.HTTPClient = defaultClient
 	flag.StringVar(&caa.BaseURL, "caa-base-url", `https://coverartarchive.org/`, "")
 	flag.DurationVar(&caa.RateLimit, "caa-rate-limit", 0, "")
 
@@ -84,11 +86,11 @@ func MusicBrainz() MusicBrainzClient {
 
 func Lyrics() lyrics.Source {
 	var musixmatch lyrics.Musixmatch
-	musixmatch.HTTPClient = http.DefaultClient
+	musixmatch.HTTPClient = defaultClient
 	musixmatch.RateLimit = 500 * time.Millisecond
 
 	var genius lyrics.Genius
-	genius.HTTPClient = http.DefaultClient
+	genius.HTTPClient = defaultClient
 	genius.RateLimit = 500 * time.Millisecond
 
 	return lyrics.ChainSource{&genius, &musixmatch}
