@@ -15,6 +15,9 @@ import (
 type Middleware func(http.RoundTripper) http.RoundTripper
 
 func Chain(middlewares ...Middleware) Middleware {
+	if len(middlewares) == 1 {
+		return middlewares[0]
+	}
 	return func(final http.RoundTripper) http.RoundTripper {
 		for i := len(middlewares) - 1; i >= 0; i-- {
 			final = middlewares[i](final)
