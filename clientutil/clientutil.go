@@ -83,6 +83,17 @@ func (f RoundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {
 	return f(r)
 }
 
+func WrapClient(c *http.Client, mw Middleware) *http.Client {
+	if c == nil {
+		c = &http.Client{}
+	}
+	if c.Transport == nil {
+		c.Transport = http.DefaultTransport
+	}
+	c.Transport = mw(c.Transport)
+	return c
+}
+
 type MemoryCache struct {
 	mu    sync.RWMutex
 	items map[string][]byte
