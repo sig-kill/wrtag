@@ -78,6 +78,8 @@ func (f *File) DiscNumber() int         { return intSep("/", first(find(f.raw, "
 func (f *File) MBRecordingID() string { return first(find(f.raw, "musicbrainz_trackid")) }
 func (f *File) MBArtistID() []string  { return find(f.raw, "musicbrainz_artistid") }
 
+func (f *File) Lyrics() string { return first(find(f.raw, "lyrics")) }
+
 func (f *File) WriteAlbum(v string)                { f.set("album", v) }
 func (f *File) WriteAlbumArtist(v string)          { f.set("albumartist", v) }
 func (f *File) WriteAlbumArtists(v []string)       { f.set("albumartists", v...) }
@@ -106,6 +108,8 @@ func (f *File) WriteDiscNumber(v int)         { f.set("discnumber", intStr(v)) }
 func (f *File) WriteMBRecordingID(v string) { f.set("musicbrainz_trackid", v) }
 func (f *File) WriteMBArtistID(v []string)  { f.set("musicbrainz_artistid", v...) }
 
+func (f *File) WriteLyrics(v string) { f.set("lyrics", v) }
+
 func (f *File) set(k string, vs ...string) {
 	// avoid doing any writes if nothing has changed
 	if len(vs) == 1 && vs[0] == "" {
@@ -133,7 +137,7 @@ func (f *File) RemoveUnknown() {
 	for k := range f.raw {
 		switch strings.ToLower(k) {
 		// TODO: re use from above somehow
-		case "title", "artist", "artists", "artist_credit", "artists_credit", "album", "albumartist", "albumartists", "albumartist_credit", "albumartists_credit", "genre", "genres", "tracknumber", "discnumber", "media", "date", "originaldate", "label", "catalognumber",
+		case "title", "artist", "artists", "artist_credit", "artists_credit", "album", "albumartist", "albumartists", "albumartist_credit", "albumartists_credit", "genre", "genres", "tracknumber", "discnumber", "media", "date", "originaldate", "label", "catalognumber", "lyrics",
 			"musicbrainz_trackid", "musicbrainz_albumid", "musicbrainz_releasegroupid", "musicbrainz_artistid", "musicbrainz_albumartistid":
 		default:
 			delete(f.raw, k)
