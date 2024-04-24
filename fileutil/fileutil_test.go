@@ -5,7 +5,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.senan.xyz/wrtag/fileutil"
@@ -39,8 +38,6 @@ func TestWalkLeaves(t *testing.T) {
 		"testdata/leaves/a/d/b/c/leaf-b",
 		"testdata/leaves/a/d/b/c/leaf-c",
 	}
-
-	spew.Dump(act)
 
 	require.Equal(t, len(exp), len(act))
 
