@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"go.senan.xyz/wrtag/clientutil"
+	"go.senan.xyz/wrtag/lyrics"
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/notifications"
 	"go.senan.xyz/wrtag/pathformat"
@@ -79,6 +80,13 @@ func MusicBrainz() MusicBrainzClient {
 	flag.DurationVar(&caa.RateLimit, "caa-rate-limit", 0, "")
 
 	return MusicBrainzClient{&mb, &caa}
+}
+
+func Lyrics() lyrics.Source {
+	var source lyrics.Musixmatch
+	source.HTTPClient = http.DefaultClient
+	source.RateLimit = 500 * time.Millisecond
+	return &source
 }
 
 var (
