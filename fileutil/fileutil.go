@@ -1,6 +1,7 @@
 package fileutil
 
 import (
+	"io/fs"
 	"path/filepath"
 	"strings"
 
@@ -60,4 +61,33 @@ func normUnidecode(text string) string {
 	text = norm.NFC.String(text)
 	text = unidecode.Unidecode(text)
 	return text
+}
+
+func WalkLeaves(root string, fn func(path string, d fs.DirEntry) error) error {
+	var lastDepth int
+	var lastPath string
+	var lastDirEntry fs.DirEntry
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			return nil
+		}
+		path = filepath.Clean(path)
+		depth := strings.Count(path, string(filepath.Separator))
+		var ferr error
+		if depth <= lastDepth {
+			ferr = fn(lastPath, lastDirEntry)
+		}
+		lastDepth, lastPath, lastDirEntry = depth, path, d
+		return ferr
+	})
+	if err != nil {
+		return err
+	}
+	if lastPath != "" {
+		return fn(lastPath, lastDirEntry)
+	}
+	return nil
 }
