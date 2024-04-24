@@ -47,6 +47,8 @@ func main() {
 		file.WriteMBRecordingID("")
 		file.WriteMBArtistID(nil)
 
+		file.WriteLyrics("")
+
 		if ru, ok := file.(interface{ RemoveUnknown() }); ok {
 			ru.RemoveUnknown()
 		}

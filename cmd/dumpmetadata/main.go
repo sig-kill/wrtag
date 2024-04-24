@@ -48,6 +48,8 @@ func main() {
 		fmt.Printf("%s\tMBRecordingID\t%s\n", path, format(file.MBRecordingID()))
 		fmt.Printf("%s\tMBArtistID\t%s\n", path, format(file.MBArtistID()))
 
+		fmt.Printf("%s\tLyrics\t%s\n", path, format(file.Lyrics()))
+
 		if err := file.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("close %s: %w", path, err))
 			continue

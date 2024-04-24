@@ -41,6 +41,8 @@ type File interface {
 	MBRecordingID() string
 	MBArtistID() []string
 
+	Lyrics() string
+
 	WriteAlbum(v string)
 	WriteAlbumArtist(v string)
 	WriteAlbumArtists(v []string)
@@ -68,6 +70,8 @@ type File interface {
 
 	WriteMBRecordingID(v string)
 	WriteMBArtistID(v []string)
+
+	WriteLyrics(v string)
 
 	Length() int
 	Bitrate() int
