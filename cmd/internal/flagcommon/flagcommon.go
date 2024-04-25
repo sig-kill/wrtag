@@ -93,7 +93,7 @@ func Lyrics() lyrics.Source {
 	genius.HTTPClient = defaultClient
 	genius.RateLimit = 500 * time.Millisecond
 
-	return lyrics.ChainSource{&genius, &musixmatch}
+	return lyrics.FastestSource{&genius, &musixmatch}
 }
 
 var (
