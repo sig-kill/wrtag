@@ -4,6 +4,8 @@ import (
 	"strconv"
 )
 
+var _ error = StatusError(0)
+
 type StatusError int
 
 func (se StatusError) Error() string {
