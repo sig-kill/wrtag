@@ -76,10 +76,6 @@ func WithUserAgent(userAgent string) Middleware {
 	}
 }
 
-var NullTransport = RoundTripFunc(func(r *http.Request) (*http.Response, error) {
-	return nil, fmt.Errorf("null transport used")
-})
-
 type RoundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f RoundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {

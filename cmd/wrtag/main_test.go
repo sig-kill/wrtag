@@ -29,9 +29,9 @@ func init() {
 	mb.MBClient.HTTPClient = clientutil.FSClient(responses, "testdata/responses/musicbrainz")
 	mb.CAAClient.HTTPClient = clientutil.FSClient(responses, "testdata/responses/coverartarchive")
 
-	// disable network just in case
-	http.DefaultClient.Transport = clientutil.NullTransport
-	http.DefaultTransport = clientutil.NullTransport
+	// panic if someone tries to use the default client/transport
+	http.DefaultClient.Transport = panicTransport
+	http.DefaultTransport = panicTransport
 }
 
 func TestMain(m *testing.M) {
@@ -130,27 +130,6 @@ func mainTagCheck() {
 	}
 }
 
-//go:embed testdata/empty.flac
-var emptyFlac []byte
-
-func ensureFlac(path string) error {
-	if _, err := os.Stat(path); err == nil {
-		return nil
-	}
-	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
-		return fmt.Errorf("make parents: %w", err)
-	}
-	f, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("open and trunc file: %w", err)
-	}
-	defer f.Close()
-	if _, err := f.Write(emptyFlac); err != nil {
-		return fmt.Errorf("write empty file: %w", err)
-	}
-	return nil
-}
-
 func mainFind() {
 	flag.Parse()
 
@@ -211,6 +190,31 @@ func mainModTime() {
 		}
 		fmt.Println(info.ModTime().UnixNano())
 	}
+}
+
+var panicTransport = clientutil.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
+	panic("null transport used")
+})
+
+//go:embed testdata/empty.flac
+var emptyFlac []byte
+
+func ensureFlac(path string) error {
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
+		return fmt.Errorf("make parents: %w", err)
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("open and trunc file: %w", err)
+	}
+	defer f.Close()
+	if _, err := f.Write(emptyFlac); err != nil {
+		return fmt.Errorf("write empty file: %w", err)
+	}
+	return nil
 }
 
 func parsePattern(pat string) []string {
