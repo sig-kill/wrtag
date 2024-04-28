@@ -193,7 +193,7 @@ func mainModTime() {
 }
 
 var panicTransport = clientutil.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
-	panic("null transport used")
+	panic("panic transport used")
 })
 
 //go:embed testdata/empty.flac
