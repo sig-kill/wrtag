@@ -76,6 +76,16 @@ func WithUserAgent(userAgent string) Middleware {
 	}
 }
 
+func FSClient(fsys fs.FS, sub string) *http.Client {
+	subfs, err := fs.Sub(fsys, sub)
+	if err != nil {
+		panic(fmt.Sprintf("clientutil: fs.Sub: %v", err.Error()))
+	}
+	c := &http.Client{}
+	c.Transport = http.NewFileTransportFS(subfs)
+	return c
+}
+
 type RoundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f RoundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -129,14 +139,4 @@ func (c *MemoryCache) Delete(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.items, key)
-}
-
-func FSClient(fsys fs.FS, sub string) *http.Client {
-	subfs, err := fs.Sub(fsys, sub)
-	if err != nil {
-		panic(fmt.Sprintf("clientutil: fs.Sub: %v", err.Error()))
-	}
-	c := &http.Client{}
-	c.Transport = http.NewFileTransportFS(subfs)
-	return c
 }
