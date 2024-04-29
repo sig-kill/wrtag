@@ -46,7 +46,13 @@ func (fsrc FastestSource) Search(ctx context.Context, artist, song string) (stri
 var musixmatchBaseURL = `https://www.musixmatch.com/lyrics`
 var musixmatchSelectContent = cascadia.MustCompile(`div.r-1v1z2uz:nth-child(1)`)
 var musixmatchIgnore = []string{"Still no lyrics here"}
-var musixmatchEsc = strings.NewReplacer(" ", "-")
+var musixmatchEsc = strings.NewReplacer(
+	" ", "-",
+	"(", "",
+	")", "",
+	"[", "",
+	"]", "",
+)
 
 type Musixmatch struct {
 	RateLimit time.Duration
@@ -100,6 +106,8 @@ var geniusEsc = strings.NewReplacer(
 	" ", "-",
 	"(", "",
 	")", "",
+	"[", "",
+	"]", "",
 )
 
 type Genius struct {
