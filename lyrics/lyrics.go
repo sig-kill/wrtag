@@ -21,23 +21,17 @@ type Source interface {
 	Search(ctx context.Context, artist, song string) (string, error)
 }
 
-type FastestSource []Source
+// TODO: maybe we should search both at once and return whichever finishes earlier
+type ChainSource []Source
 
-func (fsrc FastestSource) Search(ctx context.Context, artist, song string) (string, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	lyricData := make(chan string)
-	for _, src := range fsrc {
-		go func() {
-			ld, _ := src.Search(ctx, artist, song)
-			lyricData <- ld
-		}()
-	}
-
-	for ld := range lyricData {
-		if ld != "" {
-			return ld, nil
+func (cs ChainSource) Search(ctx context.Context, artist, song string) (string, error) {
+	for _, src := range cs {
+		lyricData, err := src.Search(ctx, artist, song)
+		if err != nil && !errors.Is(err, ErrLyricsNotFound) {
+			return "", err
+		}
+		if lyricData != "" {
+			return lyricData, nil
 		}
 	}
 	return "", ErrLyricsNotFound
