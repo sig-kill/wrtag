@@ -144,13 +144,14 @@ func ProcessDir(
 
 	labelInfo := musicbrainz.AnyLabelInfo(release)
 	genres := musicbrainz.AnyGenres(release)
+	isVA := musicbrainz.IsVA(release.ReleaseGroup.Artists)
 
 	dc := NewDirContext()
 
 	for i := range releaseTracks {
 		releaseTrack, path := releaseTracks[i], paths[i]
 
-		pathFormatData := pathformat.Data{Release: *release, Track: releaseTrack, TrackNum: i + 1, Ext: strings.ToLower(filepath.Ext(path))}
+		pathFormatData := pathformat.Data{Release: *release, Track: releaseTrack, TrackNum: i + 1, Ext: strings.ToLower(filepath.Ext(path)), IsVA: isVA}
 		destPath, err := pathFormat.Execute(pathFormatData)
 		if err != nil {
 			return nil, fmt.Errorf("create path: %w", err)

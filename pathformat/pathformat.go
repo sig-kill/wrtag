@@ -22,6 +22,7 @@ type Data struct {
 	Release  musicbrainz.Release
 	Track    musicbrainz.Track
 	TrackNum int
+	IsVA     bool
 	Ext      string
 }
 
@@ -110,8 +111,8 @@ func validate(f Format) error {
 	}
 
 	eq, err := compare(
-		Data{release("ar", "release-same"), track("track 1"), 1, ""},
-		Data{release("ar", "release-same"), track("track 2"), 2, ""},
+		Data{release("ar", "release-same"), track("track 1"), 1, false, ""},
+		Data{release("ar", "release-same"), track("track 2"), 2, false, ""},
 	)
 	if err != nil {
 		return err
@@ -121,8 +122,8 @@ func validate(f Format) error {
 	}
 
 	eq, err = compare(
-		Data{release("ar", "release 1"), track("track-same"), 1, ""},
-		Data{release("ar", "release 2"), track("track-same"), 1, ""},
+		Data{release("ar", "release 1"), track("track-same"), 1, false, ""},
+		Data{release("ar", "release 2"), track("track-same"), 1, false, ""},
 	)
 	if err != nil {
 		return err
@@ -139,9 +140,13 @@ var funcMap = texttemplate.FuncMap{
 	"sort":     func(strings []string) []string { sort.Strings(strings); return strings },
 	"safepath": func(p string) string { return fileutil.SafePath(p) },
 
-	"flatTracks":   musicbrainz.FlatTracks,
-	"artists":      musicbrainz.ArtistsNames,
-	"artistCredit": musicbrainz.ArtistsCreditString,
+	"flatTracks": musicbrainz.FlatTracks,
+
+	"artists":             musicbrainz.ArtistsNames,
+	"artistsString":       musicbrainz.ArtistsString,
+	"artistsCredit":       musicbrainz.ArtistsCreditNames,
+	"artistsCreditString": musicbrainz.ArtistsCreditString,
+
 	"disambig": func(r musicbrainz.Release) string {
 		var parts []string
 		if r.ReleaseGroup.Disambiguation != "" {
