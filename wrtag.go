@@ -23,7 +23,7 @@ import (
 	"go.senan.xyz/wrtag/pathformat"
 	"go.senan.xyz/wrtag/researchlink"
 	"go.senan.xyz/wrtag/tagmap"
-	"go.senan.xyz/wrtag/tags/tagcommon"
+	"go.senan.xyz/wrtag/tags"
 )
 
 var (
@@ -54,29 +54,29 @@ type SearchResult struct {
 }
 
 func ProcessDir(
-	ctx context.Context, mb MusicbrainzClient, tg tagcommon.Reader,
+	ctx context.Context, mb MusicbrainzClient,
 	pathFormat *pathformat.Format, tagWeights tagmap.TagWeights, researchLinkQuerier *researchlink.Querier, keepFiles map[string]struct{},
 	op FileSystemOperation, srcDir string,
 	useMBID string, yes bool,
 ) (*SearchResult, error) {
 	srcDir, _ = filepath.Abs(srcDir)
 
-	cover, paths, tagFiles, err := ReadAlbumDir(tg, srcDir)
+	cover, paths, tagFiles, err := ReadAlbumDir(srcDir)
 	if err != nil {
 		return nil, fmt.Errorf("read dir: %w", err)
 	}
 
 	searchFile := tagFiles[0]
 	query := musicbrainz.ReleaseQuery{
-		MBReleaseID:      searchFile.MBReleaseID(),
-		MBArtistID:       cmp.Or(searchFile.MBArtistID()...),
-		MBReleaseGroupID: searchFile.MBReleaseGroupID(),
-		Release:          searchFile.Album(),
-		Artist:           cmp.Or(searchFile.AlbumArtist(), searchFile.Artist()),
-		Date:             searchFile.Date(),
-		Format:           searchFile.MediaFormat(),
-		Label:            searchFile.Label(),
-		CatalogueNum:     searchFile.CatalogueNum(),
+		MBReleaseID:      searchFile.Read(tags.MBReleaseID),
+		MBArtistID:       searchFile.Read(tags.MBArtistID),
+		MBReleaseGroupID: searchFile.Read(tags.MBReleaseGroupID),
+		Release:          searchFile.Read(tags.Album),
+		Artist:           cmp.Or(searchFile.Read(tags.AlbumArtist), searchFile.Read(tags.Artist)),
+		Date:             searchFile.ReadTime(tags.Date),
+		Format:           searchFile.Read(tags.MediaFormat),
+		Label:            searchFile.Read(tags.Label),
+		CatalogueNum:     searchFile.Read(tags.CatalogueNum),
 		NumTracks:        len(tagFiles),
 	}
 	if useMBID != "" {
@@ -114,7 +114,11 @@ func ProcessDir(
 
 	var researchLinks []researchlink.SearchResult
 	if researchLinkQuerier != nil {
-		researchLinks, err = researchLinkQuerier.Search(searchFile)
+		researchLinks, err = researchLinkQuerier.Search(researchlink.Query{
+			Album:       searchFile.Read(tags.Album),
+			AlbumArtist: searchFile.Read(tags.AlbumArtist),
+			Date:        searchFile.ReadTime(tags.Date),
+		})
 		if err != nil {
 			return nil, fmt.Errorf("research querier search: %w", err)
 		}
@@ -167,14 +171,14 @@ func ProcessDir(
 		if op.ReadOnly() {
 			continue
 		}
-		tagFile, err := tg.Read(destPath)
+		tagFile, err := tags.Read(destPath)
 		if err != nil {
 			return nil, fmt.Errorf("read tag file: %w", err)
 		}
-		tagmap.WriteFile(release, labelInfo, genres, &releaseTrack, i, tagFile)
-		if err := tagFile.Close(); err != nil {
-			return nil, fmt.Errorf("close tag file after write: %w", err)
+		if err := tagmap.WriteFile(release, labelInfo, genres, &releaseTrack, i, tagFile); err != nil {
+			return nil, fmt.Errorf("write tag file: %w", err)
 		}
+		tagFile.Close()
 	}
 
 	if cover == "" {
@@ -210,7 +214,7 @@ func ProcessDir(
 	return &SearchResult{Release: release, Score: score, Diff: diff, OriginFile: originFile}, nil
 }
 
-func ReadAlbumDir(tg tagcommon.Reader, path string) (string, []string, []tagcommon.File, error) {
+func ReadAlbumDir(path string) (string, []string, []*tags.File, error) {
 	mainPaths, err := fileutil.GlobDir(path, "*")
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("glob dir: %w", err)
@@ -222,7 +226,7 @@ func ReadAlbumDir(tg tagcommon.Reader, path string) (string, []string, []tagcomm
 
 	type pathFile struct {
 		path string
-		tagcommon.File
+		f    *tags.File
 	}
 
 	var cover string
@@ -234,13 +238,13 @@ func ReadAlbumDir(tg tagcommon.Reader, path string) (string, []string, []tagcomm
 			continue
 		}
 
-		if tg.CanRead(path) {
-			file, err := tg.Read(path)
+		if tags.CanRead(path) {
+			file, err := tags.Read(path)
 			if err != nil {
 				return "", nil, nil, fmt.Errorf("read track: %w", err)
 			}
 			pathFiles = append(pathFiles, pathFile{path, file})
-			_ = file.Close()
+			file.Close()
 		}
 	}
 	if len(pathFiles) == 0 {
@@ -261,17 +265,17 @@ func ReadAlbumDir(tg tagcommon.Reader, path string) (string, []string, []tagcomm
 
 	slices.SortFunc(pathFiles, func(a, b pathFile) int {
 		return cmp.Or(
-			cmp.Compare(a.DiscNumber(), b.DiscNumber()),
-			cmp.Compare(a.TrackNumber(), b.TrackNumber()),
+			cmp.Compare(a.f.ReadNum(tags.DiscNumber), b.f.ReadNum(tags.DiscNumber)),
+			cmp.Compare(a.f.ReadNum(tags.TrackNumber), b.f.ReadNum(tags.TrackNumber)),
 			cmp.Compare(a.path, b.path),
 		)
 	})
 
 	paths := make([]string, 0, len(pathFiles))
-	files := make([]tagcommon.File, 0, len(pathFiles))
+	files := make([]*tags.File, 0, len(pathFiles))
 	for _, pf := range pathFiles {
 		paths = append(paths, pf.path)
-		files = append(files, pf.File)
+		files = append(files, pf.f)
 	}
 
 	return cover, paths, files, nil

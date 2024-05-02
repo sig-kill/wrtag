@@ -31,10 +31,7 @@ import (
 	"go.senan.xyz/wrtag"
 	"go.senan.xyz/wrtag/cmd/internal/flagcommon"
 	"go.senan.xyz/wrtag/notifications"
-	"go.senan.xyz/wrtag/tags/taglib"
 )
-
-var tg = &taglib.TagLib{}
 
 var mb = flagcommon.MusicBrainz()
 var keepFiles = flagcommon.KeepFiles()
@@ -81,7 +78,7 @@ func main() {
 		job.Status = StatusComplete
 
 		var err error
-		job.SearchResult, err = wrtag.ProcessDir(ctx, mb, tg, pathFormat, tagWeights, researchLinkQuerier, keepFiles, wrtagOperation(job.Operation), job.SourcePath, job.UseMBID, yes)
+		job.SearchResult, err = wrtag.ProcessDir(ctx, mb, pathFormat, tagWeights, researchLinkQuerier, keepFiles, wrtagOperation(job.Operation), job.SourcePath, job.UseMBID, yes)
 		if err != nil {
 			if errors.Is(err, wrtag.ErrScoreTooLow) {
 				job.Error = string(JobErrorNeedsInput)

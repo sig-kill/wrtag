@@ -32,7 +32,7 @@ func TestMusixmatch(t *testing.T) {
 
 func TestGenius(t *testing.T) {
 	var src lyrics.Genius
-	src.HTTPClient = clientutil.WrapClient(
+	src.HTTPClient = clientutil.Wrap(
 		clientutil.FSClient(responses, "testdata/genius"),
 		clientutil.WithLogging(),
 	)

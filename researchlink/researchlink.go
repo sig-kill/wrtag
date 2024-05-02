@@ -37,22 +37,22 @@ func (q *Querier) AddSource(name, templRaw string) error {
 	return nil
 }
 
-type File interface {
-	Album() string
-	AlbumArtist() string
-	Date() time.Time
+type Query struct {
+	Album       string
+	AlbumArtist string
+	Date        time.Time
 }
 
 type SearchResult struct {
 	Name, URL string
 }
 
-func (q *Querier) Search(f File) ([]SearchResult, error) {
+func (q *Querier) Search(query Query) ([]SearchResult, error) {
 	var results []SearchResult
 	var buildErrs []error
 	for _, s := range q.sources {
 		var buff strings.Builder
-		if err := s.template.Execute(&buff, f); err != nil {
+		if err := s.template.Execute(&buff, query); err != nil {
 			buildErrs = append(buildErrs, fmt.Errorf("%s: %w", s.name, err))
 			continue
 		}

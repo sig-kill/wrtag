@@ -1,6 +1,6 @@
-exec tag-write kat_moda/01.flac Title '"trk 1"'
-exec tag-write kat_moda/02.flac Title '"trk 2"'
-exec tag-write kat_moda/03.flac Title '"trk 3"'
+exec tag write kat_moda/01.flac title 'trk 1'
+exec tag write kat_moda/02.flac title 'trk 2'
+exec tag write kat_moda/03.flac title 'trk 3'
 
 cp kat_moda/01.flac 01-backup
 cp kat_moda/02.flac 02-backup

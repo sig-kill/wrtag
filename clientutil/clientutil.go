@@ -92,7 +92,7 @@ func (f RoundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {
 	return f(r)
 }
 
-func WrapClient(c *http.Client, mw Middleware) *http.Client {
+func Wrap(c *http.Client, mw Middleware) *http.Client {
 	if c == nil {
 		c = &http.Client{}
 	}

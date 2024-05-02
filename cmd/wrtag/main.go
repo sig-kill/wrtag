@@ -17,11 +17,8 @@ import (
 
 	"go.senan.xyz/wrtag"
 	"go.senan.xyz/wrtag/cmd/internal/flagcommon"
-	"go.senan.xyz/wrtag/tags/tagcommon"
-	"go.senan.xyz/wrtag/tags/taglib"
 )
 
-var tg tagcommon.Reader = taglib.TagLib{}
 var dmp = diffmatchpatch.New()
 
 var mb = flagcommon.MusicBrainz()
@@ -62,7 +59,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	r, err := wrtag.ProcessDir(ctx, mb, tg, pathFormat, tagWeights, researchLinkQuerier, keepFiles, op, dir, *useMBID, *yes)
+	r, err := wrtag.ProcessDir(ctx, mb, pathFormat, tagWeights, researchLinkQuerier, keepFiles, op, dir, *useMBID, *yes)
 	if err != nil && !errors.Is(err, wrtag.ErrScoreTooLow) {
 		log.Fatalf("error processing %q: %v", dir, err)
 	}
