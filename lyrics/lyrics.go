@@ -57,7 +57,7 @@ type Musixmatch struct {
 
 func (mm *Musixmatch) Search(ctx context.Context, artist, song string) (string, error) {
 	mm.initOnce.Do(func() {
-		mm.HTTPClient = clientutil.WrapClient(mm.HTTPClient, clientutil.Chain(
+		mm.HTTPClient = clientutil.Wrap(mm.HTTPClient, clientutil.Chain(
 			clientutil.WithRateLimit(mm.RateLimit),
 		))
 	})
@@ -113,7 +113,7 @@ type Genius struct {
 
 func (g *Genius) Search(ctx context.Context, artist, song string) (string, error) {
 	g.initOnce.Do(func() {
-		g.HTTPClient = clientutil.WrapClient(g.HTTPClient, clientutil.Chain(
+		g.HTTPClient = clientutil.Wrap(g.HTTPClient, clientutil.Chain(
 			clientutil.WithRateLimit(g.RateLimit),
 		))
 	})

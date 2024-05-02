@@ -3,7 +3,6 @@ package main
 import (
 	"embed"
 	_ "embed"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -11,13 +10,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"reflect"
+	"slices"
 	"sort"
 	"testing"
 
 	"github.com/rogpeppe/go-internal/testscript"
 	"go.senan.xyz/wrtag/clientutil"
 	"go.senan.xyz/wrtag/fileutil"
+	"go.senan.xyz/wrtag/tags"
 )
 
 //go:embed testdata/responses
@@ -29,6 +29,10 @@ func init() {
 	mb.MBClient.HTTPClient = clientutil.FSClient(responses, "testdata/responses/musicbrainz")
 	mb.CAAClient.HTTPClient = clientutil.FSClient(responses, "testdata/responses/coverartarchive")
 
+	mb.MBClient.HTTPClient = clientutil.Wrap(mb.MBClient.HTTPClient,
+		clientutil.WithLogging(),
+	)
+
 	// panic if someone tries to use the default client/transport
 	http.DefaultClient.Transport = panicTransport
 	http.DefaultTransport = panicTransport
@@ -36,13 +40,12 @@ func init() {
 
 func TestMain(m *testing.M) {
 	os.Exit(testscript.RunMain(m, map[string]func() int{
-		"wrtag":     func() int { main(); return 0 },
-		"tag-write": func() int { mainTagWrite(); return 0 },
-		"tag-check": func() int { mainTagCheck(); return 0 },
-		"find":      func() int { mainFind(); return 0 },
-		"touch":     func() int { mainTouch(); return 0 },
-		"mime":      func() int { mainMIME(); return 0 },
-		"mod-time":  func() int { mainModTime(); return 0 },
+		"wrtag":    func() int { main(); return 0 },
+		"tag":      func() int { mainTag(); return 0 },
+		"find":     func() int { mainFind(); return 0 },
+		"touch":    func() int { mainTouch(); return 0 },
+		"mime":     func() int { mainMIME(); return 0 },
+		"mod-time": func() int { mainModTime(); return 0 },
 	}))
 }
 
@@ -53,81 +56,53 @@ func TestScripts(t *testing.T) {
 	})
 }
 
-func mainTagWrite() {
+func mainTag() {
 	flag.Parse()
 
-	pat := flag.Arg(0)
+	op := flag.Arg(0)
+	switch op {
+	case "write", "check":
+	default:
+		log.Fatalf("bad op %s", op)
+	}
+
+	pat := flag.Arg(1)
 	paths := parsePattern(pat)
 	if len(paths) == 0 {
 		log.Fatalf("no paths to match pattern")
 	}
 
-	pairs := flag.Args()[1:]
-	if len(pairs)%2 != 0 {
-		log.Fatalf("invalid field/value pairs")
-	}
+	pairs := parseTagLine(flag.Args()[2:])
 
+	var exit int
 	for _, p := range paths {
 		if err := ensureFlac(p); err != nil {
 			log.Fatalf("ensure flac: %v", err)
 		}
-		f, err := tg.Read(p)
+		f, err := tags.Read(p)
 		if err != nil {
 			log.Fatalf("open tag file: %v", err)
 		}
 
-		for i := 0; i < len(pairs)-1; i += 2 {
-			field, jsonValue := pairs[i], pairs[i+1]
-
-			method := reflect.ValueOf(f).MethodByName("Write" + field)
-			dest := reflect.New(method.Type().In(0))
-			if err := json.Unmarshal([]byte(jsonValue), dest.Interface()); err != nil {
-				log.Fatalf("unmarshal json to arg: %v", err)
+		for t, vs := range pairs {
+			switch op {
+			case "write":
+				f.Write(t, vs...)
+			case "check":
+				if got := f.ReadMulti(t); !slices.Equal(vs, got) {
+					log.Printf("exp %q got %q", vs, got)
+					exit = 1
+				}
 			}
-			method.Call([]reflect.Value{dest.Elem()})
 		}
 
+		if err := f.Save(); err != nil {
+			log.Fatalf("write tag file: %v", err)
+		}
 		f.Close()
 	}
-}
 
-func mainTagCheck() {
-	flag.Parse()
-
-	pat := flag.Arg(0)
-	paths := parsePattern(pat)
-	if len(paths) == 0 {
-		log.Fatalf("no paths to match pattern")
-	}
-
-	pairs := flag.Args()[1:]
-	if len(pairs)%2 != 0 {
-		log.Fatalf("invalid field/value pairs")
-	}
-
-	for _, p := range paths {
-		f, err := tg.Read(p)
-		if err != nil {
-			log.Fatalf("open tag file: %v", err)
-		}
-
-		for i := 0; i < len(pairs)-1; i += 2 {
-			field, jsonValue := pairs[i], pairs[i+1]
-
-			method := reflect.ValueOf(f).MethodByName(field)
-			dest := reflect.New(method.Type().Out(0))
-			if err := json.Unmarshal([]byte(jsonValue), dest.Interface()); err != nil {
-				log.Fatalf("unmarshal json to arg: %v", err)
-			}
-			result := method.Call(nil)
-			exp, act := dest.Elem().Interface(), result[0].Interface()
-			if !reflect.DeepEqual(exp, act) {
-				log.Fatalf("exp %q got %q", exp, act)
-			}
-		}
-
-		f.Close()
-	}
+	os.Exit(exit)
 }
 
 func mainFind() {
@@ -224,4 +199,21 @@ func parsePattern(pat string) []string {
 	}
 	paths, _ := filepath.Glob(pat)
 	return paths
+}
+
+func parseTagLine(vs []string) map[string][]string {
+	r := make(map[string][]string)
+	var k string
+	for _, v := range vs {
+		if v == "/" {
+			k = ""
+			continue
+		}
+		if k == "" {
+			k = v
+			continue
+		}
+		r[k] = append(r[k], v)
+	}
+	return r
 }

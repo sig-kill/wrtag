@@ -1,14 +1,14 @@
 # set up folder and cover
-exec tag-write kat_moda/01.flac Title '"alarms"'
-exec tag-write kat_moda/02.flac Title '"the bells"'
-exec tag-write kat_moda/03.flac Title '"the bells fesitival mix"'
+exec tag write kat_moda/01.flac title 'alarms'
+exec tag write kat_moda/02.flac title 'the bells'
+exec tag write kat_moda/03.flac title 'the bells fesitival mix'
 
-exec tag-write kat_moda/*.flac MBReleaseID  '"e47d04a4-7460-427d-a731-cc82386d85f1"'
-exec tag-write kat_moda/*.flac Album        '"kat moda ep"'
-exec tag-write kat_moda/*.flac AlbumArtist  '"jeff pills !! "'
-exec tag-write kat_moda/*.flac Label        '"purpose maker"'
-exec tag-write kat_moda/*.flac CatalogueNum '"PMD002"'
-exec tag-write kat_moda/*.flac MediaFormat  '"digital media"'
+exec tag write kat_moda/*.flac musicbrainz_albumid  'e47d04a4-7460-427d-a731-cc82386d85f1'
+exec tag write kat_moda/*.flac album                'kat moda ep'
+exec tag write kat_moda/*.flac albumartist          'jeff pills !! '
+exec tag write kat_moda/*.flac label                'purpose maker'
+exec tag write kat_moda/*.flac catalognumber        'PMD002'
+exec tag write kat_moda/*.flac media                'digital media'
 
 exec touch kat_moda/Folder!!.png
 exec touch kat_moda/c!!!ccCoveraaaaa.png
@@ -33,29 +33,29 @@ cmp stdout exp-layout
 
 # check new tags
 cd 'albums/Jeff Mills/(1997) Kat Moda/'
-exec tag-check 02*.flac Album            '"Kat Moda"'
-exec tag-check 02*.flac AlbumArtist      '"Jeff Mills"'
-exec tag-check 02*.flac AlbumArtists     '["Jeff Mills"]'
-exec tag-check 02*.flac Date             '"2001-01-01T00:00:00Z"'
-exec tag-check 02*.flac OriginalDate     '"1997-01-01T00:00:00Z"'
-exec tag-check 02*.flac MediaFormat      '"Digital Media"'
-exec tag-check 02*.flac Label            '"Purpose Maker"'
-exec tag-check 02*.flac CatalogueNum     '"PMD002"'
-exec tag-check 02*.flac MBReleaseID      '"e47d04a4-7460-427d-a731-cc82386d85f1"'
-exec tag-check 02*.flac MBReleaseGroupID '"acb38b21-9063-3ea3-b578-35c14d9aa488"'
-exec tag-check 02*.flac MBAlbumArtistID  '["470a4ced-1323-4c91-8fd5-0bb3fb4c932a"]'
-exec tag-check 02*.flac Title            '"The Bells"'
-exec tag-check 02*.flac Artist           '"Jeff Mills"'
-exec tag-check 02*.flac Artists          '["Jeff Mills"]'
-exec tag-check 02*.flac Genre            '"techno"'
-exec tag-check 02*.flac Genres           '["techno", "electronic", "detroit techno"]'
-exec tag-check 02*.flac DiscNumber       '1'
-exec tag-check 02*.flac MBRecordingID    '"a8ea2c29-1c4b-456d-a977-19497a11f0a8"'
-exec tag-check 02*.flac MBArtistID       '["470a4ced-1323-4c91-8fd5-0bb3fb4c932a"]'
+exec tag check 02*.flac album                      'Kat Moda'
+exec tag check 02*.flac albumartist                'Jeff Mills'
+exec tag check 02*.flac albumartists               'Jeff Mills'
+exec tag check 02*.flac date                       '2001-01-01'
+exec tag check 02*.flac originaldate               '1997-01-01'
+exec tag check 02*.flac media                      'Digital Media'
+exec tag check 02*.flac label                      'Purpose Maker'
+exec tag check 02*.flac catalognumber              'PMD002'
+exec tag check 02*.flac musicbrainz_albumid        'e47d04a4-7460-427d-a731-cc82386d85f1'
+exec tag check 02*.flac musicbrainz_releasegroupid 'acb38b21-9063-3ea3-b578-35c14d9aa488'
+exec tag check 02*.flac musicbrainz_albumartistid  '470a4ced-1323-4c91-8fd5-0bb3fb4c932a'
+exec tag check 02*.flac title                      'The Bells'
+exec tag check 02*.flac artist                     'Jeff Mills'
+exec tag check 02*.flac artists                    'Jeff Mills'
+exec tag check 02*.flac genre                      'techno'
+exec tag check 02*.flac genres                     'techno' 'electronic' 'detroit techno'
+exec tag check 02*.flac discnumber                 '1'
+exec tag check 02*.flac musicbrainz_trackid        'a8ea2c29-1c4b-456d-a977-19497a11f0a8'
+exec tag check 02*.flac musicbrainz_artistid       '470a4ced-1323-4c91-8fd5-0bb3fb4c932a'
 
-exec tag-check 01*.flac TrackNumber 1
-exec tag-check 02*.flac TrackNumber 2
-exec tag-check 03*.flac TrackNumber 3
+exec tag check 01*.flac tracknumber 1
+exec tag check 02*.flac tracknumber 2
+exec tag check 03*.flac tracknumber 3
 
 cd $WORK
 

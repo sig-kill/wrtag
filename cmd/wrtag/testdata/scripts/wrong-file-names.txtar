@@ -1,11 +1,11 @@
 env WRTAG_PATH_FORMAT='albums/{{ .Release.Title }}/{{ .Track.Title }}{{ .Ext }}'
 
 # setup some files with the wrong order in filename, but corrent in TrackNumber tag
-exec tag-write kat_moda/a.flac TrackNumber '3' Title '"The Bells (Festival mix)"'
-exec tag-write kat_moda/b.flac TrackNumber '2' Title '"The Bells"'
-exec tag-write kat_moda/c.flac TrackNumber '1' Title '"Alarms"'
+exec tag write kat_moda/a.flac tracknumber 3 / title 'The Bells (Festival mix)'
+exec tag write kat_moda/b.flac tracknumber 2 / title 'The Bells'
+exec tag write kat_moda/c.flac tracknumber 1 / title 'Alarms'
 
-exec tag-write kat_moda/*.flac MBReleaseID '"e47d04a4-7460-427d-a731-cc82386d85f1"'
+exec tag write kat_moda/*.flac musicbrainz_albumid 'e47d04a4-7460-427d-a731-cc82386d85f1'
 
 # score will be too low anyway (no label info)
 ! exec wrtag move kat_moda

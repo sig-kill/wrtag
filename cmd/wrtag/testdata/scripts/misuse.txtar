@@ -1,8 +1,8 @@
 ! exec wrtag
-stderr 'unknown command ""'
+stderr 'unknown command "'
 
 ! exec wrtag f
-stderr 'unknown command "f"'
+stderr 'unknown command "f'
 
 ! exec wrtag move
 stderr 'need a dir'

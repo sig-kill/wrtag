@@ -20,11 +20,7 @@ import (
 	"go.senan.xyz/wrtag/cmd/internal/flagcommon"
 	"go.senan.xyz/wrtag/fileutil"
 	"go.senan.xyz/wrtag/notifications"
-	"go.senan.xyz/wrtag/tags/tagcommon"
-	"go.senan.xyz/wrtag/tags/taglib"
 )
-
-var tg tagcommon.Reader = taglib.TagLib{}
 
 var mb = flagcommon.MusicBrainz()
 var keepFiles = flagcommon.KeepFiles()
@@ -73,7 +69,7 @@ func main() {
 				return nil
 			}
 		}
-		if _, err := wrtag.ProcessDir(ctx, mb, tg, pathFormat, tagWeights, nil, keepFiles, wrtag.Move{DryRun: *dryRun}, dir, "", false); err != nil {
+		if _, err := wrtag.ProcessDir(ctx, mb, pathFormat, tagWeights, nil, keepFiles, wrtag.Move{DryRun: *dryRun}, dir, "", false); err != nil {
 			return err
 		}
 		if err := os.Chtimes(dir, time.Time{}, importTime); err != nil && !errors.Is(err, os.ErrNotExist) {

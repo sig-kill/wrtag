@@ -24,7 +24,7 @@ type CAAClient struct {
 
 func (c *CAAClient) request(ctx context.Context, r *http.Request, dest any) error {
 	c.initOnce.Do(func() {
-		c.HTTPClient = clientutil.WrapClient(c.HTTPClient, clientutil.Chain(
+		c.HTTPClient = clientutil.Wrap(c.HTTPClient, clientutil.Chain(
 			clientutil.WithCache(),
 			clientutil.WithRateLimit(c.RateLimit),
 		))

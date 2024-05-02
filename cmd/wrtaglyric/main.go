@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"os"
@@ -18,11 +19,8 @@ import (
 
 	"go.senan.xyz/wrtag/cmd/internal/flagcommon"
 	"go.senan.xyz/wrtag/lyrics"
-	"go.senan.xyz/wrtag/tags/tagcommon"
-	"go.senan.xyz/wrtag/tags/taglib"
+	"go.senan.xyz/wrtag/tags"
 )
-
-var tg tagcommon.Reader = taglib.TagLib{}
 
 var source = flagcommon.Lyrics()
 var configPath = flagcommon.ConfigPath()
@@ -44,7 +42,7 @@ func main() {
 				if d.IsDir() {
 					return nil
 				}
-				if tg.CanRead(path) {
+				if tags.CanRead(path) {
 					paths <- path
 				}
 				return nil
@@ -58,17 +56,20 @@ func main() {
 	}()
 
 	processTrack := func(ctx context.Context, path string) error {
-		f, err := tg.Read(path)
+		f, err := tags.Read(path)
 		if err != nil {
 			return err
 		}
 		defer f.Close()
 
-		lyricData, err := source.Search(ctx, f.Artist(), f.Title())
+		lyricData, err := source.Search(ctx, f.Read(tags.Artist), f.Read(tags.Title))
 		if err != nil && !errors.Is(err, lyrics.ErrLyricsNotFound) {
 			return err
 		}
-		f.WriteLyrics(lyricData)
+		f.Write(tags.Lyrics, lyricData)
+		if err := f.Save(); err != nil {
+			return fmt.Errorf("save: %w", err)
+		}
 
 		log.Printf("searched %q (%d bytes)", path, len(lyricData))
 		return nil
