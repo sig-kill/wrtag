@@ -312,6 +312,19 @@ func ArtistsCreditString(credits []ArtistCredit) string {
 	return sb.String()
 }
 
+// https://musicbrainz.org/artist/89ad4ac3-39f7-470e-963a-56509c546377
+// https://musicbrainz.org/tag/special%20purpose
+const variousArtistsID = "89ad4ac3-39f7-470e-963a-56509c546377"
+
+func IsVA(credits []ArtistCredit) bool {
+	for _, c := range credits {
+		if c.Artist.ID == variousArtistsID {
+			return true
+		}
+	}
+	return false
+}
+
 func FlatTracks(media []Media) []Track {
 	var tracks []Track
 	for _, media := range media {
