@@ -10,25 +10,144 @@ import (
 )
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "usage:\n")
+		fmt.Fprintf(os.Stderr, "  $ %s read  [TAG]...               -- [PATH]...\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  $ %s write [TAG [VALUE]... / ]... -- [PATH]...\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  $ %s clear [TAG]...               -- [PATH]...\n", os.Args[0])
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintf(os.Stderr, "example:\n")
+		fmt.Fprintf(os.Stderr, "  $ %s read -- a.flac b.flac                                       # read all\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  $ %s read artist title -- a.flac                                 # read some\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  $ %s write album \"album name\" -- x.flac                          # write tag\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  $ %s write genres psy minimal techno / artist Sensient -- *.flac # write multi tag, value, and track\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  $ %s clear -- a.flac                                             # clear all\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  $ %s clear lyrics artist_credit -- *.flac                        # clear some\n", os.Args[0])
+	}
 	flag.Parse()
 
-	var errs []error
-	for _, path := range flag.Args() {
-		file, err := tags.Read(path)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("read %s: %w", path, err))
-			continue
-		}
-		file.ReadAll(func(k string, vs []string) {
-			for _, v := range vs {
-				fmt.Printf("%s\t%s\t%s\n", path, k, v)
-			}
-		})
-		file.Close()
+	command := flag.Arg(0)
+	switch command {
+	case "read", "write", "clear":
+	default:
+		flag.Usage()
+		os.Exit(1)
 	}
 
+	var args []string
+	var paths []string
+
+	var cur = &args
+	for _, a := range flag.Args()[1:] {
+		if a == "--" {
+			cur = &paths
+			continue
+		}
+		*cur = append(*cur, a)
+	}
+	if len(paths) == 0 {
+		fmt.Fprintf(os.Stderr, "no paths provided\n")
+		fmt.Fprintln(os.Stderr)
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	var errs []error
+	for _, path := range paths {
+		var err error
+		switch command {
+		case "read":
+			err = read(path, parseTags(args))
+		case "write":
+			err = write(path, parseTagMap(args))
+		case "clear":
+			err = clear(path, parseTags(args))
+		}
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", path, err))
+			continue
+		}
+	}
 	if err := errors.Join(errs...); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func read(path string, keys map[string]struct{}) error {
+	file, err := tags.Read(path)
+	if err != nil {
+		return fmt.Errorf("read: %w", err)
+	}
+	defer file.Close()
+	file.ReadAll(func(k string, vs []string) {
+		if len(keys) > 0 {
+			if _, ok := keys[k]; !ok {
+				return
+			}
+		}
+		for _, v := range vs {
+			fmt.Printf("%s\t%s\t%s\n", path, k, v)
+		}
+	})
+	return nil
+}
+
+func write(path string, raw map[string][]string) error {
+	file, err := tags.Read(path)
+	if err != nil {
+		return fmt.Errorf("read: %w", err)
+	}
+	defer file.Close()
+	for k, vs := range raw {
+		file.Write(k, vs...)
+	}
+	if err := file.Save(); err != nil {
+		return fmt.Errorf("save: %w", err)
+	}
+	return nil
+}
+
+func clear(path string, keys map[string]struct{}) error {
+	file, err := tags.Read(path)
+	if err != nil {
+		return fmt.Errorf("read: %w", err)
+	}
+	defer file.Close()
+	if len(keys) == 0 {
+		file.ClearAll()
+	} else {
+		for k := range keys {
+			file.Clear(k)
+		}
+	}
+	if err := file.Save(); err != nil {
+		return fmt.Errorf("save: %w", err)
+	}
+	return nil
+}
+
+func parseTags(args []string) map[string]struct{} {
+	var keys = map[string]struct{}{}
+	for _, k := range args {
+		keys[k] = struct{}{}
+	}
+	return keys
+}
+
+func parseTagMap(args []string) map[string][]string {
+	r := make(map[string][]string)
+	var k string
+	for _, v := range args {
+		if v == "/" {
+			k = ""
+			continue
+		}
+		if k == "" {
+			k = v
+			continue
+		}
+		r[k] = append(r[k], v)
+	}
+	return r
 }
