@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -90,15 +91,24 @@ func (f *File) ReadNum(t string) int        { return anyNum(first(f.raw[t])) }
 func (f *File) ReadTime(t string) time.Time { return anyTime(first(f.raw[t])) }
 
 func (f *File) ReadAll(fn func(k string, vs []string)) {
-	for k, vs := range f.raw {
-		fn(k, vs)
+	keys := make([]string, 0, len(f.raw))
+	for k := range f.raw {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		fn(k, f.raw[k])
 	}
 }
 
 func (f *File) Write(t string, v ...string) { f.raw[t] = v }
 func (f *File) WriteNum(t string, v int)    { f.raw[t] = []string{intStr(v)} }
 
-func (f *File) ClearAll() { clear(f.raw) }
+func (f *File) Clear(t string) { delete(f.raw, t) }
+func (f *File) ClearAll() {
+	clear(f.raw)
+	f.raw["_"] = nil // for audiotags's len(map) check
+}
 
 func (f *File) Save() error {
 	if !f.file.WriteTags(f.raw) {
