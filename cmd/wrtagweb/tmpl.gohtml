@@ -13,7 +13,6 @@
 >
   <div class="p-3 cursor-pointer flex justify-between items-center">
     <span>{{ .Operation }} path <a class="italic break-all" href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></span>
-    <a href="/#" class="ml-3">[x]</a>
   </div>
   <div class="flex flex-col items-start gap-2 bg-gray-100 p-3">
     {{ if .SearchResult }}
@@ -116,30 +115,37 @@ origin file info
     </style>
     <script>
       document.addEventListener("DOMContentLoaded", () => {
+
       const modal = htmx.find("#modal")
-      modal.addEventListener("close", (e) => {
-        e.preventDefault();
-        history.pushState(null, null, "#");
+      modal.addEventListener("click", (e) => {
+        const rect = modal.getBoundingClientRect();
+        const inside =
+          rect.top <= event.clientY && event.clientY <= rect.top + rect.height &&
+          rect.left <= event.clientX && event.clientX <= rect.left + rect.width;
+        if (!inside)
+          modal.close();
       });
 
-      const checkJobModal = () => {
+      const checkModal = () => {
         const id = window.location.hash.substring(1);
         if (!id) {
-          return modal.close();
-        }
+          modal.close();
+          try { htmx.remove(htmx.find("#modal > *")) } catch(e) {};
+          return
+        };
         modal.showModal();
         htmx.ajax("GET", `/jobs/${id}`, "#modal");
-      };
+      }
 
-      checkJobModal()
-      window.addEventListener('hashchange',
-        checkJobModal
-      );
+      checkModal();
+      window.addEventListener('hashchange', () => { checkModal() })
+      modal.addEventListener('close', () => { history.replaceState("", "", "/"); checkModal(); })
 
-      document.body.addEventListener('htmx:beforeSwap', (evt) => {
-        if (evt.detail.xhr.status)
-          evt.detail.shouldSwap = true;
+      document.body.addEventListener('htmx:beforeSwap', (e) => {
+        if (e.detail.xhr.status)
+          e.detail.shouldSwap = true;
       });
+
       });
     </script>
   </head>
@@ -176,7 +182,7 @@ origin file info
       {{ end }}
     </div>
     {{ end }}
-    <dialog id="modal" class="p-0 backdrop:bg-gray-300 backdrop:bg-opacity-30"></dialog>
+    <dialog id="modal" class="p-0 backdrop:bg-gray-600/10 backdrop:backdrop-blur-[1.5px]"></dialog>
     {{ block "error" "" }}
       <div id="errors" hx-swap-oob="true">
         {{ if not (eq . "") }}
