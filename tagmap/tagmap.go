@@ -89,6 +89,9 @@ func WriteFile(
 		genreNames = append(genreNames, g.Name)
 	}
 
+	disambiguationParts := filterZero(release.ReleaseGroup.Disambiguation, release.Disambiguation)
+	disambiguation := strings.Join(disambiguationParts, ", ")
+
 	f.Write(tags.Album, release.Title)
 	f.Write(tags.AlbumArtist, musicbrainz.ArtistsString(release.Artists))
 	f.Write(tags.AlbumArtists, musicbrainz.ArtistsNames(release.Artists)...)
@@ -103,6 +106,7 @@ func WriteFile(
 	f.Write(tags.MBReleaseID, release.ID)
 	f.Write(tags.MBReleaseGroupID, release.ReleaseGroup.ID)
 	f.Write(tags.MBAlbumArtistID, mapFunc(release.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID })...)
+	f.Write(tags.MBAlbumComment, disambiguation)
 
 	f.Write(tags.Title, releaseTrack.Title)
 	f.Write(tags.Artist, musicbrainz.ArtistsString(releaseTrack.Artists))

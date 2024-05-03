@@ -32,6 +32,7 @@ const (
 	MBReleaseID      = "musicbrainz_albumid"
 	MBReleaseGroupID = "musicbrainz_releasegroupid"
 	MBAlbumArtistID  = "musicbrainz_albumartistid"
+	MBAlbumComment   = "musicbrainz_albumcomment" // seems like beets uses this for disambiguations
 
 	Title         = "title"
 	Artist        = "artist"
