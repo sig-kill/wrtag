@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"slices"
 
 	"go.senan.xyz/wrtag/tags"
 )
@@ -27,6 +28,7 @@ func main() {
 	flag.Parse()
 
 	command := flag.Arg(0)
+
 	switch command {
 	case "read", "write", "clear":
 	default:
@@ -34,16 +36,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	var args []string
-	var paths []string
+	argPaths := flag.Args()[1:]
 
-	var cur = &args
-	for _, a := range flag.Args()[1:] {
-		if a == "--" {
-			cur = &paths
-			continue
-		}
-		*cur = append(*cur, a)
+	var args, paths []string
+	if i := slices.Index(argPaths, "--"); i >= 0 {
+		args = argPaths[:i]
+		paths = argPaths[i+1:]
 	}
 	if len(paths) == 0 {
 		fmt.Fprintf(os.Stderr, "no paths provided\n")
