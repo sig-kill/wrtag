@@ -36,10 +36,10 @@ func WithCache() Middleware {
 }
 
 func WithRateLimit(interval time.Duration) Middleware {
+	if interval == 0 {
+		return Passthrough
+	}
 	return func(next http.RoundTripper) http.RoundTripper {
-		if interval == 0 {
-			return next
-		}
 		limiter := rate.NewLimiter(rate.Every(interval), 1)
 		return RoundTripFunc(func(r *http.Request) (*http.Response, error) {
 			if err := limiter.Wait(r.Context()); err != nil {
@@ -65,15 +65,19 @@ func WithLogging() Middleware {
 }
 
 func WithUserAgent(userAgent string) Middleware {
+	if userAgent == "" {
+		return Passthrough
+	}
 	return func(next http.RoundTripper) http.RoundTripper {
-		if userAgent == "" {
-			return next
-		}
 		return RoundTripFunc(func(r *http.Request) (*http.Response, error) {
 			r.Header.Add("User-Agent", userAgent)
 			return next.RoundTrip(r)
 		})
 	}
+}
+
+func Passthrough(next http.RoundTripper) http.RoundTripper {
+	return next
 }
 
 func FSClient(fsys fs.FS, sub string) *http.Client {
