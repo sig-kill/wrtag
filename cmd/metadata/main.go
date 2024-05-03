@@ -78,15 +78,16 @@ func read(path string, keys map[string]struct{}) error {
 		return fmt.Errorf("read: %w", err)
 	}
 	defer file.Close()
-	file.ReadAll(func(k string, vs []string) {
+	file.ReadAll(func(k string, vs []string) bool {
 		if len(keys) > 0 {
 			if _, ok := keys[k]; !ok {
-				return
+				return true
 			}
 		}
 		for _, v := range vs {
 			fmt.Printf("%s\t%s\t%s\n", path, k, v)
 		}
+		return true
 	})
 	return nil
 }

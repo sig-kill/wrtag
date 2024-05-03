@@ -77,8 +77,9 @@ func WriteFile(
 	releaseTrack *musicbrainz.Track, i int, f *tags.File,
 ) error {
 	prev := map[string][]string{}
-	f.ReadAll(func(k string, vs []string) {
+	f.ReadAll(func(k string, vs []string) bool {
 		prev[k] = append(prev[k], vs...)
+		return true
 	})
 
 	f.ClearAll()
@@ -118,10 +119,11 @@ func WriteFile(
 
 	// try to avoid extra filesystem writes if we can
 	var anyChanges bool
-	f.ReadAll(func(k string, vs []string) {
+	f.ReadAll(func(k string, vs []string) bool {
 		if !slices.Equal(prev[k], vs) {
 			anyChanges = true
 		}
+		return !anyChanges
 	})
 	if !anyChanges {
 		return nil
