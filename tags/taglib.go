@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -98,17 +99,14 @@ func (f *File) ReadAll(fn func(k string, vs []string) bool) {
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		if len(f.raw[k]) == 1 && f.raw[k][0] == "" {
-			continue
-		}
 		if !fn(k, f.raw[k]) {
 			break
 		}
 	}
 }
 
-func (f *File) Write(t string, v ...string) { f.raw[t] = v }
-func (f *File) WriteNum(t string, v int)    { f.raw[t] = []string{intStr(v)} }
+func (f *File) Write(t string, v ...string) { f.raw[t] = filterZero(v...) }
+func (f *File) WriteNum(t string, v int)    { f.Write(t, intStr(v)) }
 
 func (f *File) Clear(t string) { delete(f.raw, t) }
 func (f *File) ClearAll() {
@@ -176,4 +174,11 @@ func normalise(raw map[string][]string, fallbacks map[string]string) {
 		delete(raw, k)
 		raw[kNew] = vs
 	}
+}
+
+func filterZero[T comparable](elms ...T) []T {
+	var zero T
+	return slices.DeleteFunc(elms, func(t T) bool {
+		return t == zero
+	})
 }
