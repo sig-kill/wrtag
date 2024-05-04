@@ -102,10 +102,14 @@ func ProcessDir(
 
 	var researchLinks []researchlink.SearchResult
 	if researchLinkQuerier != nil {
+		var artist = searchFile.Read(tags.AlbumArtist)
+		if artist == "" {
+			artist = searchFile.Read(tags.Artist)
+		}
 		researchLinks, err = researchLinkQuerier.Search(researchlink.Query{
-			Album:       searchFile.Read(tags.Album),
-			AlbumArtist: searchFile.Read(tags.AlbumArtist),
-			Date:        searchFile.ReadTime(tags.Date),
+			Artist: artist,
+			Album:  searchFile.Read(tags.Album),
+			Date:   searchFile.ReadTime(tags.Date),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("research querier search: %w", err)
