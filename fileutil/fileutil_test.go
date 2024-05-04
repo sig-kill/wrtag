@@ -20,6 +20,7 @@ func TestSafePath(t *testing.T) {
 	assert.Equal(t, "(2004) Kesto (234.484)", fileutil.SafePath("(2004) Kesto (234.48:4)"))
 	assert.Equal(t, "01.33 Rahina I Mayhem I", fileutil.SafePath("01.33 Rähinä I Mayhem I"))
 	assert.Equal(t, "50 C .flac", fileutil.SafePath("50 ¢.flac"))
+	assert.Equal(t, "(2007)", fileutil.SafePath("(2007) ✝")) // need to fix this
 }
 
 func TestWalkLeaves(t *testing.T) {
