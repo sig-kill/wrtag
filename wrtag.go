@@ -88,22 +88,10 @@ func ProcessDir(
 	if err != nil {
 		return nil, fmt.Errorf("find origin file: %w", err)
 	}
-	if originFile != nil {
-		log.Printf("using origin file: %s", originFile)
 
-		if originFile.RecordLabel != "" {
-			query.Label = originFile.RecordLabel
-		}
-		if originFile.CatalogueNumber != "" {
-			query.CatalogueNum = originFile.CatalogueNumber
-		}
-		if originFile.Media != "" {
-			media := originFile.Media
-			media = strings.ReplaceAll(media, "WEB", "Digital Media")
-			query.Format = media
-		}
-		if originFile.EditionYear > 0 {
-			query.Date = time.Date(originFile.EditionYear, 0, 0, 0, 0, 0, 0, time.UTC)
+	if query.MBReleaseID == "" {
+		if err := extendQueryWithOriginFile(originFile, &query); err != nil {
+			return nil, fmt.Errorf("use origin file: %w", err)
 		}
 	}
 
@@ -526,6 +514,29 @@ func safeRemoveAll(src string, dryRun bool) error {
 
 	if err := os.RemoveAll(src); err != nil {
 		return fmt.Errorf("error cleaning up folder: %w", err)
+	}
+	return nil
+}
+
+func extendQueryWithOriginFile(originFile *originfile.OriginFile, q *musicbrainz.ReleaseQuery) error {
+	if originFile == nil {
+		return nil
+	}
+	log.Printf("using origin file: %s", originFile)
+
+	if originFile.RecordLabel != "" {
+		q.Label = originFile.RecordLabel
+	}
+	if originFile.CatalogueNumber != "" {
+		q.CatalogueNum = originFile.CatalogueNumber
+	}
+	if originFile.Media != "" {
+		media := originFile.Media
+		media = strings.ReplaceAll(media, "WEB", "Digital Media")
+		q.Format = media
+	}
+	if originFile.EditionYear > 0 {
+		q.Date = time.Date(originFile.EditionYear, 0, 0, 0, 0, 0, 0, time.UTC)
 	}
 	return nil
 }
