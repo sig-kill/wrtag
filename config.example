@@ -6,11 +6,11 @@
 # search links are shortcuts on for the ui to help research data, and populate missing musicbrainz data. the template is fed with tag data
 # see go.senan.xyz/tags/tagcommon for type definitions
 
-#research-link kagi https://kagi.com/search?l=4&q={{ printf "%s %s" (or .AlbumArtist .Artist) .Album | urlquery }}
-#research-link juno https://www.junodownload.com/search/?q%5Ball%5D%5B%5D={{ printf "%s %s" (or .AlbumArtist .Artist) .Album | urlquery }}
-#research-link deezer https://www.deezer.com/search/{{ printf "%s %s" (or .AlbumArtist .Artist) .Album | urlquery }}
+#research-link kagi https://kagi.com/search?l=4&q={{ printf "%s %s" .Artist .Album | urlquery }}
+#research-link juno https://www.junodownload.com/search/?q%5Ball%5D%5B%5D={{ printf "%s %s" .Artist .Album | urlquery }}
+#research-link deezer https://www.deezer.com/search/{{ printf "%s %s" .Artist .Album | urlquery }}
 #research-link a-tisket https://atisket.pulsewidth.org.uk/
-#research-link musicbrainz https://musicbrainz.org/taglookup?tag-lookup.artist={{ or .AlbumArtist .Artist | urlquery }}&tag-lookup.release={{ .Album | urlquery }}
+#research-link musicbrainz https://musicbrainz.org/taglookup?tag-lookup.artist={{ .Artist | urlquery }}&tag-lookup.release={{ .Album | urlquery }}
 
 # add notification uri that are triggered by various events
 # see all available services here https://containrrr.dev/shoutrrr/v0.8/services/generic/

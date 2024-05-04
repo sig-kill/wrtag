@@ -38,9 +38,9 @@ func (q *Querier) AddSource(name, templRaw string) error {
 }
 
 type Query struct {
-	Album       string
-	AlbumArtist string
-	Date        time.Time
+	Artist string
+	Album  string
+	Date   time.Time
 }
 
 type SearchResult struct {
