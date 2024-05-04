@@ -1,0 +1,23 @@
+exec flac
+cp stdout a.flac
+
+exec metadata clear -- a.flac
+exec metadata write a 1 2 3 , b 4 5 6 -- a.flac
+
+exec metadata read -- a.flac
+cmp stdout exp-all
+
+exec metadata read a -- a.flac
+cmp stdout exp-a
+
+-- exp-all --
+a.flac	a	1
+a.flac	a	2
+a.flac	a	3
+a.flac	b	4
+a.flac	b	5
+a.flac	b	6
+-- exp-a --
+a.flac	a	1
+a.flac	a	2
+a.flac	a	3
