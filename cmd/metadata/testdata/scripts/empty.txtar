@@ -1,0 +1,8 @@
+exec flac
+cp stdout a.flac
+
+exec metadata clear -- a.flac
+exec metadata write a '' -- a.flac
+
+exec metadata read -- a.flac
+! stdout .
