@@ -74,6 +74,10 @@ func main() {
 		log.Print(row)
 	}
 
+	for _, link := range r.ResearchLinks {
+		log.Printf("search with %-12s %s\n", link.Name, link.URL)
+	}
+
 	if err != nil {
 		log.Fatalln(err)
 	}
