@@ -14,16 +14,16 @@ func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage:\n")
 		fmt.Fprintf(os.Stderr, "  $ %s read  [TAG]...               -- [PATH]...\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  $ %s write [TAG [VALUE]... / ]... -- [PATH]...\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  $ %s write [TAG [VALUE]... , ]... -- [PATH]...\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  $ %s clear [TAG]...               -- [PATH]...\n", os.Args[0])
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintf(os.Stderr, "example:\n")
-		fmt.Fprintf(os.Stderr, "  $ %s read -- a.flac b.flac                                       # read all\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  $ %s read artist title -- a.flac                                 # read some\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  $ %s write album \"album name\" -- x.flac                          # write tag\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  $ %s write genres psy minimal techno / artist Sensient -- *.flac # write multi tag, value, and track\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  $ %s clear -- a.flac                                             # clear all\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  $ %s clear lyrics artist_credit -- *.flac                        # clear some\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  $ %s read -- a.flac b.flac c.flac\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  $ %s read artist title -- a.flac\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  $ %s write album \"album name\" -- x.flac\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  $ %s write genres \"psy\" \"minimal\" \"techno\" , artist \"Sensient\" -- dir/*.flac\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  $ %s clear -- a.flac\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  $ %s clear lyrics artist_credit -- *.flac\n", os.Args[0])
 	}
 	flag.Parse()
 
@@ -138,7 +138,7 @@ func parseTagMap(args []string) map[string][]string {
 	r := make(map[string][]string)
 	var k string
 	for _, v := range args {
-		if v == "/" {
+		if v == "," {
 			k = ""
 			continue
 		}
