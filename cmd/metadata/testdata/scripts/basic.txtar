@@ -8,7 +8,15 @@ exec metadata read -- a.flac
 cmp stdout exp-all
 
 exec metadata read a -- a.flac
-cmp stdout exp-a
+cmp stdout exp-only-a
+
+exec metadata clear b -- a.flac
+
+exec metadata read -- a.flac
+cmp stdout exp-only-a
+
+exec metadata clear -- a.flac
+! stdout .
 
 -- exp-all --
 a.flac	a	1
@@ -17,7 +25,7 @@ a.flac	a	3
 a.flac	b	4
 a.flac	b	5
 a.flac	b	6
--- exp-a --
+-- exp-only-a --
 a.flac	a	1
 a.flac	a	2
 a.flac	a	3
