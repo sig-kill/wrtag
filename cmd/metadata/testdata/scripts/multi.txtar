@@ -1,0 +1,14 @@
+exec flac
+cp stdout a.flac
+exec flac
+cp stdout b.flac
+
+exec metadata write x 'one two' 'three' , y 'okay' -- a.flac b.flac
+
+exec metadata read -- a.flac
+cmp stdout exp
+
+-- exp --
+a.flac	x	one two
+a.flac	x	three
+a.flac	y	okay

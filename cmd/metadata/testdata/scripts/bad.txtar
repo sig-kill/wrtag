@@ -1,0 +1,23 @@
+! exec metadata clear
+stderr 'no paths provided'
+
+! exec metadata wroyte
+stderr 'usage:'
+
+! exec metadata wroyte -- s
+stderr 'usage:'
+
+! exec metadata read -- f
+stderr 'open: cannot process'
+
+! exec metadata read --
+stderr 'no paths provided'
+
+! exec metadata read
+stderr 'usage:'
+
+! exec metadata read
+stderr 'no paths provided'
+
+! exec metadata
+stderr 'usage:'
