@@ -51,19 +51,30 @@ func main() {
 	}
 
 	var errs []error
-	for _, path := range paths {
-		var err error
-		switch command {
-		case "read":
-			err = read(path, parseTags(args))
-		case "write":
-			err = write(path, parseTagMap(args))
-		case "clear":
-			err = clear(path, parseTags(args))
+	switch command {
+	case "read":
+		args := parseTags(args)
+		for _, path := range paths {
+			if err := read(path, args); err != nil {
+				errs = append(errs, err)
+				continue
+			}
 		}
-		if err != nil {
-			errs = append(errs, fmt.Errorf("%s: %w", path, err))
-			continue
+	case "write":
+		args := parseTagMap(args)
+		for _, path := range paths {
+			if err := write(path, args); err != nil {
+				errs = append(errs, err)
+				continue
+			}
+		}
+	case "clear":
+		args := parseTags(args)
+		for _, path := range paths {
+			if err := clear(path, args); err != nil {
+				errs = append(errs, err)
+				continue
+			}
 		}
 	}
 	if err := errors.Join(errs...); err != nil {
