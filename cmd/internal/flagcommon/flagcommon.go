@@ -22,12 +22,11 @@ func init() {
 	flag.CommandLine.Init(name, flag.ExitOnError)
 }
 
-var mw = clientutil.Chain(
-	clientutil.WithLogging(),
-	clientutil.WithUserAgent(`wrtag/v0.0.0-alpha ( https://go.senan.xyz/wrtag )`),
-)
 var defaultClient = &http.Client{
-	Transport: mw(http.DefaultTransport),
+	Transport: clientutil.Chain(
+		clientutil.WithLogging(),
+		clientutil.WithUserAgent(`wrtag/v0.0.0-alpha ( https://go.senan.xyz/wrtag )`),
+	)(http.DefaultTransport),
 }
 
 func init() {
