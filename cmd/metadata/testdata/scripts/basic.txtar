@@ -10,6 +10,9 @@ cmp stdout exp-all
 exec metadata read a -- a.flac
 cmp stdout exp-only-a
 
+exec metadata read a missing -- a.flac
+cmp stdout exp-only-a
+
 exec metadata clear b -- a.flac
 
 exec metadata read -- a.flac
