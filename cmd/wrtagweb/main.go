@@ -67,9 +67,11 @@ func main() {
 
 	jobStream := sseServ.CreateStream("jobs")
 
-	eventAllJobs := "jobs"
-	eventUpdateJob := func(id uint64) string { return fmt.Sprintf("job-%d", id) }
-	emit := func(e string) {
+	var (
+		eventAllJobs   = func() string { return "jobs" }
+		eventUpdateJob = func(id uint64) string { return fmt.Sprintf("job-%d", id) }
+	)
+	emitEvent := func(e string) {
 		sseServ.Publish(jobStream.ID, &sse.Event{Event: []byte(e), Data: []byte{0}})
 	}
 
@@ -168,7 +170,7 @@ func main() {
 			return
 		}
 		respTmpl(w, "job-import", nil)
-		emit(eventAllJobs)
+		emitEvent(eventAllJobs())
 	})
 
 	mux.HandleFunc("GET /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -204,7 +206,7 @@ func main() {
 			return
 		}
 		respTmpl(w, "job", job)
-		emit(eventAllJobs)
+		emitEvent(eventAllJobs())
 	})
 
 	mux.HandleFunc("DELETE /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -213,7 +215,7 @@ func main() {
 			respErr(w, http.StatusInternalServerError, "error getting job")
 			return
 		}
-		emit(eventAllJobs)
+		emitEvent(eventAllJobs())
 	})
 
 	mux.HandleFunc("GET /dump", func(w http.ResponseWriter, r *http.Request) {
@@ -261,7 +263,7 @@ func main() {
 			http.Error(w, fmt.Sprintf("error saving job: %v", err), http.StatusInternalServerError)
 			return
 		}
-		emit(eventAllJobs)
+		emitEvent(eventAllJobs())
 	})
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -293,10 +295,11 @@ func main() {
 			case err != nil:
 				return fmt.Errorf("find next job: %w", err)
 			}
-			emit(eventUpdateJob(job.ID))
+			emitEvent(eventUpdateJob(job.ID))
 			defer func() {
 				_ = db.Update(job.ID, &job)
-				emit(eventUpdateJob(job.ID))
+				emitEvent(eventUpdateJob(job.ID))
+				emitEvent(eventAllJobs())
 			}()
 			return processJob(ctx, &job, false)
 		}
