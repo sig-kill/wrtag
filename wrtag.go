@@ -90,7 +90,7 @@ func ProcessDir(
 	}
 
 	if query.MBReleaseID == "" {
-		if err := extendQueryWithOriginFile(originFile, &query); err != nil {
+		if err := extendQueryWithOriginFile(&query, originFile); err != nil {
 			return nil, fmt.Errorf("use origin file: %w", err)
 		}
 	}
@@ -522,7 +522,7 @@ func safeRemoveAll(src string, dryRun bool) error {
 	return nil
 }
 
-func extendQueryWithOriginFile(originFile *originfile.OriginFile, q *musicbrainz.ReleaseQuery) error {
+func extendQueryWithOriginFile(q *musicbrainz.ReleaseQuery, originFile *originfile.OriginFile) error {
 	if originFile == nil {
 		return nil
 	}
