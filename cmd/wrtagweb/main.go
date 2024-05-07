@@ -12,6 +12,7 @@ import (
 	htmltemplate "html/template"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -61,6 +62,10 @@ func main() {
 	}
 	defer db.Close()
 
+	if err := migrateDB(db); err != nil {
+		log.Fatalf("error migrating db: %v", err)
+	}
+
 	sseServ := sse.New()
 	sseServ.AutoReplay = false
 	defer sseServ.Close()
@@ -82,12 +87,12 @@ func main() {
 		var err error
 		job.SearchResult, err = wrtag.ProcessDir(ctx, mb, pathFormat, tagWeights, researchLinkQuerier, keepFiles, wrtagOperation(job.Operation), job.SourcePath, job.UseMBID, yes)
 		if err != nil {
-			if errors.Is(err, wrtag.ErrScoreTooLow) {
-				job.Error = string(JobErrorNeedsInput)
-				notifs.Send(notifications.NeedsInput, jobNotificationMessage(*publicURL, job))
-				return nil
-			}
+			job.Status = StatusError
 			job.Error = err.Error()
+			if errors.Is(err, wrtag.ErrScoreTooLow) {
+				notifs.Send(notifications.NeedsInput, jobNotificationMessage(*publicURL, job))
+				job.Status = StatusNeedsInput
+			}
 			return nil
 		}
 
@@ -120,37 +125,53 @@ func main() {
 			return
 		}
 	}
-	respErr := func(w http.ResponseWriter, code int, f string, a ...any) {
+	respErrf := func(w http.ResponseWriter, code int, f string, a ...any) {
 		w.WriteHeader(code)
 		respTmpl(w, "error", fmt.Sprintf(f, a...))
 	}
 
 	type jobsListing struct {
-		Total  int
-		Jobs   []*Job
-		Search string
+		Filter    JobStatus
+		Search    string
+		Page      int
+		PageCount int
+		Total     int
+		Jobs      []*Job
 	}
 
-	listJobs := func(search string) (jobsListing, error) {
+	const pageSize = 20
+	listJobs := func(search string, filter JobStatus, page int) (jobsListing, error) {
 		q := &bolthold.Query{}
 		if search != "" {
 			q = q.And("SourcePath").MatchFunc(func(path string) (bool, error) {
 				return strings.Contains(strings.ToLower(path), strings.ToLower(search)), nil
 			})
 		}
-		q = q.SortBy("Time")
-		q = q.Reverse()
-
-		var jl jobsListing
-		if err := db.Find(&jl.Jobs, q); err != nil {
-			return jobsListing{}, err
+		if filter != "" {
+			q = q.And("Status").Eq(filter)
 		}
-		jl.Total, err = db.Count(&Job{}, &bolthold.Query{})
+
+		total, err := db.Count(&Job{}, q)
 		if err != nil {
 			return jobsListing{}, err
 		}
-		jl.Search = search
-		return jl, nil
+
+		pageCount := max(1, int(math.Ceil(float64(total)/float64(pageSize))))
+		if page > pageCount-1 {
+			page = 0 // reset if gone too far
+		}
+
+		q = q.
+			Skip(pageSize * page).
+			Limit(pageSize).
+			SortBy("Time").
+			Reverse()
+		var jobs []*Job
+		if err := db.Find(&jobs, q); err != nil {
+			return jobsListing{}, err
+		}
+
+		return jobsListing{filter, search, page, pageCount, total, jobs}, nil
 	}
 
 	mux := http.NewServeMux()
@@ -158,9 +179,11 @@ func main() {
 
 	mux.HandleFunc("GET /jobs", func(w http.ResponseWriter, r *http.Request) {
 		search := r.URL.Query().Get("search")
-		jl, err := listJobs(search)
+		filter := JobStatus(r.URL.Query().Get("filter"))
+		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+		jl, err := listJobs(search, filter, page)
 		if err != nil {
-			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
+			respErrf(w, http.StatusInternalServerError, "error listing jobs: %v", err)
 			return
 		}
 		respTmpl(w, "jobs", jl)
@@ -190,7 +213,7 @@ func main() {
 		id, _ := strconv.Atoi(r.PathValue("id"))
 		var job Job
 		if err := db.Get(uint64(id), &job); err != nil {
-			respErr(w, http.StatusInternalServerError, "error getting job")
+			respErrf(w, http.StatusInternalServerError, "error getting job")
 			return
 		}
 		respTmpl(w, "job", job)
@@ -206,16 +229,16 @@ func main() {
 
 		var job Job
 		if err := db.Get(uint64(id), &job); err != nil {
-			respErr(w, http.StatusInternalServerError, "error getting job")
+			respErrf(w, http.StatusInternalServerError, "error getting job")
 			return
 		}
 		job.UseMBID = useMBID
 		if err := processJob(r.Context(), &job, confirm); err != nil {
-			respErr(w, http.StatusInternalServerError, "error in job")
+			respErrf(w, http.StatusInternalServerError, "error in job")
 			return
 		}
 		if err := db.Update(uint64(id), &job); err != nil {
-			respErr(w, http.StatusInternalServerError, "save job")
+			respErrf(w, http.StatusInternalServerError, "save job")
 			return
 		}
 		respTmpl(w, "job", job)
@@ -225,7 +248,7 @@ func main() {
 	mux.HandleFunc("DELETE /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(r.PathValue("id"))
 		if err := db.Delete(uint64(id), &Job{}); err != nil {
-			respErr(w, http.StatusInternalServerError, "error getting job")
+			respErrf(w, http.StatusInternalServerError, "error getting job")
 			return
 		}
 		emitEvent(eventAllJobs())
@@ -234,19 +257,19 @@ func main() {
 	mux.HandleFunc("GET /dump", func(w http.ResponseWriter, r *http.Request) {
 		var jobs []*Job
 		if err := db.Find(&jobs, nil); err != nil {
-			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
+			respErrf(w, http.StatusInternalServerError, "error listing jobs: %v", err)
 			return
 		}
 		if err := json.NewEncoder(w).Encode(jobs); err != nil {
-			respErr(w, http.StatusInternalServerError, "error encoding jobs")
+			respErrf(w, http.StatusInternalServerError, "error encoding jobs")
 			return
 		}
 	})
 
 	mux.HandleFunc("/{$}", func(w http.ResponseWriter, r *http.Request) {
-		jl, err := listJobs("")
+		jl, err := listJobs("", "", 0)
 		if err != nil {
-			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
+			respErrf(w, http.StatusInternalServerError, "error listing jobs: %v", err)
 			return
 		}
 		respTmpl(w, "index", jl)
@@ -329,13 +352,9 @@ type JobStatus string
 
 const (
 	StatusIncomplete JobStatus = ""
+	StatusNeedsInput JobStatus = "needs-input"
+	StatusError      JobStatus = "error"
 	StatusComplete   JobStatus = "complete"
-)
-
-type JobError string
-
-const (
-	JobErrorNeedsInput JobError = "needs-input"
 )
 
 type Operation string
@@ -408,6 +427,16 @@ var funcMap = htmltemplate.FuncMap{
 	"url":  func(u string) htmltemplate.URL { return htmltemplate.URL(u) },
 	"join": func(delim string, items []string) string { return strings.Join(items, delim) },
 	"pad0": func(amount, n int) string { return fmt.Sprintf("%0*d", amount, n) },
+	"divc": func(a, b int) int { return int(math.Ceil(float64(a) / float64(b))) },
+	"add":  func(a, b int) int { return a + b },
+	"rangeN": func(n int) []int {
+		r := make([]int, 0, n)
+		for i := range n {
+			r = append(r, i)
+		}
+		return r
+	},
+	"panic": func(msg string) string { panic(msg) },
 }
 
 func logJob(jobName string) func() {
@@ -449,4 +478,17 @@ func ctxTick(ctx context.Context, interval time.Duration, f func()) {
 			f()
 		}
 	}
+}
+
+func migrateDB(db *bolthold.Store) error {
+	return db.ForEach(&bolthold.Query{}, func(job *Job) error {
+		if job.Status == "complete" && job.Error != "" {
+			job.Status = StatusError
+			if job.Error == "needs-input" {
+				job.Status = StatusNeedsInput
+			}
+			return db.Update(job.ID, job)
+		}
+		return nil
+	})
 }

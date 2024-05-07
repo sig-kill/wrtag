@@ -1,5 +1,5 @@
 {{ define "job-colour" }}
-  {{ if eq .Status "" }}bg-orange-200{{ else if .Error }}bg-red-200{{ else }}bg-gray-100{{ end }}
+  {{ if eq . "" }}bg-orange-200{{ else if or (eq . "error") (eq . "needs-input") }}bg-red-200{{ else }}bg-gray-100{{ end }}
 {{ end }}
 
 {{ define "job" }}
@@ -9,7 +9,7 @@
   hx-target="#job-{{ .ID }}"
   hx-indicator="this"
   hx-swap="outerHTML"
-  class="max-h-full overflow-auto shadow-sm {{ template "job-colour" . }} {{ if eq .Status "" }}in-progress{{ end }}"
+  class="max-h-full overflow-auto shadow-sm {{ template "job-colour" .Status }} {{ if eq .Status "" }}in-progress{{ end }}"
 >
   <div class="p-3 cursor-pointer flex justify-between items-center">
     <span>{{ .Operation }} path <a class="italic break-all" href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></span>
@@ -29,18 +29,20 @@
     {{ end }}
     {{ if eq .Status "" }}
       <p class="text-gray-600">in progress ...</p>
-    {{ else if eq .Error "needs-input" }}
+    {{ else if eq .Status "needs-input" }}
       <p><span class="text-red-500">low/no match</span> <button hx-put="/jobs/{{ .ID }}?confirm=1">[use anyway]</button></p>
       <p>use custom release <input type="text" name="mbid" class="px-2" placeholder="mbid/url" value="{{ .UseMBID }}"></p>
       <button>[retry]</button>
-    {{ else if .Error }}
+    {{ else if eq .Status "error" }}
       <p class="text-red-500">{{ .Error }}</p>
       <p>use custom release <input type="text" name="mbid" class="px-2" placeholder="mbid/url" value="{{ .UseMBID }}"></p>
       <button>[retry]</button>
-    {{ else }}
+    {{ else if eq .Status "complete" }}
       <p>sucessfully moved to <a href="{{ .DestPath | file | url }}">{{ .DestPath }}</a>
       <p>use custom release <input type="text" name="mbid" class="px-2" placeholder="mbid/url" value="{{ .UseMBID }}"></p>
       <button>[reimport]</button>
+    {{ else }}
+      {{ panic "unknown status" }}
     {{ end }}
   </div>
 </form>
@@ -167,15 +169,30 @@ origin file info
     </form>
     <hr class="w-full border border-b-gray-400" />
     {{ block "jobs" . }}
-    <div hx-get="/jobs" hx-trigger="sse:jobs, input changed from:#job-search delay:500ms, every 5s" hx-include="#job-search" hx-swap="outerHTML" class="contents">
-      <p>found {{ len .Jobs }} jobs, {{ .Total }} total</p>
+    <div
+      hx-get="/jobs"
+      hx-trigger="sse:jobs, input changed from:#job-search delay:300ms, input changed from:#job-filter, input changed from:#job-page"
+      hx-include="#job-search, #job-filter, #job-page"
+      hx-swap="outerHTML"
+      class="contents"
+    >
       <div class="flex gap-3 items-center">
-        <span class="text-gray-600">filter jobs</span>
-        <input id="job-search" type="search" name="search" value="{{ .Search }}" placeholder="filter jobs" class="border px-3 py-1 w-full sm:w-auto shadow-sm" />
+        <input id="job-search" type="search" name="search" value="{{ .Search }}" placeholder="filter jobs" autocomplete="off" class="border px-3 py-1 shadow-sm" />
+        <select id="job-filter" name="filter" class="border px-3 py-1 shadow-sm" autocomplete="off">
+          <option {{ if eq .Filter "" }}selected{{ end }} value="">any status</option>
+          <option {{ if eq .Filter "needs-input" }}selected{{ end }} value="needs-input">needs input</option>
+          <option {{ if eq .Filter "error" }}selected{{ end }} value="error">error</option>
+          <option {{ if eq .Filter "complete" }}selected{{ end }} value="complete">complete</option>
+        </select>
+        <select id="job-page" name="page" {{ if eq $.PageCount 1 }}disabled{{ end }} autocomplete="off" class="border px-3 py-1 shadow-sm">
+          {{ range $i := rangeN .PageCount  }}
+            <option {{ if eq $.Page $i }}selected{{ end }} value="{{ $i }}">page {{ add $i 1 }}</option>
+          {{ end }}
+        </select>
       </div>
-      {{ if eq (len .Jobs) 0 }}<p class="text-gray-600">no jobs yet ...</p>{{ end }}
+      <p>{{ .Total }} results {{ if not (eq (len .Jobs) .Total) }}({{ len .Jobs }} shown){{ end }}</p>
       {{ range .Jobs }}
-        <div class="p-3 cursor {{ template "job-colour" . }}">
+        <div class="p-3 cursor {{ template "job-colour" .Status }}">
           <button hx-delete="/jobs/{{ .ID }}" hx-swap="none">[x]</button>
           <span>{{ .Operation }} path <a class="italic break-all" href="#{{ .ID }}">{{ .SourcePath }}</a></span>
         </div>
