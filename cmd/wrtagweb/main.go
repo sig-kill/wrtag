@@ -125,12 +125,14 @@ func main() {
 		respTmpl(w, "error", fmt.Sprintf(f, a...))
 	}
 
-	mux := http.NewServeMux()
-	mux.Handle("GET /events", sseServ)
+	type jobsListing struct {
+		Total  int
+		Jobs   []*Job
+		Search string
+	}
 
-	mux.HandleFunc("GET /jobs", func(w http.ResponseWriter, r *http.Request) {
+	listJobs := func(search string) (jobsListing, error) {
 		q := &bolthold.Query{}
-		search := r.URL.Query().Get("search")
 		if search != "" {
 			q = q.And("SourcePath").MatchFunc(func(path string) (bool, error) {
 				return strings.Contains(strings.ToLower(path), strings.ToLower(search)), nil
@@ -139,18 +141,29 @@ func main() {
 		q = q.SortBy("Time")
 		q = q.Reverse()
 
-		var d struct {
-			Total  int
-			Jobs   []*Job
-			Search string
+		var jl jobsListing
+		if err := db.Find(&jl.Jobs, q); err != nil {
+			return jobsListing{}, err
 		}
-		if err := db.Find(&d.Jobs, q); err != nil {
+		jl.Total, err = db.Count(&Job{}, &bolthold.Query{})
+		if err != nil {
+			return jobsListing{}, err
+		}
+		jl.Search = search
+		return jl, nil
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle("GET /events", sseServ)
+
+	mux.HandleFunc("GET /jobs", func(w http.ResponseWriter, r *http.Request) {
+		search := r.URL.Query().Get("search")
+		jl, err := listJobs(search)
+		if err != nil {
 			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
 			return
 		}
-		d.Total, _ = db.Count(&Job{}, &bolthold.Query{})
-		d.Search = search
-		respTmpl(w, "jobs", d)
+		respTmpl(w, "jobs", jl)
 	})
 
 	mux.HandleFunc("POST /jobs", func(w http.ResponseWriter, r *http.Request) {
@@ -231,17 +244,12 @@ func main() {
 	})
 
 	mux.HandleFunc("/{$}", func(w http.ResponseWriter, r *http.Request) {
-		var d struct {
-			Total  int
-			Jobs   []*Job
-			Search string
-		}
-		if err := db.Find(&d.Jobs, (&bolthold.Query{}).SortBy("Time").Reverse()); err != nil {
+		jl, err := listJobs("")
+		if err != nil {
 			respErr(w, http.StatusInternalServerError, fmt.Sprintf("error listing jobs: %v", err))
 			return
 		}
-		d.Total = len(d.Jobs)
-		respTmpl(w, "index", d)
+		respTmpl(w, "index", jl)
 	})
 
 	mux.Handle("/", http.FileServer(http.FS(ui)))
