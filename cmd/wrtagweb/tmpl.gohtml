@@ -176,15 +176,15 @@ origin file info
       hx-swap="outerHTML"
       class="contents"
     >
-      <div class="flex gap-3 items-center">
-        <input id="job-search" type="search" name="search" value="{{ .Search }}" placeholder="filter jobs" autocomplete="off" class="border px-3 py-1 shadow-sm" />
-        <select id="job-filter" name="filter" class="border px-3 py-1 shadow-sm" autocomplete="off">
+      <div class="grid grid-cols-2 w-full sm:flex sm:w-auto gap-3">
+        <input id="job-search" type="search" name="search" value="{{ .Search }}" placeholder="filter jobs" autocomplete="off" class="col-span-2 border px-3 py-1 shadow-sm" />
+        <select id="job-filter" name="filter" class="col-span-1 border px-3 py-1 shadow-sm" autocomplete="off">
           <option {{ if eq .Filter "" }}selected{{ end }} value="">any status</option>
           <option {{ if eq .Filter "needs-input" }}selected{{ end }} value="needs-input">needs input</option>
           <option {{ if eq .Filter "error" }}selected{{ end }} value="error">error</option>
           <option {{ if eq .Filter "complete" }}selected{{ end }} value="complete">complete</option>
         </select>
-        <select id="job-page" name="page" {{ if eq $.PageCount 1 }}disabled{{ end }} autocomplete="off" class="border px-3 py-1 shadow-sm">
+        <select id="job-page" name="page" {{ if eq $.PageCount 1 }}disabled{{ end }} autocomplete="off" class="col-span-1 border px-3 py-1 shadow-sm">
           {{ range $i := rangeN .PageCount  }}
             <option {{ if eq $.Page $i }}selected{{ end }} value="{{ $i }}">page {{ add $i 1 }}</option>
           {{ end }}
