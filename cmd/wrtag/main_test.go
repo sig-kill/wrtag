@@ -1,10 +1,11 @@
 package main
 
 import (
+	"crypto/rand"
 	"embed"
-	_ "embed"
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"net/http"
@@ -47,6 +48,7 @@ func TestMain(m *testing.M) {
 		"touch":    func() int { mainTouch(); return 0 },
 		"mime":     func() int { mainMIME(); return 0 },
 		"mod-time": func() int { mainModTime(); return 0 },
+		"rand":     func() int { mainRand(); return 0 },
 	}))
 }
 
@@ -174,6 +176,24 @@ func mainModTime() {
 		}
 		fmt.Println(info.ModTime().UnixNano())
 	}
+}
+
+func mainRand() {
+	flag.Parse()
+
+	path, sizeStr := flag.Arg(0), flag.Arg(1)
+	if path == "" || sizeStr == "" {
+		log.Fatalf("bad args")
+	}
+
+	f, err := os.Create(path)
+	if err != nil {
+		log.Fatalf("error creating: %v", err)
+	}
+	defer f.Close()
+
+	size, _ := strconv.Atoi(sizeStr)
+	_, _ = io.Copy(f, io.LimitReader(rand.Reader, int64(size)))
 }
 
 var panicTransport = clientutil.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
