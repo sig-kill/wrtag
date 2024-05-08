@@ -158,10 +158,14 @@ func Differ(weights TagWeights, score *float64) func(field string, a, b string) 
 		diffs := dmp.DiffMain(a, b, false)
 		dist := float64(dmp.DiffLevenshtein(diffs))
 		return Diff{
-			Field:  field,
-			Before: filterFunc(diffs, func(d diffmatchpatch.Diff) bool { return d.Type <= diffmatchpatch.DiffEqual }),
-			After:  filterFunc(diffs, func(d diffmatchpatch.Diff) bool { return d.Type >= diffmatchpatch.DiffEqual }),
-			Equal:  dist == 0,
+			Field: field,
+			Before: filterFunc(append([]diffmatchpatch.Diff(nil), diffs...), func(d diffmatchpatch.Diff) bool {
+				return d.Type <= diffmatchpatch.DiffEqual
+			}),
+			After: filterFunc(append([]diffmatchpatch.Diff(nil), diffs...), func(d diffmatchpatch.Diff) bool {
+				return d.Type >= diffmatchpatch.DiffEqual
+			}),
+			Equal: dist == 0,
 		}
 	}
 }
@@ -180,19 +184,11 @@ func norm(input string) string {
 
 func filterZero[T comparable](elms ...T) []T {
 	var zero T
-	return slices.DeleteFunc(elms, func(t T) bool {
-		return t == zero
-	})
+	return slices.DeleteFunc(elms, func(t T) bool { return t == zero })
 }
 
-func filterFunc[T any](diffs []T, f func(T) bool) []T {
-	var r []T
-	for _, diff := range diffs {
-		if f(diff) {
-			r = append(r, diff)
-		}
-	}
-	return r
+func filterFunc[T any](elms []T, f func(T) bool) []T {
+	return slices.DeleteFunc(elms, func(t T) bool { return !f(t) })
 }
 
 func mapFunc[F, T any](s []F, f func(int, F) T) []T {
