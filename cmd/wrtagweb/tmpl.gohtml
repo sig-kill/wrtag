@@ -9,7 +9,7 @@
   hx-target="#job-{{ .ID }}"
   hx-indicator="this"
   hx-swap="outerHTML"
-  class="max-h-full overflow-auto shadow-sm {{ template "job-colour" .Status }} {{ if eq .Status "" }}in-progress{{ end }}"
+  class="w-max sm:w-auto shadow-sm {{ template "job-colour" .Status }} {{ if eq .Status "" }}in-progress{{ end }}"
 >
   <div class="p-3 cursor-pointer flex justify-between items-center">
     <span>{{ .Operation }} path <a class="italic break-all" href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></span>
@@ -75,7 +75,7 @@ origin file info
 {{ range . }}
   <tr class="{{ if not .Equal }}bg-gray-200{{ end }}">
     <td class="px-2 text-gray-500">{{ .Field }}</td>
-    <td class="px-2 hidden sm:table-cell">
+    <td class="px-2">
       {{ if eq (len .Before) 0 }}<span class="text-gray-400">[empty]</span>{{ end }}
       {{ range .Before }}
         {{- if (eq .Type 0) }}<span>{{ .Text }}</span>{{ end -}}
@@ -156,9 +156,9 @@ origin file info
     <form hx-post="/jobs">
       {{ block "job-import" . }}
       <div class="flex gap-3 items-center">
-        <span class="text-gray-600">manual import</span>
+        <span class="hidden sm:inline text-gray-600">manual import</span>
         <input name="path" placeholder="/mnt/media/music/The Fall - Dragnet" class="border px-3 py-1 w-full sm:w-auto shadow-sm" />
-        <fieldset>
+        <fieldset class="whitespace-nowrap">
           <input type="radio" name="operation" value="copy" checked />
           <label>copy</label>
           <input type="radio" name="operation" value="move" />
