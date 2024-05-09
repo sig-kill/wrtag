@@ -3,6 +3,7 @@ package tags
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -118,7 +119,9 @@ func (f *File) WriteNum(t string, v int) { f.Write(t, intStr(v)) }
 func (f *File) Clear(t string) { delete(f.raw, t) }
 func (f *File) ClearAll()      { clear(f.raw) }
 
-func (f *File) Len() int { return len(f.raw) }
+func (f *File) CloneRaw() map[string][]string {
+	return maps.Clone(f.raw)
+}
 
 func (f *File) Save() error {
 	if !f.file.WriteTags(f.raw) {
