@@ -62,10 +62,6 @@ func main() {
 	}
 	defer db.Close()
 
-	if err := migrateDB(db); err != nil {
-		log.Fatalf("error migrating db: %v", err)
-	}
-
 	sseServ := sse.New()
 	sseServ.AutoReplay = false
 	defer sseServ.Close()
@@ -478,17 +474,4 @@ func ctxTick(ctx context.Context, interval time.Duration, f func()) {
 			f()
 		}
 	}
-}
-
-func migrateDB(db *bolthold.Store) error {
-	return db.ForEach(&bolthold.Query{}, func(job *Job) error {
-		if job.Status == "complete" && job.Error != "" {
-			job.Status = StatusError
-			if job.Error == "needs-input" {
-				job.Status = StatusNeedsInput
-			}
-			return db.Update(job.ID, job)
-		}
-		return nil
-	})
 }
