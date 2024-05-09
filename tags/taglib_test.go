@@ -17,10 +17,10 @@ var emptyFlac []byte
 //go:embed testdata/empty.mp3
 var emptyMP3 []byte
 
-func newFile(t *testing.T, data []byte) string {
+func newFile(t *testing.T, data []byte, ext string) string {
 	t.Helper()
 
-	f, err := os.CreateTemp("", "")
+	f, err := os.CreateTemp("", "*"+ext)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		os.Remove(f.Name())
@@ -35,7 +35,7 @@ func newFile(t *testing.T, data []byte) string {
 func TestTrackNum(t *testing.T) {
 	t.Parallel()
 
-	path := newFile(t, emptyFlac)
+	path := newFile(t, emptyFlac, ".flac")
 	withf := func(fn func(*File)) {
 		t.Helper()
 
@@ -77,9 +77,9 @@ func TestZero(t *testing.T) {
 		assert.Equal(t, 0, n)
 	}
 
-	run := func(name string, data []byte) {
+	run := func(name string, data []byte, ext string) {
 		t.Run(name, func(t *testing.T) {
-			path := newFile(t, data)
+			path := newFile(t, data, ext)
 			withf(path, func(f *File) {
 				f.Write("catalognumber", "")
 				check(f)
@@ -90,8 +90,8 @@ func TestZero(t *testing.T) {
 		})
 	}
 
-	run("flac", emptyFlac)
-	run("mp3", emptyMP3)
+	run("flac", emptyFlac, ".flac")
+	run("mp3", emptyMP3, ".mp3")
 }
 
 func TestNormalise(t *testing.T) {
