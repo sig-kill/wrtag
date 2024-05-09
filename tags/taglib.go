@@ -105,8 +105,15 @@ func (f *File) ReadAll(fn func(k string, vs []string) bool) {
 	}
 }
 
-func (f *File) Write(t string, v ...string) { f.raw[t] = filterZero(v...) }
-func (f *File) WriteNum(t string, v int)    { f.Write(t, intStr(v)) }
+func (f *File) Write(t string, v ...string) {
+	v = filterZero(v...)
+	if len(v) == 0 {
+		delete(f.raw, t)
+		return
+	}
+	f.raw[t] = v
+}
+func (f *File) WriteNum(t string, v int) { f.Write(t, intStr(v)) }
 
 func (f *File) Clear(t string) { delete(f.raw, t) }
 func (f *File) ClearAll()      { clear(f.raw) }

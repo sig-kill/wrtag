@@ -7,26 +7,39 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 //go:embed testdata/empty.flac
-var empty []byte
+var emptyFlac []byte
+
+//go:embed testdata/empty.mp3
+var emptyMP3 []byte
+
+func newFile(t *testing.T, data []byte) string {
+	t.Helper()
+
+	f, err := os.CreateTemp("", "")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		os.Remove(f.Name())
+	})
+
+	_, err = io.Copy(f, bytes.NewReader(data))
+	require.NoError(t, err)
+
+	return f.Name()
+}
 
 func TestTrackNum(t *testing.T) {
 	t.Parallel()
 
-	tmpf, err := os.CreateTemp("", "*.flac")
-	require.NoError(t, err)
-	defer os.Remove(tmpf.Name())
-
-	_, err = io.Copy(tmpf, bytes.NewReader(empty))
-	require.NoError(t, err)
-
+	path := newFile(t, emptyFlac)
 	withf := func(fn func(*File)) {
 		t.Helper()
 
-		f, err := Read(tmpf.Name())
+		f, err := Read(path)
 		require.NoError(t, err)
 		fn(f)
 		require.NoError(t, f.Save())
@@ -42,6 +55,43 @@ func TestTrackNum(t *testing.T) {
 	withf(func(f *File) {
 		require.Equal(t, 69, f.ReadNum(TrackNumber))
 	})
+}
+
+func TestZero(t *testing.T) {
+	withf := func(path string, fn func(*File)) {
+		t.Helper()
+
+		f, err := Read(path)
+		require.NoError(t, err)
+		fn(f)
+		require.NoError(t, f.Save())
+		f.Close()
+	}
+
+	check := func(f *File) {
+		var n int
+		f.ReadAll(func(k string, vs []string) bool {
+			n++
+			return true
+		})
+		assert.Equal(t, 0, n)
+	}
+
+	run := func(name string, data []byte) {
+		t.Run(name, func(t *testing.T) {
+			path := newFile(t, data)
+			withf(path, func(f *File) {
+				f.Write("catalognumber", "")
+				check(f)
+			})
+			withf(path, func(f *File) {
+				check(f)
+			})
+		})
+	}
+
+	run("flac", emptyFlac)
+	run("mp3", emptyMP3)
 }
 
 func TestNormalise(t *testing.T) {
