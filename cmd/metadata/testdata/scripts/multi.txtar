@@ -1,7 +1,5 @@
-exec flac
-cp stdout a.flac
-exec flac
-cp stdout b.flac
+exec flac a.flac
+exec flac b.flac
 
 exec metadata write x 'one two' 'three' , y 'okay' -- a.flac b.flac
 

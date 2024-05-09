@@ -1,5 +1,4 @@
-exec flac
-cp stdout a.flac
+exec flac a.flac
 
 exec metadata clear -- a.flac
 exec metadata write a '' -- a.flac
