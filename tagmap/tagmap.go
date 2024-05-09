@@ -77,8 +77,7 @@ func WriteFile(
 	release *musicbrainz.Release, labelInfo musicbrainz.LabelInfo, genres []musicbrainz.Genre,
 	releaseTrack *musicbrainz.Track, i int, f *tags.File,
 ) error {
-	before := copyFile(f)
-
+	before := f.CloneRaw()
 	f.ClearAll()
 
 	var genreNames []string
@@ -119,7 +118,7 @@ func WriteFile(
 	f.Write(tags.MBArtistID, mapFunc(releaseTrack.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID })...)
 
 	// try to avoid extra filesystem writes if we can
-	after := copyFile(f)
+	after := f.CloneRaw()
 	if maps.EqualFunc(before, after, slices.Equal) {
 		return nil
 	}
@@ -188,13 +187,4 @@ func mapFunc[F, T any](s []F, f func(int, F) T) []T {
 		res = append(res, f(i, v))
 	}
 	return res
-}
-
-func copyFile(f *tags.File) map[string][]string {
-	r := make(map[string][]string, f.Len())
-	f.ReadAll(func(k string, vs []string) bool {
-		r[k] = vs
-		return true
-	})
-	return r
 }
