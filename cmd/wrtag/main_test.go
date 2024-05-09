@@ -239,12 +239,13 @@ func parseTagLine(vs []string) map[string][]string {
 	r := make(map[string][]string)
 	var k string
 	for _, v := range vs {
-		if v == "/" {
+		if v == "," {
 			k = ""
 			continue
 		}
 		if k == "" {
 			k = v
+			r[k] = nil
 			continue
 		}
 		r[k] = append(r[k], v)
