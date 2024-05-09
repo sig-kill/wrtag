@@ -106,7 +106,7 @@ func (f *File) ReadAll(fn func(k string, vs []string) bool) {
 }
 
 func (f *File) Write(t string, v ...string) {
-	v = filterZero(v...)
+	v = filterZero(v)
 	if len(v) == 0 {
 		delete(f.raw, t)
 		return
@@ -180,7 +180,7 @@ func normalise(raw map[string][]string, fallbacks map[string]string) {
 	}
 }
 
-func filterZero[T comparable](elms ...T) []T {
+func filterZero[T comparable](elms []T) []T {
 	var zero T
 	return slices.DeleteFunc(elms, func(t T) bool {
 		return t == zero
