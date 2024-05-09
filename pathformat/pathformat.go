@@ -19,11 +19,11 @@ var ErrBadData = errors.New("bad data")
 const delimL, delimR = "{{", "}}"
 
 type Data struct {
-	Release  musicbrainz.Release
-	Track    musicbrainz.Track
-	TrackNum int
-	IsVA     bool
-	Ext      string
+	Release       musicbrainz.Release
+	Track         musicbrainz.Track
+	TrackNum      int
+	IsCompilation bool
+	Ext           string
 }
 
 type Format struct {

@@ -270,17 +270,44 @@ type Release struct {
 }
 
 type ReleaseGroup struct {
-	FirstReleaseDate AnyTime        `json:"first-release-date"`
-	Genres           []Genre        `json:"genres"`
-	PrimaryTypeID    string         `json:"primary-type-id"`
-	Disambiguation   string         `json:"disambiguation"`
-	Artists          []ArtistCredit `json:"artist-credit"`
-	SecondaryTypeIDs []any          `json:"secondary-type-ids"`
-	PrimaryType      string         `json:"primary-type"`
-	ID               string         `json:"id"`
-	SecondaryTypes   []any          `json:"secondary-types"`
-	Title            string         `json:"title"`
+	FirstReleaseDate AnyTime                     `json:"first-release-date"`
+	Genres           []Genre                     `json:"genres"`
+	PrimaryTypeID    string                      `json:"primary-type-id"`
+	Disambiguation   string                      `json:"disambiguation"`
+	Artists          []ArtistCredit              `json:"artist-credit"`
+	SecondaryTypeIDs []any                       `json:"secondary-type-ids"`
+	PrimaryType      ReleaseGroupPrimaryType     `json:"primary-type"`
+	ID               string                      `json:"id"`
+	SecondaryTypes   []ReleaseGroupSecondaryType `json:"secondary-types"`
+	Title            string                      `json:"title"`
 }
+
+type ReleaseGroupPrimaryType string
+
+const (
+	Album     ReleaseGroupPrimaryType = "Album"
+	Single    ReleaseGroupPrimaryType = "Single"
+	EP        ReleaseGroupPrimaryType = "EP"
+	Broadcast ReleaseGroupPrimaryType = "Broadcast"
+	Other     ReleaseGroupPrimaryType = "Other"
+)
+
+type ReleaseGroupSecondaryType string
+
+const (
+	AudioDrama     ReleaseGroupSecondaryType = "Audio drama"
+	Audiobook      ReleaseGroupSecondaryType = "Audiobook"
+	Compilation    ReleaseGroupSecondaryType = "Compilation"
+	Demo           ReleaseGroupSecondaryType = "Demo"
+	DJMix          ReleaseGroupSecondaryType = "DJ-mix"
+	FieldRecording ReleaseGroupSecondaryType = "Field recording"
+	Interview      ReleaseGroupSecondaryType = "Interview"
+	Live           ReleaseGroupSecondaryType = "Live"
+	MixtapeStreet  ReleaseGroupSecondaryType = "Mixtape/Street"
+	Remix          ReleaseGroupSecondaryType = "Remix"
+	Soundtrack     ReleaseGroupSecondaryType = "Soundtrack"
+	Spokenword     ReleaseGroupSecondaryType = "Spokenword"
+)
 
 func ArtistsNames(credits []ArtistCredit) []string {
 	var r []string
@@ -312,13 +339,9 @@ func ArtistsCreditString(credits []ArtistCredit) string {
 	return sb.String()
 }
 
-// https://musicbrainz.org/artist/89ad4ac3-39f7-470e-963a-56509c546377
-// https://musicbrainz.org/tag/special%20purpose
-const variousArtistsID = "89ad4ac3-39f7-470e-963a-56509c546377"
-
-func IsVA(credits []ArtistCredit) bool {
-	for _, c := range credits {
-		if c.Artist.ID == variousArtistsID {
+func IsCompilation(rg ReleaseGroup) bool {
+	for _, st := range rg.SecondaryTypes {
+		if st == Compilation {
 			return true
 		}
 	}
