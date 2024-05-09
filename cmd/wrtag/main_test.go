@@ -105,7 +105,7 @@ func mainTag() {
 				f.Write(t, vs...)
 			case "check":
 				if got := f.ReadMulti(t); !slices.Equal(vs, got) {
-					log.Printf("exp %q got %q", vs, got)
+					log.Printf("%s exp %q got %q", p, vs, got)
 					exit = 1
 				}
 			}
