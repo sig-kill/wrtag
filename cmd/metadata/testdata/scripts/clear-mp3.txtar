@@ -1,0 +1,22 @@
+exec mp3
+cp stdout a.mp3
+
+exec metadata write a 1 2 , b 3 4 -- a.mp3
+
+# all tags present as usual
+exec metadata read -- a.mp3
+cmp stdout exp-read
+
+# clear them all
+exec metadata clear -- a.mp3
+
+# now we should have none left
+exec metadata read -- a.mp3
+! stderr .
+! stdout .
+
+-- exp-read --
+a.mp3	a	1
+a.mp3	a	2
+a.mp3	b	3
+a.mp3	b	4
