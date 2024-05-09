@@ -87,9 +87,13 @@ func mainTag() {
 
 	var exit int
 	for _, p := range paths {
-		if err := ensureFlac(p); err != nil {
-			log.Fatalf("ensure flac: %v", err)
+		switch op {
+		case "write":
+			if err := ensureFlac(p); err != nil {
+				log.Fatalf("ensure flac: %v", err)
+			}
 		}
+
 		f, err := tags.Read(p)
 		if err != nil {
 			log.Fatalf("open tag file: %v", err)
@@ -164,7 +168,8 @@ func mainMIME() {
 func mainModTime() {
 	flag.Parse()
 
-	paths := parsePattern(flag.Arg(0))
+	pat := flag.Arg(0)
+	paths := parsePattern(pat)
 	if len(paths) == 0 {
 		log.Fatalf("no paths to match pattern")
 	}
