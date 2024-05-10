@@ -1,9 +1,10 @@
 package notifications
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/containrrr/shoutrrr"
 	shoutrrrtypes "github.com/containrrr/shoutrrr/pkg/types"
@@ -45,7 +46,7 @@ func (n *Notifications) AddURI(event Event, uri string) error {
 
 // Send a simple string for now, maybe later message could instead be be a type which
 // implements a notifications.Bodyer or something so that notifiers can send rich notifications.
-func (n *Notifications) Send(event Event, message string) {
+func (n *Notifications) Send(ctx context.Context, event Event, message string) {
 	uris := n.mappings[event]
 	if len(uris) == 0 {
 		return
@@ -53,7 +54,7 @@ func (n *Notifications) Send(event Event, message string) {
 
 	sender, err := shoutrrr.CreateSender(uris...)
 	if err != nil {
-		log.Printf("create sender: %v", err)
+		slog.ErrorContext(ctx, "create sender", "err", err)
 		return
 	}
 
@@ -61,6 +62,7 @@ func (n *Notifications) Send(event Event, message string) {
 	params.SetTitle("wrtag")
 
 	if err := errors.Join(sender.Send(message, params)...); err != nil {
-		log.Printf("error sending notifications: %v", err)
+		slog.ErrorContext(ctx, "sending notifications", "err", err)
+		return
 	}
 }

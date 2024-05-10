@@ -2,6 +2,8 @@ package flagcommon
 
 import (
 	"flag"
+	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,21 +18,32 @@ import (
 	"go.senan.xyz/wrtag/tagmap"
 )
 
+func init() {
+	var logLevel slog.LevelVar
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: &logLevel}))
+	slog.SetDefault(logger)
+
+	// use normal log package with no prefix just for Fatalf/Panicf in various main()s
+	log.SetOutput(os.Stderr)
+	log.SetFlags(0)
+
+	flag.TextVar(&logLevel, "log-level", &logLevel, "set the logging level")
+}
+
 const name = "wrtag"
 
 func init() {
 	flag.CommandLine.Init(name, flag.ExitOnError)
 }
 
-var defaultClient = &http.Client{
-	Transport: clientutil.Chain(
-		clientutil.WithLogging(),
-		clientutil.WithUserAgent(`wrtag/v0.0.0-alpha ( https://go.senan.xyz/wrtag )`),
-	)(http.DefaultTransport),
-}
-
 func init() {
-	http.DefaultClient = defaultClient
+	http.DefaultClient = &http.Client{
+		Transport: clientutil.Chain(
+			clientutil.WithLogging(slog.Default()),
+			clientutil.WithUserAgent(`wrtag/v0.0.0-alpha ( https://go.senan.xyz/wrtag )`),
+		)(http.DefaultTransport),
+	}
 }
 
 func PathFormat() *pathformat.Format {
@@ -71,12 +84,12 @@ type MusicBrainzClient struct {
 
 func MusicBrainz() MusicBrainzClient {
 	var mb musicbrainz.MBClient
-	mb.HTTPClient = defaultClient
+	mb.HTTPClient = http.DefaultClient
 	flag.StringVar(&mb.BaseURL, "mb-base-url", `https://musicbrainz.org/ws/2/`, "")
 	flag.DurationVar(&mb.RateLimit, "mb-rate-limit", 1*time.Second, "")
 
 	var caa musicbrainz.CAAClient
-	caa.HTTPClient = defaultClient
+	caa.HTTPClient = http.DefaultClient
 	flag.StringVar(&caa.BaseURL, "caa-base-url", `https://coverartarchive.org/`, "")
 	flag.DurationVar(&caa.RateLimit, "caa-rate-limit", 0, "")
 
@@ -85,11 +98,11 @@ func MusicBrainz() MusicBrainzClient {
 
 func Lyrics() lyrics.Source {
 	var musixmatch lyrics.Musixmatch
-	musixmatch.HTTPClient = defaultClient
+	musixmatch.HTTPClient = http.DefaultClient
 	musixmatch.RateLimit = 500 * time.Millisecond
 
 	var genius lyrics.Genius
-	genius.HTTPClient = defaultClient
+	genius.HTTPClient = http.DefaultClient
 	genius.RateLimit = 500 * time.Millisecond
 
 	return lyrics.ChainSource{&genius, &musixmatch}

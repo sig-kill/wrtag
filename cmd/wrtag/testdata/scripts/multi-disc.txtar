@@ -20,4 +20,4 @@ env WRTAG_TAG_WEIGHT='label 0, catalogue num 0, media format 0'
 env WRTAG_PATH_FORMAT='albums/{{ .Release.Title }}/{{ .Track.Title }}{{ .Ext }}'
 
 exec wrtag move 'a la sala'
-stderr 'matched 100.00%'
+stderr 'score=100.00%'

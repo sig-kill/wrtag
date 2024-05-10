@@ -6,7 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"sync"
@@ -51,7 +51,7 @@ func main() {
 				return nil
 			})
 			if err != nil {
-				log.Printf("error walking leaves: %v", err)
+				slog.Error("walking leaves", "err", err)
 				continue
 			}
 		}
@@ -75,7 +75,7 @@ func main() {
 		if err := os.Chtimes(dir, time.Time{}, importTime); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("chtimes %q: %v", dir, err)
 		}
-		log.Printf("done %q", dir)
+		slog.InfoContext(ctx, "processed dir", "dir", dir)
 		return nil
 	}
 
@@ -102,7 +102,7 @@ func main() {
 						if errors.Is(err, context.Canceled) {
 							return
 						}
-						log.Printf("error processing %q: %v", dir, err)
+						slog.ErrorContext(ctx, "processing dir", "dir", dir, "err", err)
 						numError.Add(1)
 						continue
 					}
@@ -114,10 +114,14 @@ func main() {
 
 	wg.Wait()
 
-	message := fmt.Sprintf("sync finished in %s with %d dirs, %d err", time.Since(start).Truncate(time.Millisecond), numDone.Load(), numError.Load())
-	log.Print(message)
-	notifs.Send(notifications.SyncComplete, message)
+	var level slog.Level
 	if numError.Load() > 0 {
-		notifs.Send(notifications.SyncError, message)
+		level = slog.LevelError
+	}
+	slog.Log(ctx, level, "sync finished", "took", time.Since(start), "dirs", numDone.Load(), "errs", numDone.Load())
+
+	notifs.Send(ctx, notifications.SyncComplete, "sync complete")
+	if numError.Load() > 0 {
+		notifs.Send(ctx, notifications.SyncError, "sync errors")
 	}
 }

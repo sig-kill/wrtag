@@ -6,7 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -48,7 +48,7 @@ func main() {
 				return nil
 			})
 			if err != nil {
-				log.Printf("error walking paths: %v", err)
+				slog.Error("walking paths", "err", err)
 				continue
 			}
 		}
@@ -71,7 +71,7 @@ func main() {
 			return fmt.Errorf("save: %w", err)
 		}
 
-		log.Printf("searched %q (%d bytes)", path, len(lyricData))
+		slog.InfoContext(ctx, "processed track", "path", path, "lyric_bytes", len(lyricData))
 		return nil
 	}
 
@@ -90,15 +90,15 @@ func main() {
 				select {
 				case <-ctx.Done():
 					return
-				case dir, ok := <-paths:
+				case path, ok := <-paths:
 					if !ok {
 						return
 					}
-					if err := processTrack(ctx, dir); err != nil {
+					if err := processTrack(ctx, path); err != nil {
 						if errors.Is(err, context.Canceled) {
 							return
 						}
-						log.Printf("error processing %q: %v", dir, err)
+						slog.ErrorContext(ctx, "processing track", "path", path, "err", err)
 						numError.Add(1)
 						continue
 					}
@@ -110,5 +110,9 @@ func main() {
 
 	wg.Wait()
 
-	log.Printf("sync finished in %s with %d paths, %d err", time.Since(start).Truncate(time.Millisecond), numDone.Load(), numError.Load())
+	var level slog.Level
+	if numError.Load() > 0 {
+		level = slog.LevelError
+	}
+	slog.Log(ctx, level, "sync finished", "took", time.Since(start), "tracks", numDone.Load(), "errs", numDone.Load())
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 	"slices"
 
+	_ "go.senan.xyz/wrtag/cmd/internal/flagcommon"
 	"go.senan.xyz/wrtag/tags"
 )
 
