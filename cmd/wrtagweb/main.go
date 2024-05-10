@@ -71,14 +71,25 @@ func main() {
 	jobStream := sseServ.CreateStream("jobs")
 
 	var (
-		eventAllJobs   = func() string { return "jobs" }
-		eventUpdateJob = func(id uint64) string { return fmt.Sprintf("job-%d", id) }
+		eventAllJobs   = func() []string { return []string{"jobs"} }
+		eventUpdateJob = func(id uint64) []string { return append(eventAllJobs(), fmt.Sprintf("job-%d", id)) }
 	)
-	emitEvent := func(e string) {
-		sseServ.Publish(jobStream.ID, &sse.Event{Event: []byte(e), Data: []byte{0}})
+	emitEvent := func(names []string) {
+		for _, name := range names {
+			sseServ.Publish(jobStream.ID, &sse.Event{Event: []byte(name), Data: []byte{0}})
+		}
 	}
 
 	processJob := func(ctx context.Context, job *Job, yes bool) error {
+		job.Status = StatusInProgress
+		_ = db.Update(job.ID, &job)
+
+		emitEvent(eventUpdateJob(job.ID))
+		defer func() {
+			_ = db.Update(job.ID, &job)
+			emitEvent(eventUpdateJob(job.ID))
+		}()
+
 		job.Error = ""
 		job.Status = StatusComplete
 
@@ -318,18 +329,12 @@ func main() {
 
 		tick := func(ctx context.Context) error {
 			var job Job
-			switch err := db.FindOne(&job, bolthold.Where("Status").Eq(StatusIncomplete)); {
+			switch err := db.FindOne(&job, bolthold.Where("Status").Eq(StatusEnqueued)); {
 			case errors.Is(err, bolthold.ErrNotFound):
 				return nil
 			case err != nil:
 				return fmt.Errorf("find next job: %w", err)
 			}
-			emitEvent(eventUpdateJob(job.ID))
-			defer func() {
-				_ = db.Update(job.ID, &job)
-				emitEvent(eventUpdateJob(job.ID))
-				emitEvent(eventAllJobs())
-			}()
 			return processJob(ctx, &job, false)
 		}
 
@@ -351,7 +356,8 @@ func main() {
 type JobStatus string
 
 const (
-	StatusIncomplete JobStatus = ""
+	StatusEnqueued   JobStatus = ""
+	StatusInProgress JobStatus = "in-progress"
 	StatusNeedsInput JobStatus = "needs-input"
 	StatusError      JobStatus = "error"
 	StatusComplete   JobStatus = "complete"
