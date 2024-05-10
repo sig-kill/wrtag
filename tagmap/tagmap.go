@@ -67,8 +67,8 @@ func DiffRelease(weights TagWeights, release *musicbrainz.Release, files []*tags
 	for i, f := range files {
 		diffs = append(diffs, diff(
 			fmt.Sprintf("track %d", i+1),
-			strings.Join(filterZero(f.Read(tags.Artist), f.Read(tags.Title)), " – "),
-			strings.Join(filterZero(musicbrainz.ArtistsString(rtracks[i].Artists), rtracks[i].Title), " – "),
+			strings.Join(deleteZero(f.Read(tags.Artist), f.Read(tags.Title)), " – "),
+			strings.Join(deleteZero(musicbrainz.ArtistsString(rtracks[i].Artists), rtracks[i].Title), " – "),
 		))
 	}
 
@@ -87,7 +87,7 @@ func WriteFile(
 		genreNames = append(genreNames, g.Name)
 	}
 
-	disambiguationParts := filterZero(release.ReleaseGroup.Disambiguation, release.Disambiguation)
+	disambiguationParts := deleteZero(release.ReleaseGroup.Disambiguation, release.Disambiguation)
 	disambiguation := strings.Join(disambiguationParts, ", ")
 
 	f.Write(tags.Album, release.Title)
@@ -158,14 +158,10 @@ func Differ(weights TagWeights, score *float64) func(field string, a, b string) 
 		diffs := dmp.DiffMain(a, b, false)
 		dist := float64(dmp.DiffLevenshtein(diffs))
 		return Diff{
-			Field: field,
-			Before: filterFunc(append([]diffmatchpatch.Diff(nil), diffs...), func(d diffmatchpatch.Diff) bool {
-				return d.Type <= diffmatchpatch.DiffEqual
-			}),
-			After: filterFunc(append([]diffmatchpatch.Diff(nil), diffs...), func(d diffmatchpatch.Diff) bool {
-				return d.Type >= diffmatchpatch.DiffEqual
-			}),
-			Equal: dist == 0,
+			Field:  field,
+			Before: filterFunc(diffs, func(d diffmatchpatch.Diff) bool { return d.Type <= diffmatchpatch.DiffEqual }),
+			After:  filterFunc(diffs, func(d diffmatchpatch.Diff) bool { return d.Type >= diffmatchpatch.DiffEqual }),
+			Equal:  dist == 0,
 		}
 	}
 }
@@ -182,19 +178,25 @@ func norm(input string) string {
 	}, input)
 }
 
-func filterZero[T comparable](elms ...T) []T {
-	var zero T
-	return slices.DeleteFunc(elms, func(t T) bool { return t == zero })
-}
-
-func filterFunc[T any](elms []T, f func(T) bool) []T {
-	return slices.DeleteFunc(elms, func(t T) bool { return !f(t) })
-}
-
-func mapFunc[F, T any](s []F, f func(int, F) T) []T {
-	res := make([]T, 0, len(s))
-	for i, v := range s {
+func mapFunc[T, To any](elms []T, f func(int, T) To) []To {
+	var res = make([]To, 0, len(elms))
+	for i, v := range elms {
 		res = append(res, f(i, v))
 	}
 	return res
+}
+
+func filterFunc[T any](elms []T, f func(T) bool) []T {
+	var res []T
+	for _, el := range elms {
+		if f(el) {
+			res = append(res, el)
+		}
+	}
+	return res
+}
+
+func deleteZero[T comparable](elms ...T) []T {
+	var zero T
+	return slices.DeleteFunc(elms, func(t T) bool { return t == zero })
 }

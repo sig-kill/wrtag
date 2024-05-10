@@ -52,19 +52,6 @@ const (
 	Lyrics = "lyrics"
 )
 
-// tags we can use instead if we dont have the ones we're expecting.
-// it maps [bad] -> [good]
-var replacements = map[string]string{
-	"year":                Date,
-	"original_year":       OriginalDate,
-	"track":               TrackNumber,
-	"trackc":              TrackNumber,
-	"catalognum":          CatalogueNum,
-	"album_artists":       AlbumArtists,
-	"album artist credit": AlbumArtistCredit,
-	"artist credit":       ArtistCredit,
-}
-
 func CanRead(absPath string) bool {
 	switch ext := strings.ToLower(filepath.Ext(absPath)); ext {
 	case ".mp3", ".flac", ".aac", ".m4a", ".m4b", ".ogg", ".opus", ".wma", ".wav", ".wv":
@@ -83,8 +70,10 @@ func Read(absPath string) (*File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open: %w", err)
 	}
+
 	raw := f.ReadTags()
-	normalise(raw, replacements)
+	normalise(raw, replacements) // tag replacements, case normalisation, etc
+
 	return &File{raw: raw, file: f}, nil
 }
 
@@ -107,7 +96,7 @@ func (f *File) ReadAll(fn func(k string, vs []string) bool) {
 }
 
 func (f *File) Write(t string, v ...string) {
-	v = filterZero(v)
+	v = deleteZero(v)
 	if len(v) == 0 {
 		delete(f.raw, t)
 		return
@@ -161,6 +150,19 @@ func anyTime(str string) time.Time {
 	return t
 }
 
+// tags we can use instead if we dont have the ones we're expecting.
+// it maps [bad] -> [good]
+var replacements = map[string]string{
+	"year":                Date,
+	"original_year":       OriginalDate,
+	"track":               TrackNumber,
+	"trackc":              TrackNumber,
+	"catalognum":          CatalogueNum,
+	"album_artists":       AlbumArtists,
+	"album artist credit": AlbumArtistCredit,
+	"artist credit":       ArtistCredit,
+}
+
 func normalise(raw map[string][]string, fallbacks map[string]string) {
 	for kbad, kgood := range fallbacks {
 		if _, ok := raw[kgood]; ok {
@@ -185,9 +187,7 @@ func normalise(raw map[string][]string, fallbacks map[string]string) {
 	}
 }
 
-func filterZero[T comparable](elms []T) []T {
+func deleteZero[T comparable](elms []T) []T {
 	var zero T
-	return slices.DeleteFunc(elms, func(t T) bool {
-		return t == zero
-	})
+	return slices.DeleteFunc(elms, func(t T) bool { return t == zero })
 }
