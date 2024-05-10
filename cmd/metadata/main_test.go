@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/rogpeppe/go-internal/testscript"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMain(m *testing.M) {
@@ -44,4 +45,18 @@ func mainFile() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func TestParseTagMap(t *testing.T) {
+	assert.Equal(t, map[string][]string{}, parseTagMap(nil))
+	assert.Equal(t, map[string][]string{}, parseTagMap([]string{","}))
+	assert.Equal(t, map[string][]string{}, parseTagMap([]string{",", ","}))
+	assert.Equal(t, map[string][]string{"genres": nil}, parseTagMap([]string{"genres"}))
+	assert.Equal(t, map[string][]string{"genres": {"a"}}, parseTagMap([]string{"genres", "a"}))
+	assert.Equal(t, map[string][]string{"genres": {"a", "b"}}, parseTagMap([]string{"genres", "a", "b"}))
+	assert.Equal(t, map[string][]string{"genres": {"a", "b", "c"}}, parseTagMap([]string{"genres", "a", "b", "c"}))
+	assert.Equal(t, map[string][]string{"genres": {"a", "b", "c"}}, parseTagMap([]string{"genres", "a", "b", "c", ","}))
+	assert.Equal(t, map[string][]string{"genres": {"a", "b", "c"}, "artists": nil}, parseTagMap([]string{"genres", "a", "b", "c", ",", "artists"}))
+	assert.Equal(t, map[string][]string{"genres": {"a", "b", "c"}, "artists": {"a", "b"}}, parseTagMap([]string{"genres", "a", "b", "c", ",", "artists", "a", "b"}))
+	assert.Equal(t, map[string][]string{"genres": {"a", "b", "c"}, "artists": {"a", "b", "c"}}, parseTagMap([]string{"genres", "a", "b", "c", ",", "artists", "a", "b", "c"}))
 }

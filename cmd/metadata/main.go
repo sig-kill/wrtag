@@ -155,6 +155,7 @@ func parseTagMap(args []string) map[string][]string {
 		}
 		if k == "" {
 			k = v
+			r[k] = nil
 			continue
 		}
 		r[k] = append(r[k], v)
