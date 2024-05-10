@@ -50,6 +50,8 @@ func TestMain(m *testing.M) {
 }
 
 func TestScripts(t *testing.T) {
+	t.Parallel()
+
 	testscript.Run(t, testscript.Params{
 		Dir:                 "testdata/scripts",
 		RequireExplicitExec: true,

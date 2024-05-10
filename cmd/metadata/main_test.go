@@ -20,6 +20,8 @@ func TestMain(m *testing.M) {
 }
 
 func TestScripts(t *testing.T) {
+	t.Parallel()
+
 	testscript.Run(t, testscript.Params{
 		Dir:                 "testdata/scripts",
 		RequireExplicitExec: true,
@@ -56,6 +58,8 @@ func mainFile() {
 }
 
 func TestParseTagMap(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, map[string][]string{}, parseTagMap(nil))
 	assert.Equal(t, map[string][]string{}, parseTagMap([]string{","}))
 	assert.Equal(t, map[string][]string{}, parseTagMap([]string{",", ","}))

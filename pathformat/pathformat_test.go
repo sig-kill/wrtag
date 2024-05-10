@@ -11,6 +11,8 @@ import (
 )
 
 func TestValidation(t *testing.T) {
+	t.Parallel()
+
 	var pf pathformat.Format
 	_, err := pf.Execute(pathformat.Data{})
 	assert.Error(t, err) // we didn't initalise with Parse() yet
@@ -36,6 +38,8 @@ func TestValidation(t *testing.T) {
 }
 
 func TestPathFormat(t *testing.T) {
+	t.Parallel()
+
 	var pf pathformat.Format
 	require.NoError(t, pf.Parse(`/music/albums/{{ artists .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}{{ if not (eq (disambig .Release) "") }} ({{ disambig .Release | safepath }}){{ end }}/{{ pad0 2 .TrackNum }}.{{ flatTracks .Release.Media | len | pad0 2 }} {{ .Track.Title | safepath }}{{ .Ext }}`))
 

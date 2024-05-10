@@ -16,6 +16,8 @@ import (
 var responses embed.FS
 
 func TestMusixmatch(t *testing.T) {
+	t.Parallel()
+
 	var src lyrics.Musixmatch
 	src.HTTPClient = clientutil.FSClient(responses, "testdata/musixmatch")
 
@@ -31,6 +33,8 @@ func TestMusixmatch(t *testing.T) {
 }
 
 func TestGenius(t *testing.T) {
+	t.Parallel()
+
 	var src lyrics.Genius
 	src.HTTPClient = clientutil.FSClient(responses, "testdata/genius")
 

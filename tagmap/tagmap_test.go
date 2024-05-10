@@ -7,6 +7,8 @@ import (
 )
 
 func TestDiffer(t *testing.T) {
+	t.Parallel()
+
 	var score float64
 	diff := Differ(TagWeights{}, &score)
 
@@ -16,6 +18,8 @@ func TestDiffer(t *testing.T) {
 }
 
 func TestDiffWeightsLowerBound(t *testing.T) {
+	t.Parallel()
+
 	weights := TagWeights{
 		"label":         0,
 		"catalogue num": 0,
@@ -39,6 +43,8 @@ func TestDiffWeightsLowerBound(t *testing.T) {
 }
 
 func TestDiffWeightsUpperBound(t *testing.T) {
+	t.Parallel()
+
 	weights := TagWeights{
 		"label":         2,
 		"catalogue num": 2,
@@ -62,6 +68,8 @@ func TestDiffWeightsUpperBound(t *testing.T) {
 }
 
 func TestDiffNorm(t *testing.T) {
+	t.Parallel()
+
 	var score float64
 	diff := Differ(TagWeights{}, &score)
 
@@ -72,6 +80,8 @@ func TestDiffNorm(t *testing.T) {
 }
 
 func TestDiffIgnoreMissing(t *testing.T) {
+	t.Parallel()
+
 	var score float64
 	diff := Differ(TagWeights{}, &score)
 
@@ -82,6 +92,8 @@ func TestDiffIgnoreMissing(t *testing.T) {
 }
 
 func TestNorm(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, "", norm(""))
 	assert.Equal(t, "", norm(" "))
 	assert.Equal(t, "123", norm(" 1!2!3 "))

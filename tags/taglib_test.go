@@ -58,6 +58,8 @@ func TestTrackNum(t *testing.T) {
 }
 
 func TestZero(t *testing.T) {
+	t.Parallel()
+
 	withf := func(path string, fn func(*File)) {
 		t.Helper()
 
@@ -95,6 +97,8 @@ func TestZero(t *testing.T) {
 }
 
 func TestNormalise(t *testing.T) {
+	t.Parallel()
+
 	raw := map[string][]string{
 		"Some":                {"a", "b"},
 		"other Test":          {"x"},
