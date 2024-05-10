@@ -83,7 +83,7 @@ func mainTag() {
 		log.Fatalf("no paths to match pattern")
 	}
 
-	pairs := parseTagLine(flag.Args()[2:])
+	pairs := parseTagMap(flag.Args()[2:])
 
 	var exit int
 	for _, p := range paths {
@@ -235,10 +235,11 @@ func parsePattern(pat string) []string {
 	return paths
 }
 
-func parseTagLine(vs []string) map[string][]string {
+// copied from cmd/metadata
+func parseTagMap(args []string) map[string][]string {
 	r := make(map[string][]string)
 	var k string
-	for _, v := range vs {
+	for _, v := range args {
 		if v == "," {
 			k = ""
 			continue
