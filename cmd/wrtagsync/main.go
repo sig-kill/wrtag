@@ -118,7 +118,7 @@ func main() {
 	if numError.Load() > 0 {
 		level = slog.LevelError
 	}
-	slog.Log(ctx, level, "sync finished", "took", time.Since(start), "dirs", numDone.Load(), "errs", numDone.Load())
+	slog.Log(ctx, level, "sync finished", "took", time.Since(start), "dirs", numDone.Load(), "errs", numError.Load())
 
 	notifs.Send(ctx, notifications.SyncComplete, "sync complete")
 	if numError.Load() > 0 {
