@@ -8,6 +8,8 @@ import (
 )
 
 func TestUUID(t *testing.T) {
+	t.Parallel()
+
 	assert.False(t, uuidExpr.MatchString(""))
 	assert.False(t, uuidExpr.MatchString("123"))
 	assert.False(t, uuidExpr.MatchString("uhh dd720ac8-1c68-4484-abb7-0546413a55e3"))
@@ -16,6 +18,8 @@ func TestUUID(t *testing.T) {
 }
 
 func TestMergeAndSortGenres(t *testing.T) {
+	t.Parallel()
+
 	require.Equal(t,
 		[]Genre{
 			{ID: "a psychedelic", Name: "a psychedelic", Count: 3},

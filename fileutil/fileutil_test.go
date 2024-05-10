@@ -11,6 +11,8 @@ import (
 )
 
 func TestSafePath(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, "hello", fileutil.SafePath("hello"))
 	assert.Equal(t, "hello", fileutil.SafePath("hello/"))
 	assert.Equal(t, "hello a", fileutil.SafePath("hello/a"))
@@ -24,6 +26,8 @@ func TestSafePath(t *testing.T) {
 }
 
 func TestWalkLeaves(t *testing.T) {
+	t.Parallel()
+
 	var act []string
 	require.NoError(t, fileutil.WalkLeaves("testdata/leaves", func(path string, d fs.DirEntry) error {
 		act = append(act, path)
