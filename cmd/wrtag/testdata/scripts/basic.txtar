@@ -18,7 +18,7 @@ env WRTAG_PATH_FORMAT='albums/{{ artists .Release.Artists | sort | join "; " | s
 
 # we exit if score too low
 ! exec wrtag move kat_moda/
-stderr 'matched \d\d.\d\d% with'
+stderr 'matched.*\d\d.\d\d%'
 stderr 'score too low'
 
 # but can overwrite with -yes
@@ -63,7 +63,7 @@ cp 'albums/Jeff Mills/(1997) Kat Moda/01.03 Alarms.flac' tr-1-copy
 
 # move again to the same dir should be a no-op
 exec wrtag move 'albums/Jeff Mills/(1997) Kat Moda/'
-stderr 'matched 100.00%'
+stderr 'score=100.00%'
 
 exec find albums/
 cmp stdout exp-layout

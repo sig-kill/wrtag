@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/rogpeppe/go-internal/testscript"
+
 	"go.senan.xyz/wrtag/clientutil"
 	"go.senan.xyz/wrtag/fileutil"
 	"go.senan.xyz/wrtag/tags"
@@ -30,10 +31,6 @@ func init() {
 	mb.CAAClient.RateLimit = 0
 	mb.MBClient.HTTPClient = clientutil.FSClient(responses, "testdata/responses/musicbrainz")
 	mb.CAAClient.HTTPClient = clientutil.FSClient(responses, "testdata/responses/coverartarchive")
-
-	mb.MBClient.HTTPClient = clientutil.Wrap(mb.MBClient.HTTPClient,
-		clientutil.WithLogging(),
-	)
 
 	// panic if someone tries to use the default client/transport
 	http.DefaultClient.Transport = panicTransport

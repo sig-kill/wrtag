@@ -5,7 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"strings"
@@ -43,7 +43,8 @@ func main() {
 	case "copy":
 		op = wrtag.Copy{DryRun: *dryRun}
 	default:
-		log.Fatalf("unknown command %q", command)
+		slog.Error("unknown command", "command", command)
+		os.Exit(1)
 	}
 
 	subflag := flag.NewFlagSet(command, flag.ExitOnError)
@@ -53,7 +54,8 @@ func main() {
 
 	dir := subflag.Arg(0)
 	if dir == "" {
-		log.Fatalf("need a dir")
+		slog.Error("need a dir")
+		os.Exit(1)
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -61,25 +63,30 @@ func main() {
 
 	r, err := wrtag.ProcessDir(ctx, mb, pathFormat, tagWeights, researchLinkQuerier, keepFiles, op, dir, *useMBID, *yes)
 	if err != nil && !errors.Is(err, wrtag.ErrScoreTooLow) {
-		log.Fatalf("error processing %q: %v", dir, err)
+		slog.Error("processing", "dir", dir, "err", err)
+		os.Exit(1)
 	}
 
-	log.Printf("matched %.2f%% with https://musicbrainz.org/release/%s", r.Score, r.Release.ID)
+	slog.InfoContext(ctx, "matched",
+		"score", fmt.Sprintf("%.2f%%", r.Score),
+		"url", fmt.Sprintf("https://musicbrainz.org/release/%s", r.Release.ID),
+	)
 
 	t := table.NewStringWriter()
 	for _, d := range r.Diff {
 		fmt.Fprintf(t, "%s\t%s\t%s\n", d.Field, fmtDiff(d.Before), fmtDiff(d.After))
 	}
 	for _, row := range strings.Split(strings.TrimRight(t.String(), "\n"), "\n") {
-		log.Print(row)
+		fmt.Fprintf(os.Stderr, "\t%s\n", row)
 	}
 
 	for _, link := range r.ResearchLinks {
-		log.Printf("search with %-12s %s\n", link.Name, link.URL)
+		slog.InfoContext(ctx, "search with", "name", link.Name, "url", link.URL)
 	}
 
 	if err != nil {
-		log.Fatalln(err)
+		slog.Error("processing", "dir", dir, "err", err)
+		os.Exit(1)
 	}
 }
 

@@ -3,7 +3,7 @@ package clientutil
 import (
 	"fmt"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -50,7 +50,7 @@ func WithRateLimit(interval time.Duration) Middleware {
 	}
 }
 
-func WithLogging() Middleware {
+func WithLogging(logger *slog.Logger) Middleware {
 	return func(next http.RoundTripper) http.RoundTripper {
 		return RoundTripFunc(func(r *http.Request) (*http.Response, error) {
 			start := time.Now()
@@ -58,7 +58,7 @@ func WithLogging() Middleware {
 			if err != nil {
 				return nil, err
 			}
-			log.Printf("resp %d (%s) for %s", resp.StatusCode, time.Since(start).Truncate(time.Millisecond), r.URL)
+			logger.Debug("response", "status", resp.StatusCode, "url", r.URL, "took", time.Since(start))
 			return resp, nil
 		})
 	}

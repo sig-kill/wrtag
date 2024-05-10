@@ -11,7 +11,7 @@ import (
 	"fmt"
 	htmltemplate "html/template"
 	"io"
-	"log"
+	"log/slog"
 	"math"
 	"net/http"
 	"net/url"
@@ -53,12 +53,14 @@ func main() {
 	flagconf.ParseConfig(*configPath)
 
 	if *apiKey == "" {
-		log.Fatal("need api key")
+		slog.Error("need an api key")
+		os.Exit(1)
 	}
 
 	db, err := bolthold.Open(*dbPath, 0600, nil)
 	if err != nil {
-		log.Fatalf("error parsing path format template: %v", err)
+		slog.Error("parsing path format template", "err", err)
+		os.Exit(1)
 	}
 	defer db.Close()
 
@@ -86,7 +88,7 @@ func main() {
 			job.Status = StatusError
 			job.Error = err.Error()
 			if errors.Is(err, wrtag.ErrScoreTooLow) {
-				notifs.Send(notifications.NeedsInput, jobNotificationMessage(*publicURL, job))
+				notifs.Send(ctx, notifications.NeedsInput, jobNotificationMessage(*publicURL, job))
 				job.Status = StatusNeedsInput
 			}
 			return nil
@@ -97,7 +99,7 @@ func main() {
 			return fmt.Errorf("gen dest dir: %w", err)
 		}
 
-		notifs.Send(notifications.Complete, jobNotificationMessage(*publicURL, job))
+		notifs.Send(ctx, notifications.Complete, jobNotificationMessage(*publicURL, job))
 
 		// either if this was a copy or move job, subsequent re-imports should just be a move so we can retag
 		job.Operation = OperationMove
@@ -113,11 +115,11 @@ func main() {
 		buff.Reset()
 
 		if err := uiTmpl.ExecuteTemplate(w, name, data); err != nil {
-			log.Printf("error in template: %v", err)
+			slog.Error("in template", "err", err)
 			return
 		}
 		if _, err := io.Copy(w, buff); err != nil {
-			log.Printf("error copying template data: %v", err)
+			slog.Error("copy template data", "err", err)
 			return
 		}
 	}
@@ -333,14 +335,16 @@ func main() {
 
 		ctxTick(ctx, 2*time.Second, func() {
 			if err := tick(ctx); err != nil {
-				log.Printf("error in job: %v", err)
+				slog.ErrorContext(ctx, "in job", "err", err)
+				return
 			}
 		})
 		return nil
 	})
 
 	if err := errgrp.Wait(); err != nil {
-		log.Panic(err)
+		slog.ErrorContext(ctx, "wait for jobs", "err", err)
+		panic(err)
 	}
 }
 
@@ -436,15 +440,15 @@ var funcMap = htmltemplate.FuncMap{
 }
 
 func logJob(jobName string) func() {
-	log.Printf("starting job %q", jobName)
-	return func() { log.Printf("stopped job %q", jobName) }
+	slog.Info("starting job", "job", jobName)
+	return func() { slog.Info("stopping job", "job", jobName) }
 }
 
 func authMiddleware(apiKey string) func(next http.Handler) http.Handler {
 	const cookieKey = "api-key"
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Printf("req for %s", r.URL)
+			slog.Info("request", "url", r.URL)
 
 			// exchange a valid basic basic auth request for a cookie that lasts 30 days
 			if cookie, _ := r.Cookie(cookieKey); cookie != nil && subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(apiKey)) == 1 {

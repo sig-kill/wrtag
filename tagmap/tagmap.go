@@ -2,7 +2,9 @@ package tagmap
 
 import (
 	"cmp"
+	"context"
 	"fmt"
+	"log/slog"
 	"maps"
 	"slices"
 	"strings"
@@ -121,6 +123,14 @@ func WriteFile(
 	after := f.CloneRaw()
 	if maps.EqualFunc(before, after, slices.Equal) {
 		return nil
+	}
+
+	if l := slog.Default(); l.Enabled(context.Background(), slog.LevelDebug) {
+		for k := range after {
+			if b, a := before[k], after[k]; !slices.Equal(b, a) {
+				l.Debug("tag change", "key", k, "from", b, "to", a)
+			}
+		}
 	}
 
 	if err := f.Save(); err != nil {

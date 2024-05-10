@@ -32,10 +32,7 @@ func TestMusixmatch(t *testing.T) {
 
 func TestGenius(t *testing.T) {
 	var src lyrics.Genius
-	src.HTTPClient = clientutil.Wrap(
-		clientutil.FSClient(responses, "testdata/genius"),
-		clientutil.WithLogging(),
-	)
+	src.HTTPClient = clientutil.FSClient(responses, "testdata/genius")
 
 	resp, err := src.Search(context.Background(), "the fall", "totally wired")
 	require.NoError(t, err)

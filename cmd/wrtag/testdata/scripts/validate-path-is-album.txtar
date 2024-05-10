@@ -29,11 +29,11 @@ cp stdout layout-before
 exec touch 'albums/Khruangbin/A LA SALA/extra-file'
 
 exec wrtag move 'albums/Khruangbin/A LA SALA'
-stderr 'matched 100.00%'
+stderr 'score=100.00%'
 
 # move again to make sure we're in a consistent state
 exec wrtag move 'albums/Khruangbin/A LA SALA'
-stderr 'matched 100.00%'
+stderr 'score=100.00%'
 
 # compare to initial state
 exec find albums

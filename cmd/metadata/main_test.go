@@ -2,7 +2,7 @@ package main
 
 import (
 	_ "embed"
-	"fmt"
+	"flag"
 	"log"
 	"os"
 	"testing"
@@ -33,17 +33,25 @@ var emptyFlac []byte
 var emptyMP3 []byte
 
 func mainFile() {
-	var err error
-	switch name, path := os.Args[0], os.Args[1]; name {
+	var d []byte
+	switch name := os.Args[0]; name {
 	case "mp3":
-		err = os.WriteFile(path, emptyMP3, 0666)
+		d = emptyMP3
 	case "flac":
-		err = os.WriteFile(path, emptyFlac, 0666)
+		d = emptyFlac
 	default:
-		err = fmt.Errorf("unknown file type %q", name)
+		log.Fatalf("unknown filetype %q\n", name)
 	}
-	if err != nil {
-		log.Fatal(err)
+
+	flag.Parse()
+
+	path := flag.Arg(0)
+	if path == "" {
+		log.Fatalf("no path provided")
+	}
+
+	if err := os.WriteFile(path, d, 0666); err != nil {
+		log.Fatalf("write file: %v\n", err)
 	}
 }
 

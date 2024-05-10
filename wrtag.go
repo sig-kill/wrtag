@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -317,7 +317,7 @@ func (m Move) ProcessFile(dc DirContext, src, dest string) error {
 	}
 
 	if m.DryRun {
-		log.Printf("[dry run] move %q -> %q", src, dest)
+		slog.Info("[dry run] move", "src", src, "dest", dest)
 		return nil
 	}
 
@@ -380,7 +380,7 @@ func (c Copy) ProcessFile(dc DirContext, src, dest string) error {
 	}
 
 	if c.DryRun {
-		log.Printf("[dry run] copy %q -> %q", src, dest)
+		slog.Info("[dry run] copy", "src", src, "dest", dest)
 		return nil
 	}
 
@@ -434,10 +434,10 @@ func trimDir(dc DirContext, dest string, dryRun bool) error {
 	var deleteErrs []error
 	for _, p := range toDelete {
 		if dryRun {
-			log.Printf("[dry run] delete extra file %q", p)
+			slog.Info("[dry run] delete extra file", "file", p)
 			continue
 		}
-		log.Printf("deleting extra file %q", p)
+		slog.Info("deleting extra file", "file", p)
 		if err := os.Remove(p); err != nil {
 			deleteErrs = append(deleteErrs, err)
 		}
@@ -465,7 +465,7 @@ func tryDownloadMusicbrainzCover(ctx context.Context, mb MusicbrainzClient, tmpD
 	defer tmpf.Close()
 
 	n, _ := io.Copy(tmpf, bytes.NewReader(cover))
-	log.Printf("wrote cover to tmp (%d bytes)", n)
+	slog.Debug("wrote cover to tmp", "size_bytes", n)
 
 	return tmpf.Name(), nil
 }
@@ -504,7 +504,7 @@ func safeRemoveAll(src string, dryRun bool) error {
 	}
 
 	if dryRun {
-		log.Printf("[dry run] remove all %q", src)
+		slog.Info("[dry run] remove all", "path", src)
 		return nil
 	}
 
@@ -526,7 +526,7 @@ func extendQueryWithOriginFile(q *musicbrainz.ReleaseQuery, originFile *originfi
 	if originFile == nil {
 		return nil
 	}
-	log.Printf("using origin file: %s", originFile)
+	slog.Debug("using origin file", "file", originFile)
 
 	if originFile.RecordLabel != "" {
 		q.Label = originFile.RecordLabel

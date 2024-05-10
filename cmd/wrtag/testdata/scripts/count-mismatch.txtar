@@ -5,4 +5,4 @@ exec tag write kat_moda/01.flac musicbrainz_albumid 'e47d04a4-7460-427d-a731-cc8
 env WRTAG_PATH_FORMAT='albums/{{ .Release.Title }}/{{ .Track.Title }}{{ .Ext }}'
 
 ! exec wrtag move kat_moda
-stderr 'track count mismatch: 3 remote / 1 local$'
+stderr 'track count mismatch.*3 remote / 1 local'
