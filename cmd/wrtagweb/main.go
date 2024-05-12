@@ -80,7 +80,7 @@ func main() {
 		}
 	}
 
-	processJob := func(ctx context.Context, job *Job, yes bool) error {
+	processJob := func(ctx context.Context, job *Job, ic wrtag.ImportCondition) error {
 		job.Status = StatusInProgress
 		_ = db.Update(job.ID, &job)
 
@@ -94,7 +94,7 @@ func main() {
 		job.Status = StatusComplete
 
 		var err error
-		job.SearchResult, err = wrtag.ProcessDir(ctx, mb, pathFormat, tagWeights, researchLinkQuerier, keepFiles, wrtagOperation(job.Operation), job.SourcePath, job.UseMBID, yes)
+		job.SearchResult, err = wrtag.ProcessDir(ctx, mb, pathFormat, tagWeights, researchLinkQuerier, keepFiles, wrtagOperation(job.Operation), job.SourcePath, job.UseMBID, ic)
 		if err != nil {
 			job.Status = StatusError
 			job.Error = err.Error()
@@ -230,7 +230,10 @@ func main() {
 
 	mux.HandleFunc("PUT /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(r.PathValue("id"))
-		confirm, _ := strconv.ParseBool(r.FormValue("confirm"))
+		var ic wrtag.ImportCondition
+		if confirm, _ := strconv.ParseBool(r.FormValue("confirm")); confirm {
+			ic = wrtag.Confirm
+		}
 		useMBID := r.FormValue("mbid")
 		if strings.Contains(useMBID, "/") {
 			useMBID = filepath.Base(useMBID) // accept release URL
@@ -242,7 +245,7 @@ func main() {
 			return
 		}
 		job.UseMBID = useMBID
-		if err := processJob(r.Context(), &job, confirm); err != nil {
+		if err := processJob(r.Context(), &job, ic); err != nil {
 			respErrf(w, http.StatusInternalServerError, "error in job")
 			return
 		}
@@ -335,7 +338,7 @@ func main() {
 			case err != nil:
 				return fmt.Errorf("find next job: %w", err)
 			}
-			return processJob(ctx, &job, false)
+			return processJob(ctx, &job, wrtag.HighScore)
 		}
 
 		ctxTick(ctx, 2*time.Second, func() {
