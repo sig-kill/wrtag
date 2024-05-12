@@ -11,17 +11,15 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/sergi/go-diff/diffmatchpatch"
+	dmp "github.com/sergi/go-diff/diffmatchpatch"
 
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/tags"
 )
 
-var dmp = diffmatchpatch.New()
-
 type Diff struct {
 	Field         string
-	Before, After []diffmatchpatch.Diff
+	Before, After []dmp.Diff
 	Equal         bool
 }
 
@@ -140,27 +138,28 @@ func WriteFile(
 }
 
 func Differ(weights TagWeights, score *float64) func(field string, a, b string) Diff {
+	dm := dmp.New()
+
 	var total float64
 	var dist float64
-
 	return func(field, a, b string) Diff {
 		// separate, normalised diff only for score. if we have both fields
 		if a != "" && b != "" {
 			a, b := norm(a), norm(b)
 
-			diffs := dmp.DiffMain(a, b, false)
-			dist += float64(dmp.DiffLevenshtein(diffs)) * weights.For(field)
+			diffs := dm.DiffMain(a, b, false)
+			dist += float64(dm.DiffLevenshtein(diffs)) * weights.For(field)
 			total += float64(len([]rune(b)))
 
 			*score = 100 - (dist * 100 / total)
 		}
 
-		diffs := dmp.DiffMain(a, b, false)
-		dist := float64(dmp.DiffLevenshtein(diffs))
+		diffs := dm.DiffMain(a, b, false)
+		dist := float64(dm.DiffLevenshtein(diffs))
 		return Diff{
 			Field:  field,
-			Before: filterFunc(diffs, func(d diffmatchpatch.Diff) bool { return d.Type <= diffmatchpatch.DiffEqual }),
-			After:  filterFunc(diffs, func(d diffmatchpatch.Diff) bool { return d.Type >= diffmatchpatch.DiffEqual }),
+			Before: filterFunc(diffs, func(d dmp.Diff) bool { return d.Type <= dmp.DiffEqual }),
+			After:  filterFunc(diffs, func(d dmp.Diff) bool { return d.Type >= dmp.DiffEqual }),
 			Equal:  dist == 0,
 		}
 	}

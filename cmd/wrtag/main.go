@@ -11,15 +11,13 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/sergi/go-diff/diffmatchpatch"
+	dmp "github.com/sergi/go-diff/diffmatchpatch"
 	"go.senan.xyz/flagconf"
 	"go.senan.xyz/table/table"
 
 	"go.senan.xyz/wrtag"
 	"go.senan.xyz/wrtag/cmd/internal/flagcommon"
 )
-
-var dmp = diffmatchpatch.New()
 
 var mb = flagcommon.MusicBrainz()
 var keepFiles = flagcommon.KeepFiles()
@@ -90,8 +88,10 @@ func main() {
 	}
 }
 
-func fmtDiff(diff []diffmatchpatch.Diff) string {
-	if d := dmp.DiffPrettyText(diff); d != "" {
+var dm = dmp.New()
+
+func fmtDiff(diff []dmp.Diff) string {
+	if d := dm.DiffPrettyText(diff); d != "" {
 		return d
 	}
 	return "[empty]"
