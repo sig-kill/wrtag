@@ -79,36 +79,40 @@ func main() {
 		return nil
 	}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-
 	var start = time.Now()
 	var numDone, numError atomic.Uint32
+
+	work := func(ctx context.Context) {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case dir, ok := <-leaves:
+				if !ok {
+					return
+				}
+				if err := processDir(ctx, dir); err != nil {
+					if errors.Is(err, context.Canceled) {
+						return
+					}
+					slog.ErrorContext(ctx, "processing dir", "dir", dir, "err", err)
+					numError.Add(1)
+					return
+				}
+				numDone.Add(1)
+			}
+		}
+	}
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
 
 	var wg sync.WaitGroup
 	for range 4 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case dir, ok := <-leaves:
-					if !ok {
-						return
-					}
-					if err := processDir(ctx, dir); err != nil {
-						if errors.Is(err, context.Canceled) {
-							return
-						}
-						slog.ErrorContext(ctx, "processing dir", "dir", dir, "err", err)
-						numError.Add(1)
-						continue
-					}
-					numDone.Add(1)
-				}
-			}
+			work(ctx)
 		}()
 	}
 
