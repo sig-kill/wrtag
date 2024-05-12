@@ -462,7 +462,7 @@ func authMiddleware(apiKey string) func(next http.Handler) http.Handler {
 				return
 			}
 			if _, key, _ := r.BasicAuth(); subtle.ConstantTimeCompare([]byte(key), []byte(apiKey)) == 1 {
-				http.SetCookie(w, &http.Cookie{Name: cookieKey, Value: apiKey, HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode, Path: "/", Expires: time.Now().Add(30 * 24 * time.Hour)})
+				http.SetCookie(w, &http.Cookie{Name: cookieKey, Value: apiKey, HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(30 * 24 * time.Hour)})
 				next.ServeHTTP(w, r)
 				return
 			}
