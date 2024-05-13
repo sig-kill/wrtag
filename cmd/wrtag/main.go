@@ -59,7 +59,12 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	r, err := wrtag.ProcessDir(ctx, mb, pathFormat, tagWeights, researchLinkQuerier, keepFiles, op, dir, *useMBID, *yes)
+	var importCondition wrtag.ImportCondition
+	if *yes {
+		importCondition = wrtag.Confirm
+	}
+
+	r, err := wrtag.ProcessDir(ctx, mb, pathFormat, tagWeights, researchLinkQuerier, keepFiles, op, dir, *useMBID, importCondition)
 	if err != nil && !errors.Is(err, wrtag.ErrScoreTooLow) {
 		slog.Error("processing", "dir", dir, "err", err)
 		os.Exit(1)

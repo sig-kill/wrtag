@@ -69,7 +69,7 @@ func main() {
 				return nil
 			}
 		}
-		if _, err := wrtag.ProcessDir(ctx, mb, pathFormat, tagWeights, nil, keepFiles, wrtag.Move{DryRun: *dryRun}, dir, "", false); err != nil {
+		if _, err := wrtag.ProcessDir(ctx, mb, pathFormat, tagWeights, nil, keepFiles, wrtag.Move{DryRun: *dryRun}, dir, "", wrtag.HighScoreOrMBID); err != nil {
 			return err
 		}
 		if err := os.Chtimes(dir, time.Time{}, importTime); err != nil && !errors.Is(err, os.ErrNotExist) {

@@ -53,11 +53,19 @@ type SearchResult struct {
 	OriginFile    *originfile.OriginFile
 }
 
+type ImportCondition uint8
+
+const (
+	HighScore ImportCondition = iota
+	HighScoreOrMBID
+	Confirm
+)
+
 func ProcessDir(
 	ctx context.Context, mb MusicbrainzClient,
 	pathFormat *pathformat.Format, tagWeights tagmap.TagWeights, researchLinkQuerier *researchlink.Querier, keepFiles map[string]struct{},
 	op FileSystemOperation, srcDir string,
-	useMBID string, yes bool,
+	useMBID string, importCondition ImportCondition,
 ) (*SearchResult, error) {
 	srcDir, _ = filepath.Abs(srcDir)
 
@@ -67,8 +75,14 @@ func ProcessDir(
 	}
 
 	searchFile := tagFiles[0]
+
+	var mbid = searchFile.Read(tags.MBReleaseID)
+	if useMBID != "" {
+		mbid = useMBID
+	}
+
 	query := musicbrainz.ReleaseQuery{
-		MBReleaseID:      searchFile.Read(tags.MBReleaseID),
+		MBReleaseID:      mbid,
 		MBArtistID:       searchFile.Read(tags.MBArtistID),
 		MBReleaseGroupID: searchFile.Read(tags.MBReleaseGroupID),
 		Release:          searchFile.Read(tags.Album),
@@ -79,9 +93,6 @@ func ProcessDir(
 		CatalogueNum:     searchFile.Read(tags.CatalogueNum),
 		NumTracks:        len(tagFiles),
 	}
-	if useMBID != "" {
-		query.MBReleaseID = useMBID
-	}
 
 	// parse https://github.com/x1ppy/gazelle-origin files, if one exists
 	originFile, err := originfile.Find(srcDir)
@@ -89,7 +100,7 @@ func ProcessDir(
 		return nil, fmt.Errorf("find origin file: %w", err)
 	}
 
-	if query.MBReleaseID == "" {
+	if mbid == "" {
 		if err := extendQueryWithOriginFile(&query, originFile); err != nil {
 			return nil, fmt.Errorf("use origin file: %w", err)
 		}
@@ -122,8 +133,19 @@ func ProcessDir(
 	}
 
 	score, diff := tagmap.DiffRelease(tagWeights, release, tagFiles)
-	if !yes && score < minScore {
-		return &SearchResult{Release: release, Score: score, Diff: diff, ResearchLinks: researchLinks, OriginFile: originFile}, ErrScoreTooLow
+
+	var shouldImport bool
+	switch importCondition {
+	case HighScoreOrMBID:
+		shouldImport = score >= minScore || mbid != ""
+	case HighScore:
+		shouldImport = score >= minScore
+	case Confirm:
+		shouldImport = true
+	}
+
+	if !shouldImport {
+		return &SearchResult{release, score, diff, researchLinks, originFile}, ErrScoreTooLow
 	}
 
 	destDir, err := DestDir(pathFormat, release)
@@ -203,7 +225,7 @@ func ProcessDir(
 		}
 	}
 
-	return &SearchResult{Release: release, Score: score, Diff: diff, OriginFile: originFile}, nil
+	return &SearchResult{release, score, diff, nil, originFile}, nil
 }
 
 func ReadAlbumDir(path string) (string, []string, []*tags.File, error) {
