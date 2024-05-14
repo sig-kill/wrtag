@@ -4,7 +4,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"slices"
 
 	_ "go.senan.xyz/wrtag/cmd/internal/flagcommon"
@@ -23,6 +25,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  $ %s read artist title -- a.flac\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  $ %s write album \"album name\" -- x.flac\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  $ %s write genres \"psy\" \"minimal\" \"techno\" , artist \"Sensient\" -- dir/*.flac\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  $ %s write genres \"psy\" \"minimal\" \"techno\" , artist \"Sensient\" -- dir/\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  $ %s clear -- a.flac\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  $ %s clear lyrics artist_credit -- *.flac\n", os.Args[0])
 	}
@@ -51,34 +54,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	var errs []error
+	var err error
 	switch command {
 	case "read":
 		args := parseTags(args)
-		for _, path := range paths {
-			if err := read(path, args); err != nil {
-				errs = append(errs, err)
-				continue
-			}
-		}
+		err = iterFiles(paths, func(p string) error {
+			return read(p, args)
+		})
 	case "write":
 		args := parseTagMap(args)
-		for _, path := range paths {
-			if err := write(path, args); err != nil {
-				errs = append(errs, err)
-				continue
-			}
-		}
+		err = iterFiles(paths, func(p string) error {
+			return write(p, args)
+		})
 	case "clear":
 		args := parseTags(args)
-		for _, path := range paths {
-			if err := clear(path, args); err != nil {
-				errs = append(errs, err)
-				continue
-			}
-		}
+		err = iterFiles(paths, func(p string) error {
+			return clear(p, args)
+		})
 	}
-	if err := errors.Join(errs...); err != nil {
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -162,4 +156,45 @@ func parseTagMap(args []string) map[string][]string {
 		r[k] = append(r[k], v)
 	}
 	return r
+}
+
+func iterFiles(paths []string, f func(p string) error) error {
+	var pathErrs []error
+	for _, p := range paths {
+		info, err := os.Stat(p)
+		if err != nil {
+			return err
+		}
+
+		switch info.Mode().Type() {
+		// recurse if dir, only attempt when CanRead
+		case os.ModeDir:
+			err := filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if !d.Type().IsRegular() {
+					return nil
+				}
+				if !tags.CanRead(path) {
+					return nil
+				}
+				if err := f(path); err != nil {
+					pathErrs = append(pathErrs, err)
+					return nil
+				}
+				return nil
+			})
+			if err != nil {
+				return fmt.Errorf("walk: %w", err)
+			}
+		// otherwise try directly, bubble errors
+		default:
+			if err := f(p); err != nil {
+				pathErrs = append(pathErrs, err)
+				continue
+			}
+		}
+	}
+	return errors.Join(pathErrs...)
 }
