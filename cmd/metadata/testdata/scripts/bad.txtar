@@ -8,7 +8,7 @@ stderr 'usage:'
 stderr 'usage:'
 
 ! exec metadata read -- f
-stderr 'open: cannot process'
+stderr 'no such file or directory'
 
 ! exec metadata read --
 stderr 'no paths provided'
