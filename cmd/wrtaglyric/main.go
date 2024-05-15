@@ -35,6 +35,7 @@ func main() {
 	paths := make(chan string)
 	go func() {
 		for _, d := range dirs {
+			d, _ = filepath.Abs(d)
 			err := filepath.WalkDir(d, func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
 					return err
