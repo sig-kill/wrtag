@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -46,6 +47,7 @@ func main() {
 	leaves := make(chan string)
 	go func() {
 		for _, d := range dirs {
+			d, _ = filepath.Abs(d)
 			err := fileutil.WalkLeaves(d, func(path string, _ fs.DirEntry) error {
 				leaves <- path
 				return nil
