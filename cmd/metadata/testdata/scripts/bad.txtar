@@ -2,10 +2,10 @@
 stderr 'no paths provided'
 
 ! exec metadata wroyte
-stderr 'usage:'
+stderr 'unknown command'
 
 ! exec metadata wroyte -- s
-stderr 'usage:'
+stderr 'unknown command'
 
 ! exec metadata read -- f
 stderr 'no such file or directory'
@@ -14,10 +14,7 @@ stderr 'no such file or directory'
 stderr 'no paths provided'
 
 ! exec metadata read
-stderr 'usage:'
-
-! exec metadata read
 stderr 'no paths provided'
 
 ! exec metadata
-stderr 'usage:'
+stderr 'unknown command'

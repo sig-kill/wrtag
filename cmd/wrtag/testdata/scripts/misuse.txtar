@@ -1,14 +1,14 @@
 ! exec wrtag
-stderr 'unknown command'
+stderr 'no command provided'
 
 ! exec wrtag f
 stderr 'unknown command'
 
 ! exec wrtag move
-stderr 'need a dir'
+stderr 'please provide a single directory'
 
 ! exec wrtag copy
-stderr 'need a dir'
+stderr 'please provide a single directory'
 
 ! exec wrtag move no-exist
 stderr 'read dir: no tracks in dir'

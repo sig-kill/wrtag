@@ -1,0 +1,7 @@
+env WRTAG_PATH_FORMAT='albums/{{ .Release.Title }}/{{ .Track.Title }}{{ .Ext }}'
+
+! exec wrtagsync
+stderr 'albums: no such file or directory'
+
+! exec wrtagsync x
+stderr 'x: no such file or directory'

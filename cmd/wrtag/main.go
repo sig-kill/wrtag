@@ -12,62 +12,102 @@ import (
 	"syscall"
 
 	dmp "github.com/sergi/go-diff/diffmatchpatch"
-	"go.senan.xyz/flagconf"
 	"go.senan.xyz/table/table"
 
 	"go.senan.xyz/wrtag"
-	"go.senan.xyz/wrtag/cmd/internal/flagcommon"
+	"go.senan.xyz/wrtag/cmd/internal/flags"
+	"go.senan.xyz/wrtag/pathformat"
+	"go.senan.xyz/wrtag/researchlink"
+	"go.senan.xyz/wrtag/tagmap"
 )
 
-var mb = flagcommon.MusicBrainz()
-var keepFiles = flagcommon.KeepFiles()
-var pathFormat = flagcommon.PathFormat()
-var researchLinkQuerier = flagcommon.Querier()
-var tagWeights = flagcommon.TagWeights()
-var configPath = flagcommon.ConfigPath()
+func init() {
+	flag := flag.CommandLine
+	flag.Usage = func() {
+		fmt.Fprintf(flag.Output(), "Usage:\n")
+		fmt.Fprintf(flag.Output(), "  $ %s [<options>] move [<move options>] <path>\n", flag.Name())
+		fmt.Fprintf(flag.Output(), "  $ %s [<options>] copy [<copy options>] <path>\n", flag.Name())
+		fmt.Fprintf(flag.Output(), "\n")
+		fmt.Fprintf(flag.Output(), "Options:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(flag.Output(), "\n")
+		fmt.Fprintf(flag.Output(), "See also:\n")
+		fmt.Fprintf(flag.Output(), "  $ %s move -h\n", flag.Name())
+		fmt.Fprintf(flag.Output(), "  $ %s copy -h\n", flag.Name())
+	}
+}
 
-var dryRun = flag.Bool("dry-run", false, "dry run")
+// updated while testing
+var mb = flags.MusicBrainz()
 
 func main() {
-	flag.Parse()
-	flagconf.ParseEnv()
-	flagconf.ParseConfig(*configPath)
+	defer flags.ExitError()
+	var (
+		keepFiles           = flags.KeepFiles()
+		pathFormat          = flags.PathFormat()
+		researchLinkQuerier = flags.Querier()
+		tagWeights          = flags.TagWeights()
+	)
+	flags.Parse()
 
-	command := flag.Arg(0)
-	var op wrtag.FileSystemOperation
-	switch command {
-	case "move":
-		op = wrtag.Move{DryRun: *dryRun}
-	case "copy":
-		op = wrtag.Copy{DryRun: *dryRun}
+	if flag.NArg() == 0 {
+		slog.Error("no command provided")
+		return
+	}
+
+	switch command, args := flag.Arg(0), flag.Args()[1:]; command {
+	case "move", "copy":
+		flag := flag.NewFlagSet(command, flag.ExitOnError)
+		var (
+			yes     = flag.Bool("yes", false, "use the found release anyway despite a low score")
+			useMBID = flag.String("mbid", "", "overwrite matched mbid")
+			dryRun  = flag.Bool("dry-run", false, "dry run")
+		)
+		flag.Parse(args)
+
+		var importCondition wrtag.ImportCondition
+		if *yes {
+			importCondition = wrtag.Confirm
+		}
+
+		if flag.NArg() != 1 {
+			slog.Error("please provide a single directory")
+			return
+		}
+
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer cancel()
+
+		dir := flag.Arg(0)
+		if err := run(ctx, mb, pathFormat, tagWeights, researchLinkQuerier, keepFiles, operation(command, *dryRun), dir, *useMBID, importCondition); err != nil {
+			slog.Error("running", "command", command, "err", err)
+			return
+		}
 	default:
 		slog.Error("unknown command", "command", command)
-		os.Exit(1)
+		return
 	}
+}
 
-	subflag := flag.NewFlagSet(command, flag.ExitOnError)
-	yes := subflag.Bool("yes", false, "use the found release anyway despite a low score")
-	useMBID := subflag.String("mbid", "", "overwrite matched mbid")
-	subflag.Parse(flag.Args()[1:])
-
-	dir := subflag.Arg(0)
-	if dir == "" {
-		slog.Error("need a dir")
-		os.Exit(1)
+func operation(name string, dryRun bool) wrtag.FileSystemOperation {
+	switch name {
+	case "copy":
+		return wrtag.Copy{DryRun: dryRun}
+	case "move":
+		return wrtag.Move{DryRun: dryRun}
 	}
+	return nil
+}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-
-	var importCondition wrtag.ImportCondition
-	if *yes {
-		importCondition = wrtag.Confirm
-	}
-
-	r, err := wrtag.ProcessDir(ctx, mb, pathFormat, tagWeights, researchLinkQuerier, keepFiles, op, dir, *useMBID, importCondition)
+func run(
+	ctx context.Context, mb wrtag.MusicbrainzClient,
+	pathFormat *pathformat.Format, tagWeights tagmap.TagWeights, researchLinkQuerier *researchlink.Querier, keepFiles map[string]struct{},
+	op wrtag.FileSystemOperation, srcDir string,
+	useMBID string, importCondition wrtag.ImportCondition,
+) error {
+	r, err := wrtag.ProcessDir(ctx, mb, pathFormat, tagWeights, researchLinkQuerier, keepFiles, op, srcDir, useMBID, importCondition)
 	if err != nil && !errors.Is(err, wrtag.ErrScoreTooLow) {
-		slog.Error("processing", "dir", dir, "err", err)
-		os.Exit(1)
+		return fmt.Errorf("processing: %w", err)
 	}
 
 	slog.InfoContext(ctx, "matched",
@@ -88,9 +128,9 @@ func main() {
 	}
 
 	if err != nil {
-		slog.Error("processing", "dir", dir, "err", err)
-		os.Exit(1)
+		return fmt.Errorf("processing: %w", err)
 	}
+	return nil
 }
 
 var dm = dmp.New()

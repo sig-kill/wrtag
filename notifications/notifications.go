@@ -5,12 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 
 	"github.com/containrrr/shoutrrr"
 	shoutrrrtypes "github.com/containrrr/shoutrrr/pkg/types"
 )
 
-var ErrUnknownEvent = errors.New("unknown event")
+var (
+	ErrInvalidURI   = errors.New("invalid URI")
+	ErrUnknownEvent = errors.New("unknown event")
+)
 
 type Event string
 
@@ -40,8 +44,22 @@ func (n *Notifications) AddURI(event Event, uri string) error {
 	if !event.IsValid() {
 		return fmt.Errorf("%w: %q", ErrUnknownEvent, event)
 	}
+	if _, err := url.Parse(uri); err != nil {
+		return fmt.Errorf("%w: %q", ErrUnknownEvent, event)
+	}
 	n.mappings[event] = append(n.mappings[event], uri)
 	return nil
+}
+
+func (n *Notifications) IterMappings(f func(Event, string)) {
+	for event, uris := range n.mappings {
+		for _, uri := range uris {
+			f(event, uri)
+		}
+	}
+}
+func (n *Notifications) Sendf(ctx context.Context, event Event, f string, a ...any) {
+	n.Send(ctx, event, fmt.Sprintf(f, a...))
 }
 
 // Send a simple string for now, maybe later message could instead be be a type which

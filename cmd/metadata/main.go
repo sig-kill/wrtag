@@ -5,39 +5,51 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
 
-	_ "go.senan.xyz/wrtag/cmd/internal/flagcommon"
+	"go.senan.xyz/wrtag/cmd/internal/flags"
 	"go.senan.xyz/wrtag/tags"
 )
 
-func main() {
+func init() {
+	flag := flag.CommandLine
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage:\n")
-		fmt.Fprintf(os.Stderr, "  $ %s read  [TAG]...               -- [PATH]...\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  $ %s write [TAG [VALUE]... , ]... -- [PATH]...\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  $ %s clear [TAG]...               -- [PATH]...\n", os.Args[0])
-		fmt.Fprintln(os.Stderr)
-		fmt.Fprintf(os.Stderr, "example:\n")
-		fmt.Fprintf(os.Stderr, "  $ %s read -- a.flac b.flac c.flac\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  $ %s read artist title -- a.flac\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  $ %s write album \"album name\" -- x.flac\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  $ %s write genres \"psy\" \"minimal\" \"techno\" , artist \"Sensient\" -- dir/*.flac\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  $ %s write genres \"psy\" \"minimal\" \"techno\" , artist \"Sensient\" -- dir/\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  $ %s clear -- a.flac\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  $ %s clear lyrics artist_credit -- *.flac\n", os.Args[0])
+		fmt.Fprintf(flag.Output(), "Usage:\n")
+		fmt.Fprintf(flag.Output(), "  $ %s [<options>] read  <tag>...                  -- <path>...\n", flag.Name())
+		fmt.Fprintf(flag.Output(), "  $ %s [<options>] write ( <tag> <value>... , )... -- <path>...\n", flag.Name())
+		fmt.Fprintf(flag.Output(), "  $ %s [<options>] clear <tag>...                  -- <path>...\n", flag.Name())
+		fmt.Fprintf(flag.Output(), "\n")
+		fmt.Fprintf(flag.Output(), "Example:\n")
+		fmt.Fprintf(flag.Output(), "  $ %s read -- a.flac b.flac c.flac\n", flag.Name())
+		fmt.Fprintf(flag.Output(), "  $ %s read artist title -- a.flac\n", flag.Name())
+		fmt.Fprintf(flag.Output(), "  $ %s write album \"album name\" -- x.flac\n", flag.Name())
+		fmt.Fprintf(flag.Output(), "  $ %s write genres \"psy\" \"minimal\" \"techno\" , artist \"Sensient\" -- dir/*.flac\n", flag.Name())
+		fmt.Fprintf(flag.Output(), "  $ %s write genres \"psy\" \"minimal\" \"techno\" , artist \"Sensient\" -- dir/\n", flag.Name())
+		fmt.Fprintf(flag.Output(), "  $ %s clear -- a.flac\n", flag.Name())
+		fmt.Fprintf(flag.Output(), "  $ %s clear lyrics artist_credit -- *.flac\n", flag.Name())
+		fmt.Fprintf(flag.Output(), "\n")
+		fmt.Fprintf(flag.Output(), "Options:\n")
+		flag.PrintDefaults()
 	}
-	flag.Parse()
+}
+
+func main() {
+	defer flags.ExitError()
+	var (
+		noProperties = flag.Bool("no-properties", false, "dont read file properties like length or bitrate")
+	)
+	flags.Parse()
 
 	command := flag.Arg(0)
 
 	switch command {
 	case "read", "write", "clear":
 	default:
-		flag.Usage()
-		os.Exit(1)
+		slog.Error("unknown command")
+		return
 	}
 
 	argPaths := flag.Args()[1:]
@@ -48,10 +60,8 @@ func main() {
 		paths = argPaths[i+1:]
 	}
 	if len(paths) == 0 {
-		fmt.Fprintf(os.Stderr, "no paths provided\n")
-		fmt.Fprintln(os.Stderr)
-		flag.Usage()
-		os.Exit(1)
+		slog.Error("no paths provided")
+		return
 	}
 
 	var err error
@@ -59,7 +69,7 @@ func main() {
 	case "read":
 		args := parseTags(args)
 		err = iterFiles(paths, func(p string) error {
-			return read(p, args)
+			return read(p, *noProperties, args)
 		})
 	case "write":
 		args := parseTagMap(args)
@@ -73,28 +83,51 @@ func main() {
 		})
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		slog.Error("running", "err", err)
+		return
 	}
 }
 
-func read(path string, keys map[string]struct{}) error {
+func read(path string, noProperties bool, keys map[string]struct{}) error {
 	file, err := tags.Read(path)
 	if err != nil {
 		return fmt.Errorf("read: %w", err)
 	}
 	defer file.Close()
+
+	printKey := func(k string) bool {
+		if len(keys) == 0 {
+			return true
+		}
+		_, wantKey := keys[k]
+		return wantKey
+	}
+
 	file.ReadAll(func(k string, vs []string) bool {
-		if len(keys) > 0 {
-			if _, ok := keys[k]; !ok {
-				return true
-			}
+		if !printKey(k) {
+			return true
 		}
 		for _, v := range vs {
 			fmt.Printf("%s\t%s\t%s\n", path, k, v)
 		}
 		return true
 	})
+	if noProperties {
+		return nil
+	}
+
+	if k := "length"; printKey(k) {
+		fmt.Printf("%s\t%s\t%.2f\n", path, k, file.Length().Seconds())
+	}
+	if k := "bitrate"; printKey(k) {
+		fmt.Printf("%s\t%s\t%d\n", path, k, file.Bitrate())
+	}
+	if k := "sample_rate"; printKey(k) {
+		fmt.Printf("%s\t%s\t%d\n", path, k, file.SampleRate())
+	}
+	if k := "num_channels"; printKey(k) {
+		fmt.Printf("%s\t%s\t%d\n", path, k, file.NumChannels())
+	}
 	return nil
 }
 

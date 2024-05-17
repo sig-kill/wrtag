@@ -15,28 +15,40 @@ import (
 	"syscall"
 	"time"
 
-	"go.senan.xyz/flagconf"
-
 	"go.senan.xyz/wrtag"
-	"go.senan.xyz/wrtag/cmd/internal/flagcommon"
+	"go.senan.xyz/wrtag/cmd/internal/flags"
 	"go.senan.xyz/wrtag/fileutil"
 	"go.senan.xyz/wrtag/notifications"
+	"go.senan.xyz/wrtag/pathformat"
+	"go.senan.xyz/wrtag/tagmap"
 )
 
-var mb = flagcommon.MusicBrainz()
-var keepFiles = flagcommon.KeepFiles()
-var notifs = flagcommon.Notifications()
-var pathFormat = flagcommon.PathFormat()
-var tagWeights = flagcommon.TagWeights()
-var configPath = flagcommon.ConfigPath()
+func init() {
+	flag := flag.CommandLine
+	flag.Usage = func() {
+		fmt.Fprintf(flag.Output(), "Usage:\n")
+		fmt.Fprintf(flag.Output(), "  $ %s [<options>] <path>...\n", flag.Name())
+		fmt.Fprintf(flag.Output(), "\n")
+		fmt.Fprintf(flag.Output(), "Options:\n")
+		flag.PrintDefaults()
+	}
+}
 
-var interval = flag.Duration("interval", 0, "max duration a release should be left unsynced")
-var dryRun = flag.Bool("dry-run", false, "dry run")
+// updated while testing
+var mb = flags.MusicBrainz()
 
 func main() {
-	flag.Parse()
-	flagconf.ParseEnv()
-	flagconf.ParseConfig(*configPath)
+	defer flags.ExitError()
+	var (
+		keepFiles  = flags.KeepFiles()
+		notifs     = flags.Notifications()
+		pathFormat = flags.PathFormat()
+		tagWeights = flags.TagWeights()
+		interval   = flag.Duration("interval", 0, "max duration a release should be left unsynced")
+		dryRun     = flag.Bool("dry-run", false, "dry run")
+	)
+	flags.EnvPrefix("wrtag") // reuse main binary's namespace
+	flags.Parse()
 
 	// walk the whole root dir by default, or some user provided dirs
 	var dirs = []string{pathFormat.Root()}
@@ -44,6 +56,7 @@ func main() {
 		dirs = flag.Args()
 	}
 
+	start := time.Now()
 	leaves := make(chan string)
 	go func() {
 		for _, d := range dirs {
@@ -53,81 +66,88 @@ func main() {
 				return nil
 			})
 			if err != nil {
-				slog.Error("walking leaves", "err", err)
+				slog.Error("walking paths", "err", err)
 				continue
 			}
 		}
 		close(leaves)
 	}()
 
-	importTime := time.Now()
-	processDir := func(ctx context.Context, dir string) error {
-		if *interval > 0 {
-			info, err := os.Stat(dir)
-			if err != nil {
-				return fmt.Errorf("stat dir: %w", err)
-			}
-			if time.Since(info.ModTime()) < *interval {
-				return nil
-			}
-		}
-		if _, err := wrtag.ProcessDir(ctx, mb, pathFormat, tagWeights, nil, keepFiles, wrtag.Move{DryRun: *dryRun}, dir, "", wrtag.HighScoreOrMBID); err != nil {
-			return err
-		}
-		if err := os.Chtimes(dir, time.Time{}, importTime); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("chtimes %q: %v", dir, err)
-		}
-		slog.InfoContext(ctx, "processed dir", "dir", dir)
-		return nil
-	}
-
-	var start = time.Now()
-	var numDone, numError atomic.Uint32
-
-	work := func(ctx context.Context) {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case dir, ok := <-leaves:
-				if !ok {
-					return
-				}
-				if err := processDir(ctx, dir); err != nil {
-					if errors.Is(err, context.Canceled) {
-						return
-					}
-					slog.ErrorContext(ctx, "processing dir", "dir", dir, "err", err)
-					numError.Add(1)
-					return
-				}
-				numDone.Add(1)
-			}
-		}
-	}
+	operation := wrtag.Move{DryRun: *dryRun}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
+
+	var doneN, errN atomic.Uint32
 
 	var wg sync.WaitGroup
 	for range 4 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			work(ctx)
+			ctxConsume(ctx, leaves, func(dir string) {
+				if err := processDir(ctx, mb, pathFormat, tagWeights, keepFiles, operation, dir, *interval); err != nil {
+					slog.ErrorContext(ctx, "processing dir", "dir", dir, "err", err)
+					errN.Add(1)
+					return
+				}
+				doneN.Add(1)
+			})
 		}()
 	}
 
 	wg.Wait()
 
-	var level slog.Level
-	if numError.Load() > 0 {
-		level = slog.LevelError
+	slog := slog.With("took", time.Since(start), "dirs", doneN.Load(), "errs", errN.Load())
+	if errN.Load() > 0 {
+		notifs.Sendf(ctx, notifications.SyncError, "sync finished with errors")
+		slog.Error("sync finished with errors")
+		return
 	}
-	slog.Log(ctx, level, "sync finished", "took", time.Since(start), "dirs", numDone.Load(), "errs", numError.Load())
+	slog.Info("sync finished")
+	notifs.Sendf(ctx, notifications.Complete, "sync finished")
+}
 
-	notifs.Send(ctx, notifications.SyncComplete, "sync complete")
-	if numError.Load() > 0 {
-		notifs.Send(ctx, notifications.SyncError, "sync errors")
+func processDir(
+	ctx context.Context,
+	mb wrtag.MusicbrainzClient, pathFormat *pathformat.Format, tagWeights tagmap.TagWeights, keepFiles map[string]struct{},
+	op wrtag.FileSystemOperation, srcDir string,
+	interval time.Duration,
+) error {
+	if interval > 0 {
+		info, err := os.Stat(srcDir)
+		if err != nil {
+			return fmt.Errorf("stat dir: %w", err)
+		}
+		if time.Since(info.ModTime()) < interval {
+			return nil
+		}
+	}
+	if _, err := wrtag.ProcessDir(ctx, mb, pathFormat, tagWeights, nil, keepFiles, op, srcDir, "", wrtag.HighScoreOrMBID); err != nil {
+		return err
+	}
+	if err := os.Chtimes(srcDir, time.Time{}, time.Now()); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("chtimes %q: %v", srcDir, err)
+	}
+	slog.InfoContext(ctx, "processed dir", "dir", srcDir)
+	return nil
+}
+
+func ctxConsume[T any](ctx context.Context, work <-chan T, f func(T)) {
+	for {
+		select { // prority select for ctx.Done()
+		case <-ctx.Done():
+			return
+		default:
+			select {
+			case <-ctx.Done():
+				return
+			case w, ok := <-work:
+				if !ok {
+					return
+				}
+				f(w)
+			}
+		}
 	}
 }
