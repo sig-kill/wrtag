@@ -1,3 +1,5 @@
+env METADATA_NO_PROPERTIES=1
+
 exec flac a.flac
 exec flac b.flac
 

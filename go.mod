@@ -14,7 +14,7 @@ require (
 	github.com/sergi/go-diff v1.3.1
 	github.com/stretchr/testify v1.9.0
 	github.com/timshannon/bolthold v0.0.0-20240314194003-30aac6950928
-	go.senan.xyz/flagconf v0.1.8
+	go.senan.xyz/flagconf v0.1.9
 	go.senan.xyz/table v0.0.0-20240227175247-cf2c834b4c23
 	golang.org/x/net v0.25.0
 	golang.org/x/sync v0.7.0
@@ -25,7 +25,7 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/fatih/color v1.16.0 // indirect
+	github.com/fatih/color v1.17.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

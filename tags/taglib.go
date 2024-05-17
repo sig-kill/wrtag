@@ -61,8 +61,9 @@ func CanRead(absPath string) bool {
 }
 
 type File struct {
-	raw  map[string][]string
-	file *audiotags.File
+	raw   map[string][]string
+	props *audiotags.AudioProperties
+	file  *audiotags.File
 }
 
 func Read(absPath string) (*File, error) {
@@ -74,7 +75,8 @@ func Read(absPath string) (*File, error) {
 	raw := f.ReadTags()
 	normalise(raw, replacements) // tag replacements, case normalisation, etc
 
-	return &File{raw: raw, file: f}, nil
+	props := f.ReadAudioProperties()
+	return &File{raw: raw, props: props, file: f}, nil
 }
 
 func (f *File) Read(t string) string        { return first(f.raw[t]) }
@@ -107,6 +109,11 @@ func (f *File) WriteNum(t string, v int) { f.Write(t, intStr(v)) }
 
 func (f *File) Clear(t string) { delete(f.raw, t) }
 func (f *File) ClearAll()      { clear(f.raw) }
+
+func (f *File) Length() time.Duration { return time.Duration(f.props.LengthMs) * time.Millisecond }
+func (f *File) Bitrate() int          { return f.props.Bitrate }
+func (f *File) SampleRate() int       { return f.props.Samplerate }
+func (f *File) NumChannels() int      { return f.props.Channels }
 
 func (f *File) CloneRaw() map[string][]string {
 	return maps.Clone(f.raw)

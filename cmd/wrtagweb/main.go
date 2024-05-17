@@ -26,41 +26,54 @@ import (
 
 	"github.com/r3labs/sse/v2"
 	"github.com/timshannon/bolthold"
-	"go.senan.xyz/flagconf"
 	"golang.org/x/sync/errgroup"
 
 	"go.senan.xyz/wrtag"
-	"go.senan.xyz/wrtag/cmd/internal/flagcommon"
+	"go.senan.xyz/wrtag/cmd/internal/flags"
 	"go.senan.xyz/wrtag/notifications"
 )
 
-var mb = flagcommon.MusicBrainz()
-var keepFiles = flagcommon.KeepFiles()
-var notifs = flagcommon.Notifications()
-var pathFormat = flagcommon.PathFormat()
-var researchLinkQuerier = flagcommon.Querier()
-var tagWeights = flagcommon.TagWeights()
-var configPath = flagcommon.ConfigPath()
-
-var listenAddr = flag.String("listen-addr", "", "listen addr")
-var publicURL = flag.String("public-url", "", "public url")
-var apiKey = flag.String("api-key", "", "api key")
-var dbPath = flag.String("db-path", "wrtag.db", "db path")
+func init() {
+	flag := flag.CommandLine
+	flag.Usage = func() {
+		fmt.Fprintf(flag.Output(), "Usage:\n")
+		fmt.Fprintf(flag.Output(), "  $ %s [<options>]\n", flag.Name())
+		fmt.Fprintf(flag.Output(), "\n")
+		fmt.Fprintf(flag.Output(), "Options:\n")
+		flag.PrintDefaults()
+	}
+}
 
 func main() {
-	flag.Parse()
-	flagconf.ParseEnv()
-	flagconf.ParseConfig(*configPath)
+	defer flags.ExitError()
+	var (
+		mb                  = flags.MusicBrainz()
+		keepFiles           = flags.KeepFiles()
+		notifs              = flags.Notifications()
+		pathFormat          = flags.PathFormat()
+		researchLinkQuerier = flags.Querier()
+		tagWeights          = flags.TagWeights()
+		listenAddr          = flag.String("web-listen-addr", "", "listen addr for web interface")
+		publicURL           = flag.String("web-public-url", "", "public url for web interface")
+		apiKey              = flag.String("web-api-key", "", "api key for web interface")
+		dbPath              = flag.String("web-db-path", "wrtag.db", "db path for web interface")
+	)
+	flags.EnvPrefix("wrtag") // reuse main binary's namespace
+	flags.Parse()
 
+	if *listenAddr == "" {
+		slog.Error("need a listen addr")
+		return
+	}
 	if *apiKey == "" {
 		slog.Error("need an api key")
-		os.Exit(1)
+		return
 	}
 
 	db, err := bolthold.Open(*dbPath, 0600, nil)
 	if err != nil {
 		slog.Error("parsing path format template", "err", err)
-		os.Exit(1)
+		return
 	}
 	defer db.Close()
 
@@ -351,8 +364,8 @@ func main() {
 	})
 
 	if err := errgrp.Wait(); err != nil {
-		slog.ErrorContext(ctx, "wait for jobs", "err", err)
-		panic(err)
+		slog.Error("wait for jobs", "err", err)
+		return
 	}
 }
 

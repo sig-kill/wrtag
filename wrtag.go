@@ -62,8 +62,8 @@ const (
 )
 
 func ProcessDir(
-	ctx context.Context, mb MusicbrainzClient,
-	pathFormat *pathformat.Format, tagWeights tagmap.TagWeights, researchLinkQuerier *researchlink.Querier, keepFiles map[string]struct{},
+	ctx context.Context,
+	mb MusicbrainzClient, pathFormat *pathformat.Format, tagWeights tagmap.TagWeights, researchLinkQuerier *researchlink.Querier, keepFiles map[string]struct{},
 	op FileSystemOperation, srcDir string,
 	useMBID string, importCondition ImportCondition,
 ) (*SearchResult, error) {

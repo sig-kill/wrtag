@@ -8,21 +8,19 @@ import (
 	"time"
 )
 
-type Querier struct {
-	sources []source
-}
-
 type source struct {
 	name     string
 	template *texttemplate.Template
 }
 
-func (q *Querier) String() string {
-	var names []string
-	for _, sl := range q.sources {
-		names = append(names, sl.name)
+type Querier struct {
+	sources []source
+}
+
+func (q *Querier) IterSources(f func(string, *texttemplate.Template)) {
+	for _, s := range q.sources {
+		f(s.name, s.template)
 	}
-	return strings.Join(names, ", ")
 }
 
 func (q *Querier) AddSource(name, templRaw string) error {
