@@ -78,15 +78,15 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
+	var knownDests sync.Map
 	var doneN, errN atomic.Uint32
-
 	var wg sync.WaitGroup
 	for range 4 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			ctxConsume(ctx, leaves, func(dir string) {
-				if err := processDir(ctx, mb, pathFormat, tagWeights, keepFiles, operation, dir, *interval); err != nil {
+				if err := processDir(ctx, &knownDests, mb, pathFormat, tagWeights, keepFiles, operation, dir, *interval); err != nil {
 					slog.ErrorContext(ctx, "processing dir", "dir", dir, "err", err)
 					errN.Add(1)
 					return
@@ -100,20 +100,29 @@ func main() {
 
 	slog := slog.With("took", time.Since(start), "dirs", doneN.Load(), "errs", errN.Load())
 	if errN.Load() > 0 {
-		notifs.Sendf(ctx, notifications.SyncError, "sync finished with errors")
+		notifs.Send(ctx, notifications.SyncError, "sync finished with errors")
 		slog.Error("sync finished with errors")
 		return
 	}
+	notifs.Send(ctx, notifications.Complete, "sync finished")
 	slog.Info("sync finished")
-	notifs.Sendf(ctx, notifications.Complete, "sync finished")
 }
 
 func processDir(
 	ctx context.Context,
+	knownDests *sync.Map,
 	mb wrtag.MusicbrainzClient, pathFormat *pathformat.Format, tagWeights tagmap.TagWeights, keepFiles map[string]struct{},
 	op wrtag.FileSystemOperation, srcDir string,
 	interval time.Duration,
 ) error {
+	{
+		// make sure we don't try process a dir that was created while walking
+		srcDir, _ := filepath.Abs(srcDir)
+		if _, ok := knownDests.Load(srcDir); ok {
+			return nil
+		}
+	}
+
 	if interval > 0 {
 		info, err := os.Stat(srcDir)
 		if err != nil {
@@ -123,12 +132,20 @@ func processDir(
 			return nil
 		}
 	}
-	if _, err := wrtag.ProcessDir(ctx, mb, pathFormat, tagWeights, nil, keepFiles, op, srcDir, "", wrtag.HighScoreOrMBID); err != nil {
+
+	r, err := wrtag.ProcessDir(ctx, mb, pathFormat, tagWeights, nil, keepFiles, op, srcDir, "", wrtag.HighScoreOrMBID)
+	if err != nil {
 		return err
 	}
+	{
+		destDir, _ := filepath.Abs(r.DestDir)
+		knownDests.Store(destDir, nil)
+	}
+
 	if err := os.Chtimes(srcDir, time.Time{}, time.Now()); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("chtimes %q: %v", srcDir, err)
 	}
+
 	slog.InfoContext(ctx, "processed dir", "dir", srcDir)
 	return nil
 }
