@@ -95,16 +95,16 @@ func read(path string, noProperties bool, keys map[string]struct{}) error {
 	}
 	defer file.Close()
 
-	printKey := func(k string) bool {
+	wantKey := func(k string) bool {
 		if len(keys) == 0 {
 			return true
 		}
-		_, wantKey := keys[k]
-		return wantKey
+		_, want := keys[k]
+		return want
 	}
 
 	file.ReadAll(func(k string, vs []string) bool {
-		if !printKey(k) {
+		if !wantKey(k) {
 			return true
 		}
 		for _, v := range vs {
@@ -116,16 +116,16 @@ func read(path string, noProperties bool, keys map[string]struct{}) error {
 		return nil
 	}
 
-	if k := "length"; printKey(k) {
+	if k := "length"; wantKey(k) {
 		fmt.Printf("%s\t%s\t%.2f\n", path, k, file.Length().Seconds())
 	}
-	if k := "bitrate"; printKey(k) {
+	if k := "bitrate"; wantKey(k) {
 		fmt.Printf("%s\t%s\t%d\n", path, k, file.Bitrate())
 	}
-	if k := "sample_rate"; printKey(k) {
+	if k := "sample_rate"; wantKey(k) {
 		fmt.Printf("%s\t%s\t%d\n", path, k, file.SampleRate())
 	}
-	if k := "num_channels"; printKey(k) {
+	if k := "num_channels"; wantKey(k) {
 		fmt.Printf("%s\t%s\t%d\n", path, k, file.NumChannels())
 	}
 	return nil
