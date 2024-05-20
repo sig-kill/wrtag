@@ -3,7 +3,6 @@ package flags
 import (
 	"flag"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,7 +10,6 @@ import (
 
 	"go.senan.xyz/flagconf"
 	"go.senan.xyz/wrtag"
-	"go.senan.xyz/wrtag/clientutil"
 	"go.senan.xyz/wrtag/lyrics"
 	"go.senan.xyz/wrtag/musicbrainz"
 	"go.senan.xyz/wrtag/notifications"
@@ -111,15 +109,4 @@ func Lyrics() lyrics.Source {
 	genius.RateLimit = 500 * time.Millisecond
 
 	return lyrics.ChainSource{&genius, &musixmatch}
-}
-
-var httpClient *http.Client
-
-func init() {
-	httpClient = &http.Client{Transport: clientutil.Chain(
-		clientutil.WithLogging(slog.Default()),
-		clientutil.WithUserAgent(fmt.Sprintf(`wrtag/%s`, wrtag.Version)),
-	)(http.DefaultTransport)}
-
-	http.DefaultClient = httpClient
 }

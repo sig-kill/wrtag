@@ -2,9 +2,14 @@ package flags
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"sync/atomic"
+
+	"go.senan.xyz/wrtag"
+	"go.senan.xyz/wrtag/clientutil"
 )
 
 var logLevel slog.LevelVar
@@ -37,4 +42,15 @@ func (n *slogHandler) Handle(ctx context.Context, r slog.Record) error {
 		hadSlogError.Store(true)
 	}
 	return n.Handler.Handle(ctx, r)
+}
+
+var httpClient *http.Client
+
+func init() {
+	httpClient = &http.Client{Transport: clientutil.Chain(
+		clientutil.WithLogging(slog.Default()),
+		clientutil.WithUserAgent(fmt.Sprintf(`wrtag/%s`, wrtag.Version)),
+	)(http.DefaultTransport)}
+
+	http.DefaultClient = httpClient
 }
