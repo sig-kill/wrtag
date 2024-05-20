@@ -70,7 +70,7 @@ cmp stdout exp-layout
 cmp 'albums/Jeff Mills/(1997) Kat Moda/01.03 Alarms.flac' tr-1-copy
 
 -- exp-layout --
-albums/
+albums
 albums/Jeff Mills
 albums/Jeff Mills/(1997) Kat Moda
 albums/Jeff Mills/(1997) Kat Moda/01.03 Alarms.flac

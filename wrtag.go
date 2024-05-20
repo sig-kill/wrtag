@@ -48,6 +48,7 @@ type MusicbrainzClient interface {
 type SearchResult struct {
 	Release       *musicbrainz.Release
 	Score         float64
+	DestDir       string
 	Diff          []tagmap.Diff
 	ResearchLinks []researchlink.SearchResult
 	OriginFile    *originfile.OriginFile
@@ -129,7 +130,7 @@ func ProcessDir(
 
 	releaseTracks := musicbrainz.FlatTracks(release.Media)
 	if len(releaseTracks) != len(tagFiles) {
-		return &SearchResult{Release: release, ResearchLinks: researchLinks, OriginFile: originFile}, fmt.Errorf("%w: %d remote / %d local", ErrTrackCountMismatch, len(releaseTracks), len(tagFiles))
+		return &SearchResult{release, 0, "", nil, researchLinks, originFile}, fmt.Errorf("%w: %d remote / %d local", ErrTrackCountMismatch, len(releaseTracks), len(tagFiles))
 	}
 
 	score, diff := tagmap.DiffRelease(tagWeights, release, tagFiles)
@@ -145,7 +146,7 @@ func ProcessDir(
 	}
 
 	if !shouldImport {
-		return &SearchResult{release, score, diff, researchLinks, originFile}, ErrScoreTooLow
+		return &SearchResult{release, score, "", diff, researchLinks, originFile}, ErrScoreTooLow
 	}
 
 	destDir, err := DestDir(pathFormat, release)
@@ -225,7 +226,7 @@ func ProcessDir(
 		}
 	}
 
-	return &SearchResult{release, score, diff, nil, originFile}, nil
+	return &SearchResult{release, score, destDir, diff, researchLinks, originFile}, nil
 }
 
 func ReadAlbumDir(path string) (string, []string, []*tags.File, error) {
