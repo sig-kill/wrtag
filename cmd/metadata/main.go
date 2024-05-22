@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"time"
 
 	"go.senan.xyz/wrtag/cmd/internal/flags"
 	"go.senan.xyz/wrtag/tags"
@@ -117,7 +118,7 @@ func read(path string, noProperties bool, keys map[string]struct{}) error {
 	}
 
 	if k := "length"; wantKey(k) {
-		fmt.Printf("%s\t%s\t%.2f\n", path, k, file.Length().Seconds())
+		fmt.Printf("%s\t%s\t%s\n", path, k, formatDuration(file.Length()))
 	}
 	if k := "bitrate"; wantKey(k) {
 		fmt.Printf("%s\t%s\t%d\n", path, k, file.Bitrate())
@@ -230,4 +231,8 @@ func iterFiles(paths []string, f func(p string) error) error {
 		}
 	}
 	return errors.Join(pathErrs...)
+}
+
+func formatDuration(d time.Duration) string {
+	return fmt.Sprintf("%02d:%02d", int(d.Minutes()), int(d.Seconds())%60)
 }
