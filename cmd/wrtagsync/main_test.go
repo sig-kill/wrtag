@@ -9,8 +9,8 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	testcmds.MockMusicBrainz(mb.MBClient)
-	testcmds.MockCoverArtArchive(mb.CAAClient)
+	testcmds.MockMusicBrainz(&cfg.MusicBrainzClient)
+	testcmds.MockCoverArtArchive(&cfg.CoverArtArchiveClient)
 
 	os.Exit(testscript.RunMain(m, map[string]func() int{
 		"wrtagsync": func() int { main(); return 0 },
