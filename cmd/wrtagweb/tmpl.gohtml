@@ -15,16 +15,16 @@
     <span>{{ .Operation }} path <a class="italic break-all" href="{{ .SourcePath | file | url }}">{{ .SourcePath }}</a></span>
   </div>
   <div class="flex flex-col items-start gap-2 bg-gray-100 p-3">
-    {{ if .SearchResult }}
-      <p class="font-bold">{{ printf "%.2f%%" .SearchResult.Score }} match with <a href="https://musicbrainz.org/release/{{ .SearchResult.Release.ID }}" target="_blank">https://musicbrainz.org/release/{{ .SearchResult.Release.ID }}</a></p>
-      {{ if .SearchResult.Diff }}
-        {{ template "diff" .SearchResult.Diff }}
+    {{ if .SearchResult.Data }}
+      <p class="font-bold">{{ printf "%.2f%%" .SearchResult.Data.Score }} match with <a href="https://musicbrainz.org/release/{{ .SearchResult.Data.Release.ID }}" target="_blank">https://musicbrainz.org/release/{{ .SearchResult.Data.Release.ID }}</a></p>
+      {{ if .SearchResult.Data.Diff }}
+        {{ template "diff" .SearchResult.Data.Diff }}
       {{ end }}
-      {{ if .SearchResult.OriginFile }}
-        {{ template "originfile" .SearchResult.OriginFile }}
+      {{ if .SearchResult.Data.OriginFile }}
+        {{ template "originfile" .SearchResult.Data.OriginFile }}
       {{ end }}
-      {{ if .SearchResult.ResearchLinks }}
-        <p>research links <span class="inline-flex gap-2">{{ range .SearchResult.ResearchLinks }}<a target="_blank" href="{{ .URL | url }}">{{ .Name }}</a>{{ end }}</span></p>
+      {{ if .SearchResult.Data.ResearchLinks }}
+        <p>research links <span class="inline-flex gap-2">{{ range .SearchResult.Data.ResearchLinks }}<a target="_blank" href="{{ .URL | url }}">{{ .Name }}</a>{{ end }}</span></p>
       {{ end }}
     {{ end }}
     {{ if eq .Status "needs-input" }}

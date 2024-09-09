@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/subtle"
 	"database/sql"
-	"database/sql/driver"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -127,6 +126,7 @@ func main() {
 		job.Status = StatusComplete
 
 		searchResult, err := wrtag.ProcessDir(ctx, cfg, wrtagOperation(job.Operation), job.SourcePath, ic, job.UseMBID)
+		job.SearchResult = sqlb.NewJSON(searchResult)
 		if err != nil {
 			job.Status = StatusError
 			job.Error = err.Error()
@@ -136,9 +136,8 @@ func main() {
 			}
 			return nil
 		}
-		job.SearchResult = &SearchResult{SearchResult: *searchResult}
 
-		job.DestPath, err = wrtag.DestDir(&cfg.PathFormat, job.SearchResult.Release)
+		job.DestPath, err = wrtag.DestDir(&cfg.PathFormat, job.SearchResult.Data.Release)
 		if err != nil {
 			return fmt.Errorf("gen dest dir: %w", err)
 		}
@@ -183,17 +182,16 @@ func main() {
 
 	const pageSize = 20
 	listJobs := func(ctx context.Context, status JobStatus, search string, page int) (jobsListing, error) {
-		var whereb sqlb.Query
-		whereb.Append("1")
+		cond := sqlb.NewQuery("1")
 		if search != "" {
-			whereb.Append("and source_path like ?", "%"+search+"%")
+			cond.Append("and source_path like ?", "%"+search+"%")
 		}
 		if status != "" {
-			whereb.Append("and status=?", status)
+			cond.Append("and status=?", status)
 		}
 
 		var total int
-		if err := sqlb.ScanRow(ctx, db, sqlb.Primative(&total), "select count(1) from jobs where ?", whereb); err != nil {
+		if err := sqlb.ScanRow(ctx, db, sqlb.Primative(&total), "select count(1) from jobs where ?", cond); err != nil {
 			return jobsListing{}, fmt.Errorf("count total: %w", err)
 		}
 
@@ -202,15 +200,8 @@ func main() {
 			page = 0 // reset if gone too far
 		}
 
-		var q sqlb.Query
-		q.Append("select * from jobs where ?", whereb)
-		q.Append("order by time desc")
-		q.Append("limit ? offset ?", pageSize, pageSize*page)
-
-		query, values := q.SQL()
-
 		var jobs []*Job
-		if err := sqlb.Scan(ctx, db, &jobs, query, values...); err != nil {
+		if err := sqlb.Scan(ctx, db, &jobs, "select * from jobs where ? order by time desc limit ? offset ?", cond, pageSize, pageSize*page); err != nil {
 			return jobsListing{}, fmt.Errorf("list jobs: %w", err)
 		}
 
@@ -385,8 +376,11 @@ func main() {
 	errgrp.Go(func() error {
 		defer logJob("http")()
 
-		mw := authMiddleware(*apiKey)
-		server := &http.Server{Addr: *listenAddr, Handler: mw(mux)}
+		var h http.Handler
+		h = mux
+		h = authMiddleware(*apiKey)(h)
+
+		server := &http.Server{Addr: *listenAddr, Handler: h}
 		errgrp.Go(func() error { <-ctx.Done(); return server.Shutdown(context.Background()) })
 		errgrp.Go(func() error { <-ctx.Done(); sseServ.Close(); return nil })
 
@@ -472,7 +466,7 @@ type Job struct {
 	Time                 time.Time
 	UseMBID              string
 	SourcePath, DestPath string
-	SearchResult         *SearchResult
+	SearchResult         sqlb.JSON[*wrtag.SearchResult]
 }
 
 func (Job) PrimaryKey() string {
@@ -596,23 +590,4 @@ func ctxTick(ctx context.Context, interval time.Duration, f func()) {
 			f()
 		}
 	}
-}
-
-type SearchResult struct {
-	wrtag.SearchResult
-}
-
-func (sr *SearchResult) Scan(v any) error {
-	if v == nil {
-		return nil
-	}
-	b, ok := v.([]byte)
-	if !ok {
-		return errors.New("type assertion to []byte failed")
-	}
-	return json.Unmarshal(b, &sr.SearchResult)
-}
-
-func (sr SearchResult) Value() (driver.Value, error) {
-	return json.Marshal(sr.SearchResult)
 }
