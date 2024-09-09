@@ -74,19 +74,23 @@ func main() {
 
 	dbURI, _ := url.Parse("file://?cache=shared&_fk=1")
 	dbURI.Opaque = *dbPath
-	dbc, err := sql.Open("sqlite3", dbURI.String())
+	db, err := sql.Open("sqlite3", dbURI.String())
 	if err != nil {
 		slog.Error("open db template", "err", err)
 		return
 	}
-	defer dbc.Close()
+	defer db.Close()
 
-	if err := jobsMigrate(context.Background(), dbc); err != nil {
+	if lev := slog.LevelDebug; slog.Default().Enabled(context.Background(), lev) {
+		sqlb.SetLog(func(ctx context.Context, typ string, duration time.Duration, query string) {
+			slog.Log(ctx, lev, typ, "took", duration, "query", query)
+		})
+	}
+
+	if err := jobsMigrate(context.Background(), db); err != nil {
 		slog.Error("migrate db", "err", err)
 		return
 	}
-
-	db := sqlb.NewLogDB(dbc, slog.Default(), slog.LevelDebug)
 
 	sseServ := sse.New()
 	sseServ.AutoReplay = false
@@ -287,7 +291,7 @@ func main() {
 
 	mux.HandleFunc("DELETE /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(r.PathValue("id"))
-		if _, err := db.ExecContext(r.Context(), "delete from jobs where id=?", id); err != nil {
+		if err := sqlb.Exec(r.Context(), db, "delete from jobs where id=?", id); err != nil {
 			respErrf(w, http.StatusInternalServerError, "error getting job")
 			return
 		}
@@ -490,7 +494,7 @@ func (j *Job) ScanFrom(rows *sql.Rows) error {
 }
 
 func jobsMigrate(ctx context.Context, db *sql.DB) error {
-	_, err := db.ExecContext(ctx, `
+	return sqlb.Exec(ctx, db, `
 		create table if not exists jobs (
 			id            integer primary key autoincrement,
 			status        text not null default "",
@@ -506,7 +510,6 @@ func jobsMigrate(ctx context.Context, db *sql.DB) error {
 		create index if not exists idx_jobs_status on jobs (status);
 		create index if not exists idx_jobs_source_path on jobs (source_path);
 	`)
-	return err
 }
 
 func jobNotificationMessage(publicURL string, job Job) string {
