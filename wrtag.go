@@ -488,7 +488,15 @@ func trimDestDir(dc DirContext, dest string, dryRun bool) error {
 	return nil
 }
 
-func copyFile(src, dest string) error {
+func copyFile(src, dest string) (err error) {
+	defer func() {
+		if err != nil {
+			if rerr := os.Remove(dest); rerr != nil {
+				err = errors.Join(err, rerr)
+			}
+		}
+	}()
+
 	srcf, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("open src: %w", err)
