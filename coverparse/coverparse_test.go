@@ -78,9 +78,9 @@ func TestSelection(t *testing.T) {
 
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			var s coverparse.Front
+			var s string
 			for _, c := range test.covers {
-				s.Compare(c)
+				coverparse.BestBetween(&s, c)
 			}
 			if string(s) != test.expected {
 				t.Errorf("with covers %v expected %q got %q", test.covers, test.expected, s)
@@ -89,6 +89,8 @@ func TestSelection(t *testing.T) {
 	}
 }
 
+// thanks to @heimoshuiyu for orignal test cases
+// https://github.com/sentriz/gonic/pull/516
 func TestCoverSorting(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -108,7 +110,7 @@ func TestCoverSorting(t *testing.T) {
 		},
 		{
 			name:     "different art types",
-			expected: []string{"albumart 2.png", "folder.bmp", "scan 1.jpg"},
+			expected: []string{"folder.bmp", "albumart 2.png", "scan 1.jpg"},
 		},
 		{
 			name:     "same prefix with different numbers",
@@ -120,7 +122,7 @@ func TestCoverSorting(t *testing.T) {
 		},
 		{
 			name:     "various cover types",
-			expected: []string{"cover.png", "front.jpg", "albumart 1.gif", "folder.bmp"},
+			expected: []string{"cover.png", "front.jpg", "folder.bmp", "albumart 1.gif"},
 		},
 		{
 			name:     "ignored art types",
@@ -171,7 +173,9 @@ func TestCoverSorting(t *testing.T) {
 			r.Shuffle(len(inp), func(i, j int) {
 				inp[i], inp[j] = inp[j], inp[i]
 			})
-			slices.SortFunc(inp, coverparse.Compare)
+
+			slices.SortStableFunc(inp, coverparse.Compare)
+
 			if !slices.Equal(inp, tc.expected) {
 				t.Errorf("expected %q got %q", tc.expected, inp)
 			}

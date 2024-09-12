@@ -252,11 +252,11 @@ func ReadReleaseDir(path string) (string, []*tags.File, error) {
 		return "", nil, fmt.Errorf("glob dir for discs: %w", err)
 	}
 
-	var cover coverparse.Front
+	var cover string
 	var files []*tags.File
 	for _, p := range append(mainPaths, discPaths...) {
 		if coverparse.IsCover(p) {
-			cover.Compare(p)
+			coverparse.BestBetween(&cover, p)
 			continue
 		}
 

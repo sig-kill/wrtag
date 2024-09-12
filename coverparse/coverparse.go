@@ -26,16 +26,14 @@ func Compare(a, b string) int {
 	)
 }
 
-type Front string
-
-// Compare updates the current best candidate if the new path is better.
-func (h *Front) Compare(other string) {
-	if *h == "" {
-		*h = Front(other)
+// BestBetween updates the current best candidate if the new path is better.
+func BestBetween(cover *string, other string) {
+	if *cover == "" {
+		*cover = other
 		return
 	}
-	if Compare(string(*h), other) > 0 {
-		*h = Front(other)
+	if Compare(*cover, other) > 0 {
+		*cover = other
 	}
 }
 
@@ -57,6 +55,12 @@ func init() {
 	for k := range artTypePriorities {
 		quoted = append(quoted, regexp.QuoteMeta(k))
 	}
+	slices.SortFunc(quoted, func(a, b string) int {
+		return cmp.Or(
+			len(b)-len(a),
+			cmp.Compare(a, b),
+		)
+	})
 	quoteExpr := strings.Join(quoted, "|")
 	artTypeExpr = regexp.MustCompile(quoteExpr)
 }
