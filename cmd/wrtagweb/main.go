@@ -57,9 +57,9 @@ func main() {
 	var (
 		cfg        = cmds.WrtagConfig()
 		listenAddr = flag.String("web-listen-addr", "", "listen addr for web interface")
-		publicURL  = flag.String("web-public-url", "", "public url for web interface")
 		apiKey     = flag.String("web-api-key", "", "api key for web interface")
 		dbPath     = flag.String("web-db-path", "wrtag.db", "db path for web interface")
+		publicURL  = flag.String("web-public-url", "", "public url for web interface (optional)")
 	)
 	cmds.Parse()
 
@@ -69,6 +69,10 @@ func main() {
 	}
 	if *apiKey == "" {
 		slog.Error("need an api key")
+		return
+	}
+	if *dbPath == "" {
+		slog.Error("need a db path")
 		return
 	}
 
