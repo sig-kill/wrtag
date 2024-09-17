@@ -32,10 +32,9 @@ func TestZero(t *testing.T) {
 
 	check := func(f *File) {
 		var n int
-		f.ReadAll(func(k string, vs []string) bool {
+		for range f.Iter() {
 			n++
-			return true
-		})
+		}
 		assert.Equal(t, 0, n)
 	}
 

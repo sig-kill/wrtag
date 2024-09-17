@@ -108,15 +108,14 @@ func read(path string, withProperties bool, keys map[string]struct{}) error {
 		return want
 	}
 
-	file.ReadAll(func(k string, vs []string) bool {
+	for k, vs := range file.Iter() {
 		if !wantKey(k) {
-			return true
+			continue
 		}
 		for _, v := range vs {
 			fmt.Printf("%s\t%s\t%s\n", path, k, v)
 		}
-		return true
-	})
+	}
 	if !withProperties {
 		return nil
 	}

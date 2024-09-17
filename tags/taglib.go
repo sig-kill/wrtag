@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"log/slog"
 	"maps"
 	"path/filepath"
 	"regexp"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -106,15 +106,12 @@ func (f *File) ReadFloat(t string) float64 { return anyFloat(first(f.raw[t])) }
 
 func (f *File) ReadTime(t string) time.Time { return anyTime(first(f.raw[t])) }
 
-func (f *File) ReadAll(fn func(k string, vs []string) bool) {
-	keys := make([]string, 0, len(f.raw))
-	for k := range f.raw {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		if !fn(k, f.raw[k]) {
-			break
+func (f *File) Iter() iter.Seq2[string, []string] {
+	return func(yield func(string, []string) bool) {
+		for _, k := range slices.Sorted(maps.Keys(f.raw)) {
+			if !yield(k, f.raw[k]) {
+				break
+			}
 		}
 	}
 }
