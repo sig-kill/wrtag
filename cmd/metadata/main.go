@@ -12,7 +12,7 @@ import (
 	"slices"
 	"time"
 
-	"go.senan.xyz/wrtag/cmd/internal/cmds"
+	"go.senan.xyz/wrtag/cmd/internal/logging"
 	"go.senan.xyz/wrtag/tags"
 )
 
@@ -51,7 +51,7 @@ func init() {
 }
 
 func main() {
-	defer cmds.Logging()()
+	defer logging.Logging()()
 	flag.Parse()
 
 	if flag.NArg() == 0 {

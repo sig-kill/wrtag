@@ -17,6 +17,7 @@ import (
 
 	"go.senan.xyz/wrtag"
 	"go.senan.xyz/wrtag/cmd/internal/cmds"
+	"go.senan.xyz/wrtag/cmd/internal/logging"
 )
 
 func init() {
@@ -36,7 +37,7 @@ func init() {
 }
 
 func main() {
-	defer cmds.Logging()()
+	defer logging.Logging()()
 	cmds.WrapClient()
 	var (
 		cfg = cmds.WrtagConfig()

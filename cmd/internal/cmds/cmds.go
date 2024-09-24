@@ -1,7 +1,6 @@
 package cmds
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,7 +11,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"text/template"
 	"time"
 
@@ -25,38 +23,6 @@ import (
 	"go.senan.xyz/wrtag/researchlink"
 	"go.senan.xyz/wrtag/tagmap"
 )
-
-func Logging() (exit func()) {
-	var logLevel slog.LevelVar
-	flag.TextVar(&logLevel, "log-level", &logLevel, "set the logging level")
-
-	h := &slogErrorHandler{
-		Handler: slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: &logLevel}),
-	}
-
-	logger := slog.New(h)
-	slog.SetDefault(logger)
-	slog.SetLogLoggerLevel(slog.LevelError)
-
-	return func() {
-		if h.hadSlogError.Load() {
-			os.Exit(1)
-		}
-		os.Exit(0)
-	}
-}
-
-type slogErrorHandler struct {
-	slog.Handler
-	hadSlogError atomic.Bool
-}
-
-func (n *slogErrorHandler) Handle(ctx context.Context, r slog.Record) error {
-	if r.Level == slog.LevelError {
-		n.hadSlogError.Store(true)
-	}
-	return n.Handler.Handle(ctx, r)
-}
 
 func WrapClient() {
 	chain := clientutil.Chain(

@@ -27,6 +27,7 @@ import (
 
 	"go.senan.xyz/wrtag"
 	"go.senan.xyz/wrtag/cmd/internal/cmds"
+	"go.senan.xyz/wrtag/cmd/internal/logging"
 
 	_ "github.com/ncruces/go-sqlite3/driver"
 	_ "github.com/ncruces/go-sqlite3/embed"
@@ -52,7 +53,7 @@ const (
 )
 
 func main() {
-	defer cmds.Logging()()
+	defer logging.Logging()()
 	cmds.WrapClient()
 	var (
 		cfg        = cmds.WrtagConfig()
