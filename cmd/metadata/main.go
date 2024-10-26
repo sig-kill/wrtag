@@ -98,7 +98,6 @@ func read(path string, withProperties bool, keys map[string]struct{}) error {
 	if err != nil {
 		return fmt.Errorf("read: %w", err)
 	}
-	defer file.Close()
 
 	wantKey := func(k string) bool {
 		if len(keys) == 0 {
@@ -140,7 +139,6 @@ func write(path string, keyValues map[string][]string) error {
 	if err != nil {
 		return fmt.Errorf("read: %w", err)
 	}
-	defer file.Close()
 	for k, vs := range keyValues {
 		file.Write(k, vs...)
 	}
@@ -155,7 +153,6 @@ func clear(path string, keys map[string]struct{}) error {
 	if err != nil {
 		return fmt.Errorf("read: %w", err)
 	}
-	defer file.Close()
 	if len(keys) == 0 {
 		file.ClearAll()
 	} else {

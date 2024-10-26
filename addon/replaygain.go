@@ -39,7 +39,6 @@ func (a ReplayGainAddon) ProcessRelease(ctx context.Context, paths []string) err
 			if err != nil {
 				return "", err
 			}
-			defer f.Close()
 			return f.Read(tags.ReplayGainTrackGain), nil
 		}()
 		if err != nil {

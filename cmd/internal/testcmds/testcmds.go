@@ -83,7 +83,6 @@ func Tag() {
 		if err := f.Save(); err != nil {
 			log.Fatalf("write tag file: %v", err)
 		}
-		f.Close()
 	}
 
 	os.Exit(exit)

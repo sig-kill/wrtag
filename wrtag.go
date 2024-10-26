@@ -266,7 +266,6 @@ func ReadReleaseDir(path string) (string, []*tags.File, error) {
 				return "", nil, fmt.Errorf("read track: %w", err)
 			}
 			files = append(files, file)
-			file.Close()
 			continue
 		}
 	}

@@ -78,7 +78,6 @@ func TestDoubleSave(t *testing.T) {
 	path := newFile(t, emptyFLAC, ".flac")
 	f, err := Read(path)
 	require.NoError(t, err)
-	defer f.Close()
 
 	f.Write(Album, "a")
 	require.NoError(t, f.Save())
@@ -92,7 +91,6 @@ func TestExtract(t *testing.T) {
 	path := newFile(t, emptyFLAC, ".flac")
 	f, err := Read(path)
 	require.NoError(t, err)
-	defer f.Close()
 
 	f.Write("v", "it's -0.244!")
 	require.Equal(t, -0.244, f.ReadFloat("v"))
@@ -113,14 +111,14 @@ func TestExtendedTags(t *testing.T) {
 
 			p := newFile(t, tf.data, tf.ext)
 			withf(t, p, func(f *File) {
-				f.Write(Artist, "steely dan")            // standard
-				f.Write(AlbumArtist, "steely dan")       // extended
-				f.Write(AlbumArtistCredit, "steely dan") // non standard
+				f.Write(Artist, "1. steely dan")            // standard
+				f.Write(AlbumArtist, "2. steely dan")       // extended
+				f.Write(AlbumArtistCredit, "3. steely dan") // non standard
 			})
 			withf(t, p, func(f *File) {
-				assert.Equal(t, "steely dan", f.Read(Artist))
-				assert.Equal(t, "steely dan", f.Read(AlbumArtist))
-				assert.Equal(t, "steely dan", f.Read(AlbumArtistCredit))
+				assert.Equal(t, "1. steely dan", f.Read(Artist))
+				assert.Equal(t, "2. steely dan", f.Read(AlbumArtist))
+				assert.Equal(t, "3. steely dan", f.Read(AlbumArtistCredit))
 			})
 		})
 	}
@@ -136,14 +134,14 @@ var testFiles = []struct {
 	{"m4a", emptyM4A, ".m4a"},
 }
 
-//go:embed testdata/empty.flac
-var emptyFLAC []byte
-
-//go:embed testdata/empty.mp3
-var emptyMP3 []byte
-
-//go:embed testdata/empty.m4a
-var emptyM4A []byte
+var (
+	//go:embed testdata/empty.flac
+	emptyFLAC []byte
+	//go:embed testdata/empty.mp3
+	emptyMP3 []byte
+	//go:embed testdata/empty.m4a
+	emptyM4A []byte
+)
 
 func newFile(t *testing.T, data []byte, ext string) string {
 	t.Helper()
@@ -167,5 +165,4 @@ func withf(t *testing.T, path string, fn func(*File)) {
 	require.NoError(t, err)
 	fn(f)
 	require.NoError(t, f.Save())
-	f.Close()
 }

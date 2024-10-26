@@ -87,10 +87,8 @@ L:
 			if alt != key {
 				fmt.Fprintf(outFile, "\t%q: %q,\n", alt, key)
 			}
-			fmt.Fprintf(outFile, "\t%q: %q,\n", strings.ToUpper(alt), key)
 			if strings.Contains(alt, "_") {
 				fmt.Fprintf(outFile, "\t%q: %q,\n", strings.ReplaceAll(alt, "_", " "), key)
-				fmt.Fprintf(outFile, "\t%q: %q,\n", strings.ToUpper(strings.ReplaceAll(alt, "_", " ")), key)
 			}
 		}
 	}
