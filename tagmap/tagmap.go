@@ -52,6 +52,7 @@ func DiffRelease(weights TagWeights, release *musicbrainz.Release, tracks []musi
 			diff("artist", firstFile.Read(tags.AlbumArtist), musicbrainz.ArtistsString(release.Artists)),
 			diff("label", firstFile.Read(tags.Label), labelInfo.Label.Name),
 			diff("catalogue num", firstFile.Read(tags.CatalogueNum), labelInfo.CatalogNumber),
+			diff("upc", firstFile.Read(tags.UPC), release.Barcode),
 			diff("media format", firstFile.Read(tags.MediaFormat), release.Media[0].Format),
 		)
 	}
