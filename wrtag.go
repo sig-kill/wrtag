@@ -556,6 +556,9 @@ func processCover(
 }
 
 func tryDownloadMusicBrainzCover(ctx context.Context, caa *musicbrainz.CAAClient, release *musicbrainz.Release, skipFunc func(*http.Response) bool) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	coverURL, err := caa.GetCoverURL(ctx, release)
 	if err != nil {
 		return "", err
@@ -564,7 +567,11 @@ func tryDownloadMusicBrainzCover(ctx context.Context, caa *musicbrainz.CAAClient
 		return "", nil
 	}
 
-	resp, err := caa.HTTPClient.Get(coverURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, coverURL, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := caa.HTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("request cover url: %w", err)
 	}
