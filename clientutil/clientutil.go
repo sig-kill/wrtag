@@ -56,7 +56,7 @@ func WithLogging(logger *slog.Logger) Middleware {
 			if err != nil {
 				return nil, err
 			}
-			logger.Debug("response", "status", resp.StatusCode, "url", r.URL, "took", time.Since(start))
+			logger.DebugContext(r.Context(), "response", "status", resp.StatusCode, "url", r.URL, "took", time.Since(start))
 			return resp, nil
 		})
 	}
