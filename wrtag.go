@@ -534,6 +534,7 @@ func processCover(
 			}
 			return resp.ContentLength == info.Size()
 		}
+
 		coverTmp, err := tryDownloadMusicBrainzCover(ctx, &cfg.CoverArtArchiveClient, release, skipFunc)
 		if err != nil {
 			return fmt.Errorf("maybe fetch better cover: %w", err)
