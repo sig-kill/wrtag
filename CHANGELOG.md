@@ -1,5 +1,12 @@
 # Changelog
 
+### [0.2.1](https://www.github.com/sentriz/wrtag/compare/v0.2.0...v0.2.1) (2024-11-28)
+
+
+### Bug Fixes
+
+* **ci:** don't use hardcoded binary names ([c9a80b2](https://www.github.com/sentriz/wrtag/commit/c9a80b2be3d4f2ee38e932169ab2701fd6983584))
+
 ## [0.2.0](https://www.github.com/sentriz/wrtag/compare/v0.1.0...v0.2.0) (2024-11-28)
 
 
