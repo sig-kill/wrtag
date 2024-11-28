@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://www.github.com/sentriz/wrtag/compare/v0.1.0...v0.2.0) (2024-11-28)
+
+
+### Features
+
+* **ci:** faster binary build ([696eb83](https://www.github.com/sentriz/wrtag/commit/696eb838bdd2a5608359a475faa80f3c28c740e8))
+
 ## 0.1.0 (2024-11-28)
 
 
