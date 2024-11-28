@@ -1,5 +1,12 @@
 # Changelog
 
+### [0.2.2](https://www.github.com/sentriz/wrtag/compare/v0.2.1...v0.2.2) (2024-11-28)
+
+
+### Bug Fixes
+
+* **ci:** upload binaries to output tag ([c0b5677](https://www.github.com/sentriz/wrtag/commit/c0b5677b9b077cc2c710d5712f2b3531a377bf4f))
+
 ### [0.2.1](https://www.github.com/sentriz/wrtag/compare/v0.2.0...v0.2.1) (2024-11-28)
 
 
