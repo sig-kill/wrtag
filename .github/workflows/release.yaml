@@ -61,7 +61,7 @@ jobs:
                   cd "$dir"
                   [[ "$os" = "windows" ]] && suff=".exe"
                   for p in *; do
-                      mv "$p" "${p%.*}-$os-$arch-v0.1.0$suff"
+                      mv "$p" "${p%.*}-$os-$arch-${{ needs.release-please.outputs.tag_name }}$suff"
                   done
                   cd -
               done
