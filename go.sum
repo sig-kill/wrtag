@@ -86,8 +86,8 @@ go.senan.xyz/sqlb v0.0.0-20241026155526-a18584fdfbe0 h1:9m2SnPMgg4l816dF2kzG+MSN
 go.senan.xyz/sqlb v0.0.0-20241026155526-a18584fdfbe0/go.mod h1:/K5GaBsXCs03K/1uKeHlVIvrpjDq1Q7UWfO2Qxz8LMI=
 go.senan.xyz/table v0.0.0-20240227175247-cf2c834b4c23 h1:dJXADKSrn0V7N59jckuiY3cEEYzqvZRELS+J2/TVwx4=
 go.senan.xyz/table v0.0.0-20240227175247-cf2c834b4c23/go.mod h1:r81hVuBSkscXYCP+zIDC0S/V7zoNG4o+kmESIu0LbTs=
-go.senan.xyz/taglib-wasm v0.1.2-0.20241128161440-3e66b1c3b479 h1:4WIp2kzL4njuKTFSI/kPeI8TUILirsMSth7eWUdAgLI=
-go.senan.xyz/taglib-wasm v0.1.2-0.20241128161440-3e66b1c3b479/go.mod h1:g1ijVd+JwFJK/vPsXRYtw5ftic4G6v9tEid33LzBu3E=
+go.senan.xyz/taglib v0.1.2-0.20241129130125-bc59db9de34e h1:GeU1C+7YebkypUF/ql/o6Hp8nzz712Y+VWgU/uBgEH4=
+go.senan.xyz/taglib v0.1.2-0.20241129130125-bc59db9de34e/go.mod h1:BLGB1pvkpJJZ/b3PYKb3TZe8Vj6iw8oZxF3iIeAh0t0=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20210921155107-089bfa567519/go.mod h1:GvvjBRRGRdwPK5ydBHafDWAxML/pGHZbMvKqRZ5+Abc=
 golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4/go.mod h1:jJ57K6gSWd91VN4djpZkiMVwK6gcyfeH4XE8wZrZaV4=

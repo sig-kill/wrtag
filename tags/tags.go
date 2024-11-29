@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/araddon/dateparse"
-	"go.senan.xyz/taglib-wasm"
+	"go.senan.xyz/taglib"
 )
 
 var ErrWrite = errors.New("error writing tags")

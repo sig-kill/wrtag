@@ -19,7 +19,7 @@ require (
 	go.senan.xyz/natcmp v0.1.2
 	go.senan.xyz/sqlb v0.0.0-20241026155526-a18584fdfbe0
 	go.senan.xyz/table v0.0.0-20240227175247-cf2c834b4c23
-	go.senan.xyz/taglib-wasm v0.1.2-0.20241128161440-3e66b1c3b479
+	go.senan.xyz/taglib v0.1.2-0.20241129130125-bc59db9de34e
 	golang.org/x/net v0.31.0
 	golang.org/x/sync v0.9.0
 	golang.org/x/text v0.20.0
