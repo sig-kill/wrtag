@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://www.github.com/sentriz/mrtag/compare/v0.2.2...v0.3.0) (2024-12-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* rebrand to mrtag
+* rename `wrtagsync` -> `wrtag sync`
+
+### Features
+
+* rebrand to mrtag ([a8399af](https://www.github.com/sentriz/mrtag/commit/a8399af5452f037689d1f66ad57907541c1d9a93)), closes [#58](https://www.github.com/sentriz/mrtag/issues/58)
+* rename `wrtagsync` -> `wrtag sync` ([a3c097f](https://www.github.com/sentriz/mrtag/commit/a3c097f1197d4e63780c0b66be08a8c3ff7c379c))
+
 ### [0.2.2](https://www.github.com/sentriz/mrtag/compare/v0.2.1...v0.2.2) (2024-11-28)
 
 
