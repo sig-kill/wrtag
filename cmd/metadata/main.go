@@ -12,8 +12,8 @@ import (
 	"slices"
 	"time"
 
-	"go.senan.xyz/wrtag/cmd/internal/logging"
-	"go.senan.xyz/wrtag/tags"
+	"go.senan.xyz/mrtag/cmd/internal/logging"
+	"go.senan.xyz/mrtag/tags"
 )
 
 func init() {

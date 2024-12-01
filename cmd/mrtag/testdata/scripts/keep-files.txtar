@@ -1,0 +1,33 @@
+exec tag write kat_moda/01.flac title 'trk 1'
+exec tag write kat_moda/02.flac title 'trk 2'
+exec tag write kat_moda/03.flac title 'trk 3'
+
+exec tag write kat_moda/*.flac musicbrainz_albumid 'e47d04a4-7460-427d-a731-cc82386d85f1'
+
+env MRTAG_PATH_FORMAT='albums/{{ .Release.Title }}/{{ .Track.Title }}{{ .Ext }}'
+env MRTAG_KEEP_FILE=
+
+# move with no keep-file setting, no files kept
+exec mrtag copy -yes kat_moda/
+exec find albums
+! stdout keep-me
+
+env MRTAG_KEEP_FILE=keep-me-1,keep-me-2,im-missing-thats-fine
+
+# now with keep-file setting
+exec mrtag copy -yes kat_moda/
+exec find albums
+stdout '^albums/Kat Moda/keep-me-1$'
+stdout '^albums/Kat Moda/keep-me-2$'
+
+# same for moves
+exec rm -r albums
+exec mrtag move -yes kat_moda/
+exec find albums
+stdout '^albums/Kat Moda/keep-me-1$'
+stdout '^albums/Kat Moda/keep-me-2$'
+
+-- kat_moda/keep-me-1 --
+oh please keep me, don't delete me
+-- kat_moda/keep-me-2 --
+oh please keep me, don't delete me

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/andybalholm/cascadia"
-	"go.senan.xyz/wrtag/clientutil"
+	"go.senan.xyz/mrtag/clientutil"
 	"golang.org/x/net/html"
 )
 

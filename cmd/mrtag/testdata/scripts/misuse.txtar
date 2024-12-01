@@ -1,0 +1,17 @@
+! exec mrtag
+stderr 'no command provided'
+
+! exec mrtag f
+stderr 'unknown command'
+
+! exec mrtag move
+stderr 'please provide a single directory'
+
+! exec mrtag copy
+stderr 'please provide a single directory'
+
+! exec mrtag move no-exist
+stderr 'read dir: no tracks in dir'
+
+! exec mrtag copy no-exist
+stderr 'read dir: no tracks in dir'

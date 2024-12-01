@@ -1,4 +1,4 @@
-module go.senan.xyz/wrtag
+module go.senan.xyz/mrtag
 
 go 1.23.0
 

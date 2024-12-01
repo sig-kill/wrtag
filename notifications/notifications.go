@@ -56,7 +56,7 @@ func (n *Notifications) Send(ctx context.Context, event string, message string) 
 	}
 
 	params := &shoutrrrtypes.Params{}
-	params.SetTitle("wrtag")
+	params.SetTitle("mrtag")
 
 	if err := errors.Join(sender.Send(message, params)...); err != nil {
 		slog.ErrorContext(ctx, "sending notifications", "err", err)

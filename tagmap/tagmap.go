@@ -10,8 +10,8 @@ import (
 
 	dmp "github.com/sergi/go-diff/diffmatchpatch"
 
-	"go.senan.xyz/wrtag/musicbrainz"
-	"go.senan.xyz/wrtag/tags"
+	"go.senan.xyz/mrtag/musicbrainz"
+	"go.senan.xyz/mrtag/tags"
 )
 
 type Diff struct {

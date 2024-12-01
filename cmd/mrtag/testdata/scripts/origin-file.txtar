@@ -1,0 +1,28 @@
+exec tag write kat_moda/01.flac title 'trk 1'
+exec tag write kat_moda/02.flac title 'trk 2'
+exec tag write kat_moda/03.flac title 'trk 3'
+
+env MRTAG_LOG_LEVEL=debug
+env MRTAG_PATH_FORMAT='albums/{{ .Release.Title }}/{{ .Track.Title }}{{ .Ext }}'
+
+exec mrtag move -yes kat_moda/
+stderr 'using origin file.*Jeff Mills - Kat Moda EP \(2009\) \[Purpose Maker #PMD-002\]'
+
+-- kat_moda/origin.yaml --
+Artist:         Jeff Mills
+Name:           Kat Moda EP
+Edition:        ~
+Edition year:   2009
+Media:          WEB
+Catalog number: PMD-002
+Record label:   Purpose Maker
+Original year:  1997
+Format:         FLAC
+Encoding:       Lossless
+Log:            ~
+Directory:      Jeff Mills - Kat Moda - Digital (1997) [FLAC]
+Size:           118087854
+File count:     4
+Info hash:
+Uploaded:       2018-04-04 20:00:17
+Permalink:      https://example.com

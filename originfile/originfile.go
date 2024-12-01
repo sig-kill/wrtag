@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"go.senan.xyz/wrtag/fileutil"
+	"go.senan.xyz/mrtag/fileutil"
 	"gopkg.in/yaml.v2"
 )
 

@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"go.senan.xyz/wrtag/addon/lyrics"
-	"go.senan.xyz/wrtag/tags"
+	"go.senan.xyz/mrtag/addon/lyrics"
+	"go.senan.xyz/mrtag/tags"
 )
 
 type LyricsAddon struct {

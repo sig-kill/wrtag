@@ -1,0 +1,17 @@
+env MRTAG_PATH_FORMAT='albums/{{ .Release.Title }}/{{ .Track.Title }}{{ .Ext }}'
+
+# setup some files with the wrong order in filename, but corrent in TrackNumber tag
+exec tag write kat_moda/a.flac tracknumber 3 , title 'The Bells (Festival mix)'
+exec tag write kat_moda/b.flac tracknumber 2 , title 'The Bells'
+exec tag write kat_moda/c.flac tracknumber 1 , title 'Alarms'
+
+exec tag write kat_moda/*.flac musicbrainz_albumid 'e47d04a4-7460-427d-a731-cc82386d85f1'
+
+# score will be too low anyway (no label info)
+! exec mrtag move kat_moda
+stderr 'score too low' 
+
+# but we should see the correct tags on the left side of the diff table
+stderr 'track 1\s+Alarms\b'
+stderr 'track 2\s+The Bells\b'
+stderr 'track 3\s+The Bells \(Festival mix\)'

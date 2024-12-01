@@ -37,7 +37,7 @@ jobs:
           token: ${{ secrets.CR_PAT }}
           release-type: simple
           changelog-path: CHANGELOG.md
-          package-name: wrtag
+          package-name: mrtag
   build-binaries:
     name: Build binaries
     runs-on: ubuntu-latest

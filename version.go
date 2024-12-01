@@ -1,4 +1,4 @@
-package wrtag
+package mrtag
 
 import (
 	_ "embed"
@@ -9,4 +9,4 @@ import (
 var version string
 var Version = strings.TrimSpace(version)
 
-var Name = "wrtag"
+var Name = "mrtag"
