@@ -1,4 +1,4 @@
-package cmds
+package wrtagflag
 
 import (
 	"errors"
@@ -24,7 +24,7 @@ import (
 	"go.senan.xyz/wrtag/tagmap"
 )
 
-func WrapClient() {
+func DefaultClient() {
 	chain := clientutil.Chain(
 		clientutil.WithLogging(slog.Default()),
 		clientutil.WithUserAgent(fmt.Sprintf(`%s/%s`, wrtag.Name, wrtag.Version)),
@@ -34,7 +34,11 @@ func WrapClient() {
 }
 
 func Parse() {
-	userConfig, _ := os.UserConfigDir()
+	userConfig, err := os.UserConfigDir()
+	if err != nil {
+		panic(err)
+	}
+
 	defaultConfigPath := filepath.Join(userConfig, wrtag.Name, "config")
 	configPath := flag.String("config-path", defaultConfigPath, "path config file")
 
@@ -58,7 +62,7 @@ func Parse() {
 	}
 }
 
-func WrtagConfig() *wrtag.Config {
+func Config() *wrtag.Config {
 	var cfg wrtag.Config
 
 	flag.Var(&pathFormatParser{&cfg.PathFormat}, "path-format", "music directory and go templated path format to define music library layout")

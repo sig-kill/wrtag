@@ -1,9 +1,9 @@
 env WRTAG_PATH_FORMAT='albums/{{ .Release.Title }}/{{ .Track.Title }}{{ .Ext }}'
 
-! exec wrtagsync
+! exec wrtag sync
 stderr 'albums: no such file or directory'
 
-! exec wrtagsync x
+! exec wrtag sync x
 stderr 'x: no such file or directory'
 
 env WRTAG_LOG_LEVEL=debug
@@ -40,7 +40,7 @@ exec tag write 'albums/Jeff Mills/Kat Moda/*.flac' artist              'Jeff Mil
 exec find -max-depth 2 albums
 cmp stdout exp-shape
 
-exec wrtagsync
+exec wrtag sync
 stderr 'processed dir.*albums/Jeff Mills/Kat Moda'
 stderr 'processed dir.*albums/Khruangbin/A LA SALA'
 stderr 'saw=2 processed=2 errors=0'
@@ -49,7 +49,7 @@ exec find -max-depth 2 albums
 cmp stdout exp-shape
 
 # check we don't import after age-older
-exec wrtagsync -age-older 5m
+exec wrtag sync -age-older 5m
 ! stderr 'processed dir'
 
 -- exp-shape --

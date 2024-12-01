@@ -2,19 +2,21 @@ package main
 
 import (
 	_ "embed"
+	"flag"
+	"log"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/rogpeppe/go-internal/testscript"
 	"github.com/stretchr/testify/assert"
-	"go.senan.xyz/wrtag/cmd/internal/testcmds"
 )
 
 func TestMain(m *testing.M) {
 	os.Exit(testscript.RunMain(m, map[string]func() int{
 		"metadata":           func() int { main(); return 0 },
-		"create-audio-files": func() int { testcmds.CreateAudioFiles(); return 0 },
+		"create-audio-files": func() int { mainCreateAudioFiles(); return 0 },
 	}))
 }
 
@@ -25,6 +27,40 @@ func TestScripts(t *testing.T) {
 		Dir:                 "testdata/scripts",
 		RequireExplicitExec: true,
 	})
+}
+
+var (
+	//go:embed testdata/empty.flac
+	emptyFLAC []byte
+	//go:embed testdata/empty.m4a
+	emptyM4A []byte
+	//go:embed testdata/empty.mp3
+	emptyMP3 []byte
+)
+
+func mainCreateAudioFiles() {
+	flag.Parse()
+
+	paths := flag.Args()
+	for _, path := range paths {
+		if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
+			log.Fatalf("make parents: %v", err)
+		}
+
+		var d []byte
+		switch ext := filepath.Ext(path); ext {
+		case ".flac":
+			d = emptyFLAC
+		case ".m4a":
+			d = emptyM4A
+		case ".mp3":
+			d = emptyMP3
+		}
+
+		if err := os.WriteFile(path, d, os.ModePerm); err != nil {
+			log.Fatalf("write file: %v", err)
+		}
+	}
 }
 
 func TestParseTagMap(t *testing.T) {

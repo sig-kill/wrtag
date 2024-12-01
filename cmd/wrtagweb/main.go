@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"go.senan.xyz/wrtag"
-	"go.senan.xyz/wrtag/cmd/internal/cmds"
 	"go.senan.xyz/wrtag/cmd/internal/logging"
+	wrtagflag "go.senan.xyz/wrtag/cmd/internal/wrtagflag"
 
 	_ "github.com/ncruces/go-sqlite3/driver"
 	_ "github.com/ncruces/go-sqlite3/embed"
@@ -54,15 +54,15 @@ const (
 
 func main() {
 	defer logging.Logging()()
-	cmds.WrapClient()
+	wrtagflag.DefaultClient()
 	var (
-		cfg        = cmds.WrtagConfig()
+		cfg        = wrtagflag.Config()
 		listenAddr = flag.String("web-listen-addr", "", "listen addr for web interface")
 		apiKey     = flag.String("web-api-key", "", "api key for web interface")
 		dbPath     = flag.String("web-db-path", "wrtag.db", "db path for web interface")
 		publicURL  = flag.String("web-public-url", "", "public url for web interface (optional)")
 	)
-	cmds.Parse()
+	wrtagflag.Parse()
 
 	if *listenAddr == "" {
 		slog.Error("need a listen addr")
