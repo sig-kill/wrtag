@@ -1,5 +1,3 @@
-[ci] skip 'gh ci is taglib v1, handles tracknumbers weird'
-
 env MRTAG_PATH_FORMAT='albums/{{ .Release.Title }}/{{ .TrackNum }}{{ .Ext }}'
 
 exec tag write kat_moda/x.flac title 'the bells fesitival mix'

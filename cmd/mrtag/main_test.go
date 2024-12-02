@@ -53,14 +53,6 @@ func TestScripts(t *testing.T) {
 	testscript.Run(t, testscript.Params{
 		Dir:                 "testdata/scripts",
 		RequireExplicitExec: true,
-		Condition: func(cond string) (bool, error) {
-			switch cond {
-			case "ci":
-				v, _ := strconv.ParseBool(os.Getenv("CI"))
-				return v, nil
-			}
-			return false, fmt.Errorf("unknown cond")
-		},
 	})
 }
 

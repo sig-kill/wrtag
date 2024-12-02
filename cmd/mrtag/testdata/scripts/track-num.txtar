@@ -1,5 +1,3 @@
-[ci] skip 'gh ci is taglib v1, handles tracknumbers weird'
-
 exec tag write test-0.flac tracknumber 0
 exec tag check test-0.flac tracknumber 0
 
