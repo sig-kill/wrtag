@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/argusdusty/treelock"
-	"go.senan.xyz/natcmp"
 	"go.senan.xyz/mrtag/coverparse"
 	"go.senan.xyz/mrtag/fileutil"
 	"go.senan.xyz/mrtag/musicbrainz"
@@ -28,6 +27,7 @@ import (
 	"go.senan.xyz/mrtag/researchlink"
 	"go.senan.xyz/mrtag/tagmap"
 	"go.senan.xyz/mrtag/tags"
+	"go.senan.xyz/natcmp"
 )
 
 var (
@@ -37,6 +37,10 @@ var (
 	ErrNotSortable        = errors.New("tracks in dir can't be sorted")
 	ErrSelfCopy           = errors.New("can't copy self to self")
 )
+
+func IsNonFatalError(err error) bool {
+	return errors.Is(err, ErrScoreTooLow) || errors.Is(err, ErrTrackCountMismatch)
+}
 
 const minScore = 95
 
