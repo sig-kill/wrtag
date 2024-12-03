@@ -528,6 +528,9 @@ func processCover(
 
 	if !op.ReadOnly() && (cover == "" || cfg.UpgradeCover) {
 		skipFunc := func(resp *http.Response) bool {
+			if resp.ContentLength > 8388608 /* 8 MiB */ {
+				return true // too big to download
+			}
 			if cover == "" {
 				return false
 			}
