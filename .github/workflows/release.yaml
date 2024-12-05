@@ -71,7 +71,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.CR_PAT }}
-          file: bin-*/*
+          file: out/*
           file_glob: true
           tag: ${{ needs.release-please.outputs.tag_name }}
   build-docker:
