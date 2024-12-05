@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://www.github.com/sentriz/mrtag/compare/v0.3.0...v0.4.0) (2024-12-05)
+
+
+### Features
+
+* **ci:** don't use qemu for multi platform builds ([b4b90c0](https://www.github.com/sentriz/mrtag/commit/b4b90c08eeedcd500c7a0961759d4b9798cb1e81))
+
 ## [0.3.0](https://www.github.com/sentriz/mrtag/compare/v0.2.2...v0.3.0) (2024-12-01)
 
 
