@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://www.github.com/sentriz/mrtag/compare/v0.4.0...v0.5.0) (2024-12-05)
+
+
+### Features
+
+* **ci:** use matrix to build binaries ([938ae37](https://www.github.com/sentriz/mrtag/commit/938ae379056646a4f3801405d136b7d8273e34f1))
+
 ## [0.4.0](https://www.github.com/sentriz/mrtag/compare/v0.3.0...v0.4.0) (2024-12-05)
 
 
