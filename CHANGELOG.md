@@ -1,5 +1,12 @@
 # Changelog
 
+### [0.5.1](https://www.github.com/sentriz/mrtag/compare/v0.5.0...v0.5.1) (2024-12-05)
+
+
+### Bug Fixes
+
+* **ci:** upload binaries ([9d8d9b3](https://www.github.com/sentriz/mrtag/commit/9d8d9b324d967890f1823463849169ef66fe21c4))
+
 ## [0.5.0](https://www.github.com/sentriz/mrtag/compare/v0.4.0...v0.5.0) (2024-12-05)
 
 
