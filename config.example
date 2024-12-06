@@ -1,5 +1,5 @@
 # path-format is rooted in your destination music dir. the template is fed with musicbrainz release data
-# see go.senan.xyz/mrtag/musicbrainz for type definitions
+# see go.senan.xyz/wrtag/musicbrainz for type definitions
 
 #path-format /mnt/music/albums/{{ artists .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}{{ if not (eq (disambig .Release) "") }} ({{ disambig .Release | safepath }}){{ end }}/{{ pad0 2 .TrackNum }}.{{ flatTracks .Release.Media | len | pad0 2 }} {{ if .IsCompilation }}{{ artistsString .Track.Artists | safepath }} - {{ end }}{{ .Track.Title | safepath }}{{ .Ext }}
 
@@ -17,7 +17,7 @@
 # possible events are complete, needs-input, sync-complete, sync-error
 
 #notification-uri complete,needs-input,sync-error smtp://username:password@host:port/?from=from@example.com&to=recipient@example.com
-#notification-uri complete,sync-complete          generic+https://my.subsonic.com/rest/startScan.view?c=mrtag&v=1.16&u=user&p=password
+#notification-uri complete,sync-complete          generic+https://my.subsonic.com/rest/startScan.view?c=wrtag&v=1.16&u=user&p=password
 
 # set a list of files to keep when moving or copying
 

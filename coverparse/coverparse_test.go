@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"go.senan.xyz/mrtag/coverparse"
+	"go.senan.xyz/wrtag/coverparse"
 )
 
 func TestSelection(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"go.senan.xyz/mrtag/addon/replaygain"
-	"go.senan.xyz/mrtag/tags"
+	"go.senan.xyz/wrtag/addon/replaygain"
+	"go.senan.xyz/wrtag/tags"
 )
 
 type ReplayGainAddon struct {

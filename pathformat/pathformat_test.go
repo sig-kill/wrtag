@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.senan.xyz/mrtag/musicbrainz"
-	"go.senan.xyz/mrtag/pathformat"
+	"go.senan.xyz/wrtag/musicbrainz"
+	"go.senan.xyz/wrtag/pathformat"
 )
 
 func TestValidation(t *testing.T) {

@@ -1,1 +1,1 @@
-![](.github/mrtag.svg)
+![](.github/wrtag.svg)

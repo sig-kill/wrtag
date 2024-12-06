@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.senan.xyz/mrtag/fileutil"
+	"go.senan.xyz/wrtag/fileutil"
 )
 
 func TestSafePath(t *testing.T) {

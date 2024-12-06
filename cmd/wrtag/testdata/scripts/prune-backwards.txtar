@@ -1,0 +1,16 @@
+env WRTAG_PATH_FORMAT='albums/{{ .Release.Title }}/{{ .Track.Title }}{{ .Ext }}'
+
+exec tag write albums/deep/down/inside/kat_moda/01.flac title 'trk 1'
+exec tag write albums/deep/down/inside/kat_moda/02.flac title 'trk 2'
+exec tag write albums/deep/down/inside/kat_moda/03.flac title 'trk 3'
+
+exec tag write albums/deep/down/inside/kat_moda/*.flac musicbrainz_albumid 'e47d04a4-7460-427d-a731-cc82386d85f1'
+
+exec touch albums/deep/down/inside/extra.txt
+
+# move deepest in tree
+exec wrtag move -yes albums/deep/down/inside/kat_moda
+
+# we deleted the whole tree all the way up until the root
+! exists albums/deep
+exists albums

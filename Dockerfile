@@ -10,8 +10,8 @@ RUN  \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/ ./cmd/...
 
 FROM alpine:3.20
-LABEL org.opencontainers.image.source=https://github.com/sentriz/mrtag
+LABEL org.opencontainers.image.source=https://github.com/sentriz/wrtag
 RUN apk add -U --no-cache \
     rsgain
 COPY --from=builder /out/* /usr/local/bin/
-CMD ["mrtagweb"]
+CMD ["wrtagweb"]

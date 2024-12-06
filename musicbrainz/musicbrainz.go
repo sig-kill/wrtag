@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/araddon/dateparse"
-	"go.senan.xyz/mrtag/clientutil"
+	"go.senan.xyz/wrtag/clientutil"
 )
 
 var ErrNoResults = fmt.Errorf("no results")

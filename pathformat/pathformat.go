@@ -8,8 +8,8 @@ import (
 	"strings"
 	texttemplate "text/template"
 
-	"go.senan.xyz/mrtag/fileutil"
-	"go.senan.xyz/mrtag/musicbrainz"
+	"go.senan.xyz/wrtag/fileutil"
+	"go.senan.xyz/wrtag/musicbrainz"
 )
 
 var ErrInvalidFormat = errors.New("invalid format")

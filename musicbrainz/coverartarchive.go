@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"go.senan.xyz/mrtag/clientutil"
+	"go.senan.xyz/wrtag/clientutil"
 )
 
 type CAAClient struct {
