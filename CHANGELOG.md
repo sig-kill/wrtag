@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://www.github.com/sentriz/wrtag/compare/v0.5.1...v0.6.0) (2024-12-06)
+
+
+### Features
+
+* rebrand back to wrtag ([2a9c836](https://www.github.com/sentriz/wrtag/commit/2a9c836120a3ef360ec7c7ed2c138d7f5f6f8e8b))
+
 ### [0.5.1](https://www.github.com/sentriz/wrtag/compare/v0.5.0...v0.5.1) (2024-12-05)
 
 
