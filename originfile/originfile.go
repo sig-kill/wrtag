@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"go.senan.xyz/wrtag/fileutil"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // https://github.com/x1ppy/gazelle-origin
