@@ -91,30 +91,33 @@ func ProcessDir(
 	}
 	srcDir = filepath.Clean(srcDir)
 
-	cover, files, err := ReadReleaseDir(srcDir)
+	cover, pathTags, err := ReadReleaseDir(srcDir)
 	if err != nil {
 		return nil, fmt.Errorf("read dir: %w", err)
 	}
+	if len(pathTags) == 0 {
+		return nil, ErrNoTracks
+	}
 
-	searchFile := files[0]
+	searchTags := pathTags[0].Tags
 
-	var mbid = searchFile.Read(tags.MBReleaseID)
+	var mbid = searchTags.Read(tags.MBReleaseID)
 	if useMBID != "" {
 		mbid = useMBID
 	}
 
 	query := musicbrainz.ReleaseQuery{
 		MBReleaseID:      mbid,
-		MBArtistID:       searchFile.Read(tags.MBArtistID),
-		MBReleaseGroupID: searchFile.Read(tags.MBReleaseGroupID),
-		Release:          searchFile.Read(tags.Album),
-		Artist:           cmp.Or(searchFile.Read(tags.AlbumArtist), searchFile.Read(tags.Artist)),
-		Date:             searchFile.ReadTime(tags.Date),
-		Format:           searchFile.Read(tags.MediaFormat),
-		Label:            searchFile.Read(tags.Label),
-		CatalogueNum:     searchFile.Read(tags.CatalogueNum),
-		Barcode:          searchFile.Read(tags.UPC),
-		NumTracks:        len(files),
+		MBArtistID:       searchTags.Read(tags.MBArtistID),
+		MBReleaseGroupID: searchTags.Read(tags.MBReleaseGroupID),
+		Release:          searchTags.Read(tags.Album),
+		Artist:           cmp.Or(searchTags.Read(tags.AlbumArtist), searchTags.Read(tags.Artist)),
+		Date:             searchTags.ReadTime(tags.Date),
+		Format:           searchTags.Read(tags.MediaFormat),
+		Label:            searchTags.Read(tags.Label),
+		CatalogueNum:     searchTags.Read(tags.CatalogueNum),
+		Barcode:          searchTags.Read(tags.UPC),
+		NumTracks:        len(pathTags),
 	}
 
 	// parse https://github.com/x1ppy/gazelle-origin files, if one exists
@@ -136,10 +139,10 @@ func ProcessDir(
 
 	var researchLinks []researchlink.SearchResult
 	researchLinks, err = cfg.ResearchLinkQuerier.Search(researchlink.Query{
-		Artist: cmp.Or(searchFile.Read(tags.AlbumArtist), searchFile.Read(tags.Artist)),
-		Album:  searchFile.Read(tags.Album),
-		UPC:    searchFile.Read(tags.UPC),
-		Date:   searchFile.ReadTime(tags.Date),
+		Artist: cmp.Or(searchTags.Read(tags.AlbumArtist), searchTags.Read(tags.Artist)),
+		Album:  searchTags.Read(tags.Album),
+		UPC:    searchTags.Read(tags.UPC),
+		Date:   searchTags.ReadTime(tags.Date),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("research querier search: %w", err)
@@ -147,10 +150,10 @@ func ProcessDir(
 
 	releaseTracks := musicbrainz.FlatTracks(release.Media)
 
-	score, diff := tagmap.DiffRelease(cfg.TagWeights, release, releaseTracks, files)
+	score, diff := tagmap.DiffRelease(cfg.TagWeights, release, releaseTracks, pathTags)
 
-	if len(releaseTracks) != len(files) {
-		return &SearchResult{release, 0, "", diff, researchLinks, originFile}, fmt.Errorf("%w: %d remote / %d local", ErrTrackCountMismatch, len(releaseTracks), len(files))
+	if len(pathTags) != len(releaseTracks) {
+		return &SearchResult{release, 0, "", diff, researchLinks, originFile}, fmt.Errorf("%w: %d remote / %d local", ErrTrackCountMismatch, len(releaseTracks), len(pathTags))
 	}
 
 	var shouldImport bool
@@ -182,34 +185,37 @@ func ProcessDir(
 		destDir,
 	)
 
-	dc := NewDirContext()
+	destPaths := make([]string, 0, len(pathTags))
+	for i := range len(pathTags) {
+		pt, rt := pathTags[i], releaseTracks[i]
 
-	destPaths := make([]string, 0, len(releaseTracks))
-	for i, t := range releaseTracks {
-		file := files[i]
-		pathFormatData := pathformat.Data{Release: release, Track: &t, TrackNum: i + 1, Ext: strings.ToLower(filepath.Ext(file.Path())), IsCompilation: isCompilation}
+		pathFormatData := pathformat.Data{Release: release, Track: &rt, TrackNum: i + 1, Ext: strings.ToLower(filepath.Ext(pt.path)), IsCompilation: isCompilation}
 		destPath, err := cfg.PathFormat.Execute(pathFormatData)
 		if err != nil {
 			return nil, fmt.Errorf("create path: %w", err)
 		}
-		if err := os.MkdirAll(filepath.Dir(destPath), os.ModePerm); err != nil {
-			return nil, fmt.Errorf("create dest path: %w", err)
-		}
-		if err := op.ProcessFile(dc, file.Path(), destPath); err != nil {
-			return nil, fmt.Errorf("process path %q: %w", filepath.Base(file.Path()), err)
+
+		destPaths = append(destPaths, destPath)
+	}
+
+	dc := NewDirContext()
+
+	for i := range len(pathTags) {
+		pt, rt, destPath := pathTags[i], releaseTracks[i], destPaths[i]
+
+		if err := op.ProcessFile(dc, pt.path, destPath); err != nil {
+			return nil, fmt.Errorf("process path %q: %w", filepath.Base(pt.path), err)
 		}
 
-		if !op.ReadOnly() {
-			err = tags.Write(destPath, func(f *tags.File) error {
-				tagmap.WriteTo(release, labelInfo, genres, i, &t, f)
-				return nil
-			})
-			if err != nil {
+		destTags, ok := tags.DiffChanged(destPath, pt.Tags, func(t tags.Tags) {
+			tagmap.WriteTo(release, labelInfo, genres, i, &rt, t)
+		})
+
+		if !ok && !op.ReadOnly() {
+			if err := tags.WriteTags(destPath, destTags); err != nil {
 				return nil, fmt.Errorf("write tag file: %w", err)
 			}
 		}
-
-		destPaths = append(destPaths, destPath)
 	}
 
 	if err := processCover(ctx, cfg, op, dc, release, destDir, cover); err != nil {
@@ -246,34 +252,45 @@ func ProcessDir(
 	return &SearchResult{release, score, destDir, diff, researchLinks, originFile}, nil
 }
 
-func ReadReleaseDir(path string) (string, []*tags.File, error) {
-	mainPaths, err := fileutil.GlobDir(path, "*")
+type PathTags struct {
+	path string
+	tags.Tags
+}
+
+func ReadReleaseDir(dirPath string) (string, []PathTags, error) {
+	mainPaths, err := fileutil.GlobDir(dirPath, "*")
 	if err != nil {
 		return "", nil, fmt.Errorf("glob dir: %w", err)
 	}
-	discPaths, err := fileutil.GlobDir(path, "*/*") // recurse once for any disc1/ disc2/ dirs
+	discPaths, err := fileutil.GlobDir(dirPath, "*/*") // recurse once for any disc1/ disc2/ dirs
 	if err != nil {
 		return "", nil, fmt.Errorf("glob dir for discs: %w", err)
 	}
 
 	var cover string
-	var files []*tags.File
-	for _, p := range append(mainPaths, discPaths...) {
-		if coverparse.IsCover(p) {
-			coverparse.BestBetween(&cover, p)
+	var pathTags []PathTags
+
+	paths := append(mainPaths, discPaths...)
+	for _, path := range paths {
+		if coverparse.IsCover(path) {
+			coverparse.BestBetween(&cover, path)
 			continue
 		}
 
-		if tags.CanRead(p) {
-			file, err := tags.Read(p)
+		if tags.CanRead(path) {
+			tags, err := tags.ReadTags(path)
 			if err != nil {
 				return "", nil, fmt.Errorf("read track: %w", err)
 			}
-			files = append(files, file)
+			pathTags = append(pathTags, PathTags{
+				path: path,
+				Tags: tags,
+			})
 			continue
 		}
 	}
-	if len(files) == 0 {
+
+	if len(pathTags) == 0 {
 		return "", nil, ErrNoTracks
 	}
 
@@ -281,10 +298,10 @@ func ReadReleaseDir(path string) (string, []*tags.File, error) {
 		// validate we aren't accidentally importing something like an artist folder, which may look
 		// like a multi disc album to us, but will have all its tracks in one subdirectory
 		discDirs := map[string]struct{}{}
-		for _, pf := range files {
-			discDirs[filepath.Dir(pf.Path())] = struct{}{}
+		for _, pt := range pathTags {
+			discDirs[filepath.Dir(pt.path)] = struct{}{}
 		}
-		if len(discDirs) == 1 && filepath.Dir(files[0].Path()) != filepath.Clean(path) {
+		if len(discDirs) == 1 && filepath.Dir(pathTags[0].path) != filepath.Clean(dirPath) {
 			return "", nil, fmt.Errorf("validate tree: %w", ErrNoTracks)
 		}
 	}
@@ -293,11 +310,11 @@ func ReadReleaseDir(path string) (string, []*tags.File, error) {
 		// validate that we have track numbers, or track numbers in filenames to sort on. if we don't any
 		// then releases that consist only of untitled tracks may get mixed up
 		var haveNum, havePath bool = true, true
-		for _, f := range files {
-			if haveNum && f.Read(tags.TrackNumber) == "" {
+		for _, pt := range pathTags {
+			if haveNum && pt.Read(tags.TrackNumber) == "" {
 				haveNum = false
 			}
-			if havePath && !strings.ContainsFunc(filepath.Base(f.Path()), func(r rune) bool { return '0' <= r && r <= '9' }) {
+			if havePath && !strings.ContainsFunc(filepath.Base(pt.path), func(r rune) bool { return '0' <= r && r <= '9' }) {
 				havePath = false
 			}
 		}
@@ -306,16 +323,16 @@ func ReadReleaseDir(path string) (string, []*tags.File, error) {
 		}
 	}
 
-	slices.SortFunc(files, func(a, b *tags.File) int {
+	slices.SortFunc(pathTags, func(a, b PathTags) int {
 		return cmp.Or(
 			natcmp.Compare(a.Read(tags.DiscNumber), b.Read(tags.DiscNumber)),   // disc mumbers like "1", "2", "disc 1", "disc 10"
-			natcmp.Compare(filepath.Dir(a.Path()), filepath.Dir(b.Path())),     // might have disc folders instead of tags
+			natcmp.Compare(filepath.Dir(a.path), filepath.Dir(b.path)),         // might have disc folders instead of tags
 			natcmp.Compare(a.Read(tags.TrackNumber), b.Read(tags.TrackNumber)), // track numbers, could be "A1" "B1" "1" "10" "100" "1/10" "2/10"
-			natcmp.Compare(a.Path(), b.Path()),                                 // fallback to paths
+			natcmp.Compare(a.path, b.path),                                     // fallback to paths
 		)
 	})
 
-	return string(cover), files, nil
+	return string(cover), pathTags, nil
 }
 
 func DestDir(pathFormat *pathformat.Format, release *musicbrainz.Release) (string, error) {
@@ -362,8 +379,12 @@ func (m Move) ProcessFile(dc DirContext, src, dest string) error {
 	}
 
 	if m.DryRun {
-		slog.Info("[dry run] move", "from", src, "to", dest)
+		slog.Info("move", "from", src, "to", dest)
 		return nil
+	}
+
+	if err := os.MkdirAll(filepath.Dir(dest), os.ModePerm); err != nil {
+		return fmt.Errorf("create dest path: %w", err)
 	}
 
 	if err := os.Rename(src, dest); err != nil {
@@ -429,8 +450,12 @@ func (c Copy) ProcessFile(dc DirContext, src, dest string) error {
 	}
 
 	if c.DryRun {
-		slog.Info("[dry run] copy", "from", src, "to", dest)
+		slog.Info("copy", "from", src, "to", dest)
 		return nil
+	}
+
+	if err := os.MkdirAll(filepath.Dir(dest), os.ModePerm); err != nil {
+		return fmt.Errorf("create dest path: %w", err)
 	}
 
 	if err := copyFile(src, dest); err != nil {
@@ -448,7 +473,9 @@ func (Copy) RemoveSrc(dc DirContext, limit string, src string) error {
 // trimDestDir deletes all items in a destination dir that don't look like they should be there
 func trimDestDir(dc DirContext, dest string, dryRun bool) error {
 	entries, err := os.ReadDir(dest)
-	if err != nil {
+	if dryRun && errors.Is(err, os.ErrNotExist) {
+		// this is fine if we're only doing a dry run
+	} else if err != nil {
 		return fmt.Errorf("read dir: %w", err)
 	}
 
@@ -476,7 +503,7 @@ func trimDestDir(dc DirContext, dest string, dryRun bool) error {
 	var deleteErrs []error
 	for _, p := range toDelete {
 		if dryRun {
-			slog.Info("[dry run] delete extra file", "path", p)
+			slog.Info("delete extra file", "path", p)
 			continue
 		}
 		if err := os.Remove(p); err != nil {
@@ -637,7 +664,7 @@ func safeRemoveAll(src string, dryRun bool) error {
 	}
 
 	if dryRun {
-		slog.Info("[dry run] remove all", "path", src)
+		slog.Info("remove all", "path", src)
 		return nil
 	}
 

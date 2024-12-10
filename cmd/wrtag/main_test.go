@@ -83,24 +83,24 @@ func mainTag() {
 			}
 		}
 
-		f, err := tags.Read(p)
+		t, err := tags.ReadTags(p)
 		if err != nil {
 			log.Fatalf("open tag file: %v", err)
 		}
 
-		for t, vs := range pairs {
+		for k, vs := range pairs {
 			switch op {
 			case "write":
-				f.Write(t, vs...)
+				t.Write(k, vs...)
 			case "check":
-				if got := f.ReadMulti(t); !slices.Equal(vs, got) {
+				if got := t.ReadMulti(k); !slices.Equal(vs, got) {
 					log.Printf("%s exp %q got %q", p, vs, got)
 					exit = 1
 				}
 			}
 		}
 
-		if err := f.Save(); err != nil {
+		if err := tags.WriteTags(p, t); err != nil {
 			log.Fatalf("write tag file: %v", err)
 		}
 	}

@@ -16,13 +16,13 @@ func TestTrackNum(t *testing.T) {
 	t.Parallel()
 
 	path := newFile(t, emptyFLAC, ".flac")
-	withf(t, path, func(f *File) {
+	withf(t, path, func(f Tags) {
 		f.WriteNum(TrackNumber, 69)
 	})
-	withf(t, path, func(f *File) {
+	withf(t, path, func(f Tags) {
 		f.WriteNum(TrackNumber, 69)
 	})
-	withf(t, path, func(f *File) {
+	withf(t, path, func(f Tags) {
 		assert.Equal(t, 69, f.ReadNum(TrackNumber))
 	})
 }
@@ -30,7 +30,7 @@ func TestTrackNum(t *testing.T) {
 func TestZero(t *testing.T) {
 	t.Parallel()
 
-	check := func(f *File) {
+	check := func(f Tags) {
 		var n int
 		for range f.Iter() {
 			n++
@@ -41,11 +41,11 @@ func TestZero(t *testing.T) {
 	for _, tf := range testFiles {
 		t.Run(tf.name, func(t *testing.T) {
 			path := newFile(t, tf.data, tf.ext)
-			withf(t, path, func(f *File) {
+			withf(t, path, func(f Tags) {
 				f.Write("catalognumber", "")
 				check(f)
 			})
-			withf(t, path, func(f *File) {
+			withf(t, path, func(f Tags) {
 				check(f)
 			})
 		})
@@ -76,20 +76,20 @@ func TestDoubleSave(t *testing.T) {
 	t.Parallel()
 
 	path := newFile(t, emptyFLAC, ".flac")
-	f, err := Read(path)
+	f, err := ReadTags(path)
 	require.NoError(t, err)
 
 	f.Write(Album, "a")
-	require.NoError(t, f.Save())
+	require.NoError(t, WriteTags(path, f))
 	f.Write(Album, "b")
-	require.NoError(t, f.Save())
+	require.NoError(t, WriteTags(path, f))
 	f.Write(Album, "c")
-	require.NoError(t, f.Save())
+	require.NoError(t, WriteTags(path, f))
 }
 
 func TestExtract(t *testing.T) {
 	path := newFile(t, emptyFLAC, ".flac")
-	f, err := Read(path)
+	f, err := ReadTags(path)
 	require.NoError(t, err)
 
 	f.Write("v", "it's -0.244!")
@@ -110,12 +110,12 @@ func TestExtendedTags(t *testing.T) {
 			}
 
 			p := newFile(t, tf.data, tf.ext)
-			withf(t, p, func(f *File) {
+			withf(t, p, func(f Tags) {
 				f.Write(Artist, "1. steely dan")            // standard
 				f.Write(AlbumArtist, "2. steely dan")       // extended
 				f.Write(AlbumArtistCredit, "3. steely dan") // non standard
 			})
-			withf(t, p, func(f *File) {
+			withf(t, p, func(f Tags) {
 				assert.Equal(t, "1. steely dan", f.Read(Artist))
 				assert.Equal(t, "2. steely dan", f.Read(AlbumArtist))
 				assert.Equal(t, "3. steely dan", f.Read(AlbumArtistCredit))
@@ -158,11 +158,11 @@ func newFile(t *testing.T, data []byte, ext string) string {
 	return f.Name()
 }
 
-func withf(t *testing.T, path string, fn func(*File)) {
+func withf(t *testing.T, path string, fn func(Tags)) {
 	t.Helper()
 
-	f, err := Read(path)
+	f, err := ReadTags(path)
 	require.NoError(t, err)
 	fn(f)
-	require.NoError(t, f.Save())
+	require.NoError(t, WriteTags(path, f))
 }

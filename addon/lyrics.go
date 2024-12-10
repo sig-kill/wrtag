@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -37,27 +38,31 @@ func NewLyricsAddon(conf string) (LyricsAddon, error) {
 }
 
 func (l LyricsAddon) ProcessRelease(ctx context.Context, paths []string) error {
-	var pathErrs = make([]error, len(paths))
 	var wg sync.WaitGroup
+
+	var pathErrs = make([]error, len(paths))
 	for i, path := range paths {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			pathErrs[i] = tags.Write(path, func(f *tags.File) error {
-				if f.Read(tags.Lyrics) != "" {
-					return nil
+			pathErrs[i] = tags.UpdateTags(path, func(t tags.Tags) {
+				if t.Read(tags.Lyrics) != "" {
+					return
 				}
 
-				lyricData, err := l.source.Search(ctx, f.Read(tags.ArtistCredit), f.Read(tags.Title))
+				lyricData, err := l.source.Search(ctx, t.Read(tags.ArtistCredit), t.Read(tags.Title))
 				if err != nil && !errors.Is(err, lyrics.ErrLyricsNotFound) {
-					return err
+					slog.ErrorContext(ctx, "fetch lyrics", "path", path, "err", err)
+					return
 				}
-				f.Write(tags.Lyrics, lyricData)
-				return nil
+
+				t.Write(tags.Lyrics, lyricData)
 			})
 		}()
 	}
+
 	wg.Wait()
+
 	return errors.Join(pathErrs...)
 }
 

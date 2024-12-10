@@ -94,7 +94,7 @@ func main() {
 }
 
 func read(path string, withProperties bool, keys map[string]struct{}) error {
-	file, err := tags.Read(path)
+	t, err := tags.ReadTags(path)
 	if err != nil {
 		return fmt.Errorf("read: %w", err)
 	}
@@ -107,7 +107,7 @@ func read(path string, withProperties bool, keys map[string]struct{}) error {
 		return want
 	}
 
-	for k, vs := range file.Iter() {
+	for k, vs := range t.Iter() {
 		if !wantKey(k) {
 			continue
 		}
@@ -119,48 +119,49 @@ func read(path string, withProperties bool, keys map[string]struct{}) error {
 		return nil
 	}
 
+	properties, err := tags.ReadProperties(path)
+	if err != nil {
+		return err
+	}
+
 	if k := "length"; wantKey(k) {
-		fmt.Printf("%s\t%s\t%s\n", path, k, formatDuration(file.Length()))
+		fmt.Printf("%s\t%s\t%s\n", path, k, formatDuration(properties.Length))
 	}
 	if k := "bitrate"; wantKey(k) {
-		fmt.Printf("%s\t%s\t%d\n", path, k, file.Bitrate())
+		fmt.Printf("%s\t%s\t%d\n", path, k, properties.Bitrate)
 	}
 	if k := "sample_rate"; wantKey(k) {
-		fmt.Printf("%s\t%s\t%d\n", path, k, file.SampleRate())
+		fmt.Printf("%s\t%s\t%d\n", path, k, properties.SampleRate)
 	}
-	if k := "num_channels"; wantKey(k) {
-		fmt.Printf("%s\t%s\t%d\n", path, k, file.NumChannels())
+	if k := "channels"; wantKey(k) {
+		fmt.Printf("%s\t%s\t%d\n", path, k, properties.Channels)
 	}
 	return nil
 }
 
 func write(path string, keyValues map[string][]string) error {
-	file, err := tags.Read(path)
+	err := tags.UpdateTags(path, func(t tags.Tags) {
+		for k, vs := range keyValues {
+			t.Write(k, vs...)
+		}
+	})
 	if err != nil {
-		return fmt.Errorf("read: %w", err)
-	}
-	for k, vs := range keyValues {
-		file.Write(k, vs...)
-	}
-	if err := file.Save(); err != nil {
 		return fmt.Errorf("save: %w", err)
 	}
 	return nil
 }
 
 func clear(path string, keys map[string]struct{}) error {
-	file, err := tags.Read(path)
-	if err != nil {
-		return fmt.Errorf("read: %w", err)
-	}
-	if len(keys) == 0 {
-		file.ClearAll()
-	} else {
-		for k := range keys {
-			file.Clear(k)
+	err := tags.UpdateTags(path, func(t tags.Tags) {
+		if len(keys) == 0 {
+			t.ClearAll()
+			return
 		}
-	}
-	if err := file.Save(); err != nil {
+		for k := range keys {
+			t.Clear(k)
+		}
+	})
+	if err != nil {
 		return fmt.Errorf("save: %w", err)
 	}
 	return nil

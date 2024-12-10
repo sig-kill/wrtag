@@ -34,7 +34,7 @@ func (tw TagWeights) For(field string) float64 {
 	return 1
 }
 
-func DiffRelease(weights TagWeights, release *musicbrainz.Release, tracks []musicbrainz.Track, files []*tags.File) (float64, []Diff) {
+func DiffRelease[T interface{ Read(string) string }](weights TagWeights, release *musicbrainz.Release, tracks []musicbrainz.Track, tagFiles []T) (float64, []Diff) {
 	if len(tracks) == 0 {
 		return 0, nil
 	}
@@ -46,21 +46,21 @@ func DiffRelease(weights TagWeights, release *musicbrainz.Release, tracks []musi
 
 	var diffs []Diff
 	{
-		firstFile := files[0]
+		tf := tagFiles[0]
 		diffs = append(diffs,
-			diff("release", firstFile.Read(tags.Album), release.Title),
-			diff("artist", firstFile.Read(tags.AlbumArtist), musicbrainz.ArtistsString(release.Artists)),
-			diff("label", firstFile.Read(tags.Label), labelInfo.Label.Name),
-			diff("catalogue num", firstFile.Read(tags.CatalogueNum), labelInfo.CatalogNumber),
-			diff("upc", firstFile.Read(tags.UPC), release.Barcode),
-			diff("media format", firstFile.Read(tags.MediaFormat), release.Media[0].Format),
+			diff("release", tf.Read(tags.Album), release.Title),
+			diff("artist", tf.Read(tags.AlbumArtist), musicbrainz.ArtistsString(release.Artists)),
+			diff("label", tf.Read(tags.Label), labelInfo.Label.Name),
+			diff("catalogue num", tf.Read(tags.CatalogueNum), labelInfo.CatalogNumber),
+			diff("upc", tf.Read(tags.UPC), release.Barcode),
+			diff("media format", tf.Read(tags.MediaFormat), release.Media[0].Format),
 		)
 	}
 
-	for i := range max(len(files), len(tracks)) {
+	for i := range max(len(tagFiles), len(tracks)) {
 		var a, b string
-		if i < len(files) {
-			a = strings.Join(deleteZero(files[i].Read(tags.Artist), files[i].Read(tags.Title)), " – ")
+		if i < len(tagFiles) {
+			a = strings.Join(deleteZero(tagFiles[i].Read(tags.Artist), tagFiles[i].Read(tags.Title)), " – ")
 		}
 		if i < len(tracks) {
 			b = strings.Join(deleteZero(musicbrainz.ArtistsString(tracks[i].Artists), tracks[i].Title), " – ")
@@ -73,9 +73,9 @@ func DiffRelease(weights TagWeights, release *musicbrainz.Release, tracks []musi
 
 func WriteTo(
 	release *musicbrainz.Release, labelInfo musicbrainz.LabelInfo, genres []musicbrainz.Genre,
-	i int, trk *musicbrainz.Track, f *tags.File,
+	i int, trk *musicbrainz.Track, t tags.Tags,
 ) {
-	f.ClearUnknown()
+	t.ClearUnknown()
 
 	var genreNames []string
 	for _, g := range genres[:min(6, len(genres))] { // top 6 genre strings
@@ -85,36 +85,36 @@ func WriteTo(
 	disambiguationParts := deleteZero(release.ReleaseGroup.Disambiguation, release.Disambiguation)
 	disambiguation := strings.Join(disambiguationParts, ", ")
 
-	f.Write(tags.Album, release.Title)
-	f.Write(tags.AlbumArtist, musicbrainz.ArtistsString(release.Artists))
-	f.Write(tags.AlbumArtists, musicbrainz.ArtistsNames(release.Artists)...)
-	f.Write(tags.AlbumArtistCredit, musicbrainz.ArtistsCreditString(release.Artists))
-	f.Write(tags.AlbumArtistsCredit, musicbrainz.ArtistsCreditNames(release.Artists)...)
-	f.Write(tags.Date, formatDate(release.Date.Time))
-	f.Write(tags.OriginalDate, formatDate(release.ReleaseGroup.FirstReleaseDate.Time))
-	f.Write(tags.MediaFormat, release.Media[0].Format)
-	f.Write(tags.Label, labelInfo.Label.Name)
-	f.Write(tags.CatalogueNum, labelInfo.CatalogNumber)
-	f.Write(tags.UPC, release.Barcode)
-	f.Write(tags.Compilation, formatBool(musicbrainz.IsCompilation(release.ReleaseGroup)))
+	t.Write(tags.Album, release.Title)
+	t.Write(tags.AlbumArtist, musicbrainz.ArtistsString(release.Artists))
+	t.Write(tags.AlbumArtists, musicbrainz.ArtistsNames(release.Artists)...)
+	t.Write(tags.AlbumArtistCredit, musicbrainz.ArtistsCreditString(release.Artists))
+	t.Write(tags.AlbumArtistsCredit, musicbrainz.ArtistsCreditNames(release.Artists)...)
+	t.Write(tags.Date, formatDate(release.Date.Time))
+	t.Write(tags.OriginalDate, formatDate(release.ReleaseGroup.FirstReleaseDate.Time))
+	t.Write(tags.MediaFormat, release.Media[0].Format)
+	t.Write(tags.Label, labelInfo.Label.Name)
+	t.Write(tags.CatalogueNum, labelInfo.CatalogNumber)
+	t.Write(tags.UPC, release.Barcode)
+	t.Write(tags.Compilation, formatBool(musicbrainz.IsCompilation(release.ReleaseGroup)))
 
-	f.Write(tags.MBReleaseID, release.ID)
-	f.Write(tags.MBReleaseGroupID, release.ReleaseGroup.ID)
-	f.Write(tags.MBAlbumArtistID, mapFunc(release.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID })...)
-	f.Write(tags.MBAlbumComment, disambiguation)
+	t.Write(tags.MBReleaseID, release.ID)
+	t.Write(tags.MBReleaseGroupID, release.ReleaseGroup.ID)
+	t.Write(tags.MBAlbumArtistID, mapFunc(release.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID })...)
+	t.Write(tags.MBAlbumComment, disambiguation)
 
-	f.Write(tags.Title, trk.Title)
-	f.Write(tags.Artist, musicbrainz.ArtistsString(trk.Artists))
-	f.Write(tags.Artists, musicbrainz.ArtistsNames(trk.Artists)...)
-	f.Write(tags.ArtistCredit, musicbrainz.ArtistsCreditString(trk.Artists))
-	f.Write(tags.ArtistsCredit, musicbrainz.ArtistsCreditNames(trk.Artists)...)
-	f.Write(tags.Genre, cmp.Or(genreNames...))
-	f.Write(tags.Genres, genreNames...)
-	f.WriteNum(tags.TrackNumber, i+1)
-	f.WriteNum(tags.DiscNumber, 1)
+	t.Write(tags.Title, trk.Title)
+	t.Write(tags.Artist, musicbrainz.ArtistsString(trk.Artists))
+	t.Write(tags.Artists, musicbrainz.ArtistsNames(trk.Artists)...)
+	t.Write(tags.ArtistCredit, musicbrainz.ArtistsCreditString(trk.Artists))
+	t.Write(tags.ArtistsCredit, musicbrainz.ArtistsCreditNames(trk.Artists)...)
+	t.Write(tags.Genre, cmp.Or(genreNames...))
+	t.Write(tags.Genres, genreNames...)
+	t.WriteNum(tags.TrackNumber, i+1)
+	t.WriteNum(tags.DiscNumber, 1)
 
-	f.Write(tags.MBRecordingID, trk.Recording.ID)
-	f.Write(tags.MBArtistID, mapFunc(trk.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID })...)
+	t.Write(tags.MBRecordingID, trk.Recording.ID)
+	t.Write(tags.MBArtistID, mapFunc(trk.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID })...)
 }
 
 func Differ(weights TagWeights, score *float64) func(field string, a, b string) Diff {

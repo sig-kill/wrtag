@@ -2,8 +2,6 @@ package tags
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"iter"
 	"log/slog"
 	"maps"
@@ -12,14 +10,11 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/araddon/dateparse"
 	"go.senan.xyz/taglib"
 )
-
-var ErrWrite = errors.New("error writing tags")
 
 // https://picard-docs.musicbrainz.org/downloads/MusicBrainz_Picard_Tag_Map.html
 
@@ -72,113 +67,111 @@ func CanRead(absPath string) bool {
 	return false
 }
 
-type File struct {
-	tags       map[string][]string
-	properties func() taglib.Properties
-	path       string
-}
+type Tags struct{ tags map[string][]string }
 
-func Read(path string) (*File, error) {
-	tags, err := taglib.ReadTags(path)
+func ReadTags(path string) (Tags, error) {
+	t, err := taglib.ReadTags(path)
 	if err != nil {
-		return nil, err
+		return Tags{}, err
 	}
 
-	normalise(tags, alternatives)
+	normalise(t, alternatives)
 
-	properties := sync.OnceValue(func() taglib.Properties {
-		p, _ := taglib.ReadProperties(path)
-		return p
-	})
-
-	return &File{
-		tags:       tags,
-		properties: properties,
-		path:       path,
-	}, nil
+	return Tags{t}, nil
 }
 
-func (f *File) Read(t string) string        { return first(f.tags[t]) }
-func (f *File) ReadMulti(t string) []string { return f.tags[t] }
+func (t Tags) Read(k string) string        { return first(t.tags[k]) }
+func (t Tags) ReadMulti(k string) []string { return t.tags[k] }
 
-func (f *File) ReadNum(t string) int       { return anyNum(first(f.tags[t])) }
-func (f *File) ReadFloat(t string) float64 { return anyFloat(first(f.tags[t])) }
+func (t Tags) ReadNum(k string) int       { return anyNum(first(t.tags[k])) }
+func (t Tags) ReadFloat(k string) float64 { return anyFloat(first(t.tags[k])) }
 
-func (f *File) ReadTime(t string) time.Time { return anyTime(first(f.tags[t])) }
+func (t Tags) ReadTime(k string) time.Time { return anyTime(first(t.tags[k])) }
 
-func (f *File) Iter() iter.Seq2[string, []string] {
+func (t Tags) Iter() iter.Seq2[string, []string] {
 	return func(yield func(string, []string) bool) {
-		for _, k := range slices.Sorted(maps.Keys(f.tags)) {
-			if !yield(k, f.tags[k]) {
+		for _, k := range slices.Sorted(maps.Keys(t.tags)) {
+			if !yield(k, t.tags[k]) {
 				break
 			}
 		}
 	}
 }
 
-func (f *File) Write(t string, v ...string) {
+func (t Tags) Write(k string, v ...string) {
 	v = slices.DeleteFunc(v, func(t string) bool {
 		return t == ""
 	})
 	if len(v) == 0 {
-		delete(f.tags, t)
+		delete(t.tags, k)
 		return
 	}
-	f.tags[t] = v
+	t.tags[k] = v
 }
-func (f *File) WriteNum(t string, v int)       { f.Write(t, fmtInt(v)) }
-func (f *File) WriteFloat(t string, v float64) { f.Write(t, fmtFloat(v, 6)) }
+func (t Tags) WriteNum(k string, v int)       { t.Write(k, fmtInt(v)) }
+func (t Tags) WriteFloat(k string, v float64) { t.Write(k, fmtFloat(v, 6)) }
 
-func (f *File) Clear(t string) { delete(f.tags, t) }
-func (f *File) ClearAll()      { clear(f.tags) }
-func (f *File) ClearUnknown() {
-	for k := range f.tags {
+func (t Tags) Clear(k string) { delete(t.tags, k) }
+func (t Tags) ClearAll()      { clear(t.tags) }
+func (t Tags) ClearUnknown() {
+	for k := range t.tags {
 		if _, ok := knownTags[k]; !ok {
-			delete(f.tags, k)
+			delete(t.tags, k)
 		}
 	}
 }
 
-func (f *File) Length() time.Duration { return f.properties().Length }
-func (f *File) Bitrate() uint         { return f.properties().Bitrate }
-func (f *File) SampleRate() uint      { return f.properties().SampleRate }
-func (f *File) NumChannels() uint     { return f.properties().Channels }
-
-func (f *File) Save() error {
-	return taglib.WriteTags(f.path, f.tags)
+func ReadProperties(path string) (taglib.Properties, error) {
+	return taglib.ReadProperties(path)
 }
 
-func (f *File) Path() string { return f.path }
+func WriteTags(path string, tags Tags) error {
+	return taglib.WriteTags(path, tags.tags)
+}
 
-func Write(path string, fn func(f *File) error) error {
-	f, err := Read(path)
-	if err != nil {
-		return fmt.Errorf("read tag file: %w", err)
+func clone(t Tags) Tags {
+	return Tags{
+		tags: maps.Clone(t.tags),
 	}
+}
 
-	before := maps.Clone(f.tags)
-	if err := fn(f); err != nil {
+func UpdateTags(path string, f func(t Tags)) error {
+	t, err := ReadTags(path)
+	if err != nil {
 		return err
 	}
 
-	// try avoid filesystem writes if we can
-	if maps.EqualFunc(before, f.tags, slices.Equal) {
+	dt, ok := DiffChanged(path, t, func(t Tags) {
+		f(t)
+	})
+	if ok {
 		return nil
 	}
 
-	if lvl, l := slog.LevelDebug, slog.Default(); l.Enabled(context.Background(), lvl) {
-		pathBase := filepath.Base(path)
-		for k := range f.tags {
-			if before, after := before[k], f.tags[k]; !slices.Equal(before, after) {
-				l.Log(context.Background(), lvl, "tag change", "file", pathBase, "key", k, "from", before, "to", after)
+	if err := WriteTags(path, dt); err != nil {
+		return err
+	}
+	return nil
+}
+
+func DiffChanged(fileKey string, before Tags, f func(Tags)) (Tags, bool) {
+	after := clone(before)
+	f(after)
+
+	if maps.EqualFunc(before.tags, after.tags, slices.Equal) {
+		return after, true
+	}
+
+	if lvl, slog := slog.LevelDebug, slog.Default(); slog.Enabled(context.Background(), lvl) {
+		fileKey := filepath.Base(fileKey)
+		for k := range after.tags {
+			if before, after := before.tags[k], after.tags[k]; !slices.Equal(before, after) {
+				slog.Log(context.Background(), lvl, "tag change", "file", fileKey, "key", k, "from", before, "to", after)
 			}
 		}
 	}
 
-	if err := f.Save(); err != nil {
-		return fmt.Errorf("save: %w", err)
-	}
-	return nil
+	return after, false
 }
 
 func first(vs []string) string {

@@ -35,7 +35,7 @@ func (a ReplayGainAddon) ProcessRelease(ctx context.Context, paths []string) err
 
 	if !a.force {
 		existingTag, err := func() (string, error) {
-			f, err := tags.Read(paths[0])
+			f, err := tags.ReadTags(paths[0])
 			if err != nil {
 				return "", err
 			}
@@ -57,12 +57,11 @@ func (a ReplayGainAddon) ProcessRelease(ctx context.Context, paths []string) err
 	var trackErrs []error
 	for i := range paths {
 		trackL, path := trackLevs[i], paths[i]
-		err := tags.Write(path, func(f *tags.File) error {
-			f.Write(tags.ReplayGainTrackGain, fmtdB(trackL.GaindB))
-			f.WriteFloat(tags.ReplayGainTrackPeak, trackL.Peak)
-			f.Write(tags.ReplayGainAlbumGain, fmtdB(albumLev.GaindB))
-			f.WriteFloat(tags.ReplayGainAlbumPeak, albumLev.Peak)
-			return nil
+		err := tags.UpdateTags(path, func(t tags.Tags) {
+			t.Write(tags.ReplayGainTrackGain, fmtdB(trackL.GaindB))
+			t.WriteFloat(tags.ReplayGainTrackPeak, trackL.Peak)
+			t.Write(tags.ReplayGainAlbumGain, fmtdB(albumLev.GaindB))
+			t.WriteFloat(tags.ReplayGainAlbumPeak, albumLev.Peak)
 		})
 		if err != nil {
 			trackErrs = append(trackErrs, err)
