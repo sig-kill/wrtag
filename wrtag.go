@@ -207,7 +207,7 @@ func ProcessDir(
 			return nil, fmt.Errorf("process path %q: %w", filepath.Base(pt.path), err)
 		}
 
-		destTags, ok := tags.DiffChanged(destPath, pt.Tags, func(t tags.Tags) {
+		destTags, ok := tags.DiffChanged(pt.path, pt.Tags, func(t tags.Tags) {
 			tagmap.WriteTo(release, labelInfo, genres, i, &rt, t)
 		})
 
