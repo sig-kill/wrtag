@@ -1,5 +1,12 @@
 # Changelog
 
+### [0.6.1](https://www.github.com/sentriz/wrtag/compare/v0.6.0...v0.6.1) (2024-12-11)
+
+
+### Bug Fixes
+
+* **wrtag:** fix windows tag read/write ([e5c9013](https://www.github.com/sentriz/wrtag/commit/e5c901365d3c2539b948193868788ea74152c2ae))
+
 ## [0.6.0](https://www.github.com/sentriz/wrtag/compare/v0.5.1...v0.6.0) (2024-12-06)
 
 
