@@ -9,7 +9,7 @@ require (
 	github.com/containrrr/shoutrrr v0.8.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
-	github.com/ncruces/go-sqlite3 v0.20.3
+	github.com/ncruces/go-sqlite3 v0.21.0
 	github.com/r3labs/sse/v2 v2.10.0
 	github.com/rainycape/unidecode v0.0.0-20150907023854-cb7f23ec59be
 	github.com/rogpeppe/go-internal v1.13.1
@@ -19,7 +19,7 @@ require (
 	go.senan.xyz/natcmp v0.1.2
 	go.senan.xyz/sqlb v0.0.0-20241026155526-a18584fdfbe0
 	go.senan.xyz/table v0.0.0-20240227175247-cf2c834b4c23
-	go.senan.xyz/taglib v0.4.0
+	go.senan.xyz/taglib v0.4.1
 	golang.org/x/net v0.32.0
 	golang.org/x/sync v0.10.0
 	golang.org/x/text v0.21.0

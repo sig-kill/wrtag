@@ -42,8 +42,8 @@ github.com/mattn/go-isatty v0.0.16/go.mod h1:kYGgaQfpe5nmfYZH+SKPsOc2e4SrIfOl2e/
 github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWEY=
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
 github.com/mattn/go-runewidth v0.0.10/go.mod h1:RAqKPSqVFrSLVXbA8x7dzmKdmGzieGRCM46jaSJTDAk=
-github.com/ncruces/go-sqlite3 v0.20.3 h1:+4G4uEqOeusF0yRuQVUl9fuoEebUolwQSnBUjYBLYIw=
-github.com/ncruces/go-sqlite3 v0.20.3/go.mod h1:ojLIAB243gtz68Eo283Ps+k9PyR3dvzS+9/RgId4+AA=
+github.com/ncruces/go-sqlite3 v0.21.0 h1:EwKFoy1hHEopN4sFZarmi+McXdbCcbTuLixhEayXVbQ=
+github.com/ncruces/go-sqlite3 v0.21.0/go.mod h1:zxMOaSG5kFYVFK4xQa0pdwIszqxqJ0W0BxBgwdrNjuA=
 github.com/ncruces/julianday v1.0.0 h1:fH0OKwa7NWvniGQtxdJRxAgkBMolni2BjDHaWTxqt7M=
 github.com/ncruces/julianday v1.0.0/go.mod h1:Dusn2KvZrrovOMJuOt0TNXL6tB7U2E8kvza5fFc9G7g=
 github.com/onsi/ginkgo/v2 v2.9.2 h1:BA2GMJOtfGAfagzYtrAlufIP0lq6QERkFmHLMLPwFSU=
@@ -80,8 +80,8 @@ go.senan.xyz/sqlb v0.0.0-20241026155526-a18584fdfbe0 h1:9m2SnPMgg4l816dF2kzG+MSN
 go.senan.xyz/sqlb v0.0.0-20241026155526-a18584fdfbe0/go.mod h1:/K5GaBsXCs03K/1uKeHlVIvrpjDq1Q7UWfO2Qxz8LMI=
 go.senan.xyz/table v0.0.0-20240227175247-cf2c834b4c23 h1:dJXADKSrn0V7N59jckuiY3cEEYzqvZRELS+J2/TVwx4=
 go.senan.xyz/table v0.0.0-20240227175247-cf2c834b4c23/go.mod h1:r81hVuBSkscXYCP+zIDC0S/V7zoNG4o+kmESIu0LbTs=
-go.senan.xyz/taglib v0.4.0 h1:Tq4ok931sipVYLptfLW5qnUV0I3o2Zqn9RSxiiaBt/U=
-go.senan.xyz/taglib v0.4.0/go.mod h1:4XsEUZPk4JtQFZkakn/vGF4Zp22O4k5P3EXcAJYRSjQ=
+go.senan.xyz/taglib v0.4.1 h1:Zamrd2LdYTjb/HFIUh6q4J9iyBFXyI7yRFPXxEPXeDg=
+go.senan.xyz/taglib v0.4.1/go.mod h1:4XsEUZPk4JtQFZkakn/vGF4Zp22O4k5P3EXcAJYRSjQ=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20210921155107-089bfa567519/go.mod h1:GvvjBRRGRdwPK5ydBHafDWAxML/pGHZbMvKqRZ5+Abc=
 golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4/go.mod h1:jJ57K6gSWd91VN4djpZkiMVwK6gcyfeH4XE8wZrZaV4=
