@@ -128,9 +128,23 @@ func main() {
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer cancel()
 
-		if err := runSync(ctx, cfg, dirs, *ageYounger, *ageOlder, *dryRun, *numWorkers); err != nil {
+		start := time.Now()
+
+		var stats syncStats
+		if err := runSync(ctx, cfg, &stats, dirs, *ageYounger, *ageOlder, *dryRun, *numWorkers); err != nil {
 			slog.Error("running", "command", command, "err", err)
 			return
+		}
+
+		took := time.Since(start).Truncate(time.Millisecond)
+
+		switch {
+		case stats.errors.Load() > 0:
+			slog.Error("sync finished", "took", took, "", &stats)
+			cfg.Notifications.Sendf(ctx, notifSyncError, "sync finished in %v %v", took, &stats)
+		default:
+			slog.Info("sync finished", "took", took, "", &stats)
+			cfg.Notifications.Sendf(ctx, notifSyncComplete, "sync finished in %v %v", took, &stats)
 		}
 
 	default:
@@ -176,9 +190,7 @@ const (
 	notifSyncError    = "sync-error"
 )
 
-func runSync(ctx context.Context, cfg *wrtag.Config, dirs []string, ageYounger, ageOlder time.Duration, dryRun bool, numWorkers int) error {
-	start := time.Now()
-
+func runSync(ctx context.Context, cfg *wrtag.Config, stats *syncStats, dirs []string, ageYounger, ageOlder time.Duration, dryRun bool, numWorkers int) error {
 	leaves := make(chan string)
 	go func() {
 		for _, d := range dirs {
@@ -194,22 +206,21 @@ func runSync(ctx context.Context, cfg *wrtag.Config, dirs []string, ageYounger, 
 		close(leaves)
 	}()
 
-	var st syncStats
 	var wg sync.WaitGroup
 	for range numWorkers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			ctxConsume(ctx, leaves, func(dir string) {
-				st.saw.Add(1)
+				stats.saw.Add(1)
 				r, err := syncDir(ctx, cfg, ageYounger, ageOlder, wrtag.Move{DryRun: dryRun}, dir)
 				if err != nil && !errors.Is(err, context.Canceled) {
-					st.errors.Add(1)
+					stats.errors.Add(1)
 					slog.ErrorContext(ctx, "processing dir", "dir", dir, "err", err)
 					return
 				}
 				if r != nil {
-					st.processed.Add(1)
+					stats.processed.Add(1)
 					slog.InfoContext(ctx, "processed dir", "dir", dir, "score", r.Score)
 				}
 			})
@@ -218,21 +229,10 @@ func runSync(ctx context.Context, cfg *wrtag.Config, dirs []string, ageYounger, 
 
 	wg.Wait()
 
-	st.took = time.Since(start)
-
-	if st.errors.Load() > 0 {
-		slog.Error("sync finished", "", &st)
-		cfg.Notifications.Sendf(ctx, notifSyncError, "sync finished %v", &st)
-		return nil
-	}
-	slog.Info("sync finished", "", &st)
-	cfg.Notifications.Sendf(ctx, notifSyncComplete, "sync finished %v", &st)
-
 	return nil
 }
 
 type syncStats struct {
-	took      time.Duration
 	saw       atomic.Uint64
 	processed atomic.Uint64
 	errors    atomic.Uint64
@@ -240,7 +240,6 @@ type syncStats struct {
 
 func (s *syncStats) LogValue() slog.Value {
 	return slog.GroupValue(
-		slog.Duration("took", s.took.Truncate(time.Millisecond)),
 		slog.Uint64("saw", s.saw.Load()),
 		slog.Uint64("processed", s.processed.Load()),
 		slog.Uint64("errors", s.errors.Load()),
