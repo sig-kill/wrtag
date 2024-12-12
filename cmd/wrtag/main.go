@@ -57,6 +57,11 @@ func main() {
 		return
 	}
 
+	if cfg.PathFormat.Root() == "" {
+		slog.Error("no path-format configured")
+		return
+	}
+
 	switch command, args := flag.Arg(0), flag.Args()[1:]; command {
 	case "move", "copy":
 		flag := flag.NewFlagSet(command, flag.ExitOnError)
@@ -103,11 +108,14 @@ func main() {
 		)
 		flag.Parse(args)
 
-		// walk the whole root dir by default, or some user provided dirs
-		var dirs = []string{cfg.PathFormat.Root()}
-		if flag.NArg() > 0 {
-			dirs = flag.Args()
+		// walk the whole root dir by default, or some user provided dirs if provided
+		var dirs []string
+		if args := flag.Args(); len(args) > 0 {
+			dirs = append(dirs, args...)
+		} else if root := cfg.PathFormat.Root(); root != "" {
+			dirs = append(dirs, root)
 		}
+
 		for i := range dirs {
 			var err error
 			dirs[i], err = filepath.Abs(dirs[i])

@@ -86,6 +86,10 @@ func ProcessDir(
 	ctx context.Context, cfg *Config,
 	op FileSystemOperation, srcDir string, cond ImportCondition, useMBID string,
 ) (*SearchResult, error) {
+	if cfg.PathFormat.Root() == "" {
+		return nil, fmt.Errorf("no path format provided")
+	}
+
 	if !filepath.IsAbs(srcDir) {
 		panic("src dir not abs") // this is a programmer error for now
 	}

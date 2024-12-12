@@ -64,6 +64,11 @@ func main() {
 	)
 	wrtagflag.Parse()
 
+	if cfg.PathFormat.Root() == "" {
+		slog.Error("no path-format configured")
+		return
+	}
+
 	if *listenAddr == "" {
 		slog.Error("need a listen addr")
 		return

@@ -2,6 +2,26 @@
 stderr 'no command provided'
 
 ! exec wrtag f
+stderr 'no path-format configured'
+
+! exec wrtag move
+stderr 'no path-format configured'
+
+! exec wrtag copy
+stderr 'no path-format configured'
+
+! exec wrtag move no-exist
+stderr 'no path-format configured'
+
+! exec wrtag copy no-exist
+stderr 'no path-format configured'
+
+env WRTAG_PATH_FORMAT='albums/{{ .Release.Title }}/{{ .TrackNum }}{{ .Ext }}'
+
+! exec wrtag
+stderr 'no command provided'
+
+! exec wrtag f
 stderr 'unknown command'
 
 ! exec wrtag move
