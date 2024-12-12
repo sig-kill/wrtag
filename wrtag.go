@@ -185,11 +185,12 @@ func ProcessDir(
 		destDir,
 	)
 
+	// calculate new paths
 	destPaths := make([]string, 0, len(pathTags))
 	for i := range len(pathTags) {
 		pt, rt := pathTags[i], releaseTracks[i]
 
-		pathFormatData := pathformat.Data{Release: release, Track: &rt, TrackNum: i + 1, Ext: strings.ToLower(filepath.Ext(pt.path)), IsCompilation: isCompilation}
+		pathFormatData := pathformat.Data{Release: release, Track: &rt, TrackNum: i + 1, Ext: strings.ToLower(filepath.Ext(pt.Path)), IsCompilation: isCompilation}
 		destPath, err := cfg.PathFormat.Execute(pathFormatData)
 		if err != nil {
 			return nil, fmt.Errorf("create path: %w", err)
@@ -200,18 +201,26 @@ func ProcessDir(
 
 	dc := NewDirContext()
 
+	// move/copy and tag
 	for i := range len(pathTags) {
 		pt, rt, destPath := pathTags[i], releaseTracks[i], destPaths[i]
 
-		if err := op.ProcessFile(dc, pt.path, destPath); err != nil {
-			return nil, fmt.Errorf("process path %q: %w", filepath.Base(pt.path), err)
+		if err := op.ProcessFile(dc, pt.Path, destPath); err != nil {
+			return nil, fmt.Errorf("process path %q: %w", filepath.Base(pt.Path), err)
 		}
 
-		destTags, ok := tags.DiffChanged(pt.path, pt.Tags, func(t tags.Tags) {
-			tagmap.WriteTo(release, labelInfo, genres, i, &rt, t)
-		})
+		destTags := tags.Clone(pt.Tags)
+		tagmap.WriteTo(release, labelInfo, genres, i, &rt, destTags)
 
-		if !ok && !op.ReadOnly() {
+		if tags.Equal(pt.Tags, destTags) {
+			continue
+		}
+
+		if lvl, slog := slog.LevelDebug, slog.Default(); slog.Enabled(ctx, lvl) {
+			logTagChanges(ctx, pt.Path, lvl, pt.Tags, destTags)
+		}
+
+		if !op.ReadOnly() {
 			if err := tags.WriteTags(destPath, destTags); err != nil {
 				return nil, fmt.Errorf("write tag file: %w", err)
 			}
@@ -253,7 +262,7 @@ func ProcessDir(
 }
 
 type PathTags struct {
-	path string
+	Path string
 	tags.Tags
 }
 
@@ -283,7 +292,7 @@ func ReadReleaseDir(dirPath string) (string, []PathTags, error) {
 				return "", nil, fmt.Errorf("read track: %w", err)
 			}
 			pathTags = append(pathTags, PathTags{
-				path: path,
+				Path: path,
 				Tags: tags,
 			})
 			continue
@@ -299,9 +308,9 @@ func ReadReleaseDir(dirPath string) (string, []PathTags, error) {
 		// like a multi disc album to us, but will have all its tracks in one subdirectory
 		discDirs := map[string]struct{}{}
 		for _, pt := range pathTags {
-			discDirs[filepath.Dir(pt.path)] = struct{}{}
+			discDirs[filepath.Dir(pt.Path)] = struct{}{}
 		}
-		if len(discDirs) == 1 && filepath.Dir(pathTags[0].path) != filepath.Clean(dirPath) {
+		if len(discDirs) == 1 && filepath.Dir(pathTags[0].Path) != filepath.Clean(dirPath) {
 			return "", nil, fmt.Errorf("validate tree: %w", ErrNoTracks)
 		}
 	}
@@ -314,7 +323,7 @@ func ReadReleaseDir(dirPath string) (string, []PathTags, error) {
 			if haveNum && pt.Read(tags.TrackNumber) == "" {
 				haveNum = false
 			}
-			if havePath && !strings.ContainsFunc(filepath.Base(pt.path), func(r rune) bool { return '0' <= r && r <= '9' }) {
+			if havePath && !strings.ContainsFunc(filepath.Base(pt.Path), func(r rune) bool { return '0' <= r && r <= '9' }) {
 				havePath = false
 			}
 		}
@@ -326,9 +335,9 @@ func ReadReleaseDir(dirPath string) (string, []PathTags, error) {
 	slices.SortFunc(pathTags, func(a, b PathTags) int {
 		return cmp.Or(
 			natcmp.Compare(a.Read(tags.DiscNumber), b.Read(tags.DiscNumber)),   // disc mumbers like "1", "2", "disc 1", "disc 10"
-			natcmp.Compare(filepath.Dir(a.path), filepath.Dir(b.path)),         // might have disc folders instead of tags
+			natcmp.Compare(filepath.Dir(a.Path), filepath.Dir(b.Path)),         // might have disc folders instead of tags
 			natcmp.Compare(a.Read(tags.TrackNumber), b.Read(tags.TrackNumber)), // track numbers, could be "A1" "B1" "1" "10" "100" "1/10" "2/10"
-			natcmp.Compare(a.path, b.path),                                     // fallback to paths
+			natcmp.Compare(a.Path, b.Path),                                     // fallback to paths
 		)
 	})
 
@@ -682,6 +691,15 @@ func safeRemoveAll(src string, dryRun bool) error {
 
 	slog.Debug("removed path", "path", src)
 	return nil
+}
+
+func logTagChanges(ctx context.Context, fileKey string, lvl slog.Level, before, after tags.Tags) {
+	fileKey = filepath.Base(fileKey)
+	for k := range after.Iter() {
+		if before, after := before.ReadMulti(k), after.ReadMulti(k); !slices.Equal(before, after) {
+			slog.Log(ctx, lvl, "tag change", "file", fileKey, "key", k, "from", before, "to", after)
+		}
+	}
 }
 
 func extendQueryWithOriginFile(q *musicbrainz.ReleaseQuery, originFile *originfile.OriginFile) error {

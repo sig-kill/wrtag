@@ -1,9 +1,7 @@
 package tags
 
 import (
-	"context"
 	"iter"
-	"log/slog"
 	"maps"
 	"path/filepath"
 	"regexp"
@@ -129,11 +127,8 @@ func WriteTags(path string, tags Tags) error {
 	return taglib.WriteTags(path, tags.tags)
 }
 
-func clone(t Tags) Tags {
-	return Tags{
-		tags: maps.Clone(t.tags),
-	}
-}
+func Clone(t Tags) Tags    { return Tags{tags: maps.Clone(t.tags)} }
+func Equal(a, b Tags) bool { return maps.EqualFunc(a.tags, b.tags, slices.Equal) }
 
 func UpdateTags(path string, f func(t Tags)) error {
 	t, err := ReadTags(path)
@@ -141,37 +136,17 @@ func UpdateTags(path string, f func(t Tags)) error {
 		return err
 	}
 
-	dt, ok := DiffChanged(path, t, func(t Tags) {
-		f(t)
-	})
-	if ok {
+	before := Clone(t)
+	f(t)
+
+	if Equal(t, before) {
 		return nil
 	}
 
-	if err := WriteTags(path, dt); err != nil {
+	if err := WriteTags(path, t); err != nil {
 		return err
 	}
 	return nil
-}
-
-func DiffChanged(fileKey string, before Tags, f func(Tags)) (Tags, bool) {
-	after := clone(before)
-	f(after)
-
-	if maps.EqualFunc(before.tags, after.tags, slices.Equal) {
-		return after, true
-	}
-
-	if lvl, slog := slog.LevelDebug, slog.Default(); slog.Enabled(context.Background(), lvl) {
-		fileKey := filepath.Base(fileKey)
-		for k := range after.tags {
-			if before, after := before.tags[k], after.tags[k]; !slices.Equal(before, after) {
-				slog.Log(context.Background(), lvl, "tag change", "file", fileKey, "key", k, "from", before, "to", after)
-			}
-		}
-	}
-
-	return after, false
 }
 
 func first(vs []string) string {
