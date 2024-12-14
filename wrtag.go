@@ -209,7 +209,7 @@ func ProcessDir(
 			logTagChanges(ctx, pt.Path, lvl, pt.Tags, destTags)
 		}
 
-		if !op.ReadOnly() {
+		if !op.IsDryRun() {
 			if err := tags.WriteTags(destPath, destTags); err != nil {
 				return nil, fmt.Errorf("write tag file: %w", err)
 			}
@@ -220,8 +220,8 @@ func ProcessDir(
 		return nil, fmt.Errorf("process cover: %w", err)
 	}
 
-	// process addons with new tag.Files
-	if !op.ReadOnly() {
+	// process addons with new files
+	if !op.IsDryRun() {
 		for _, addon := range cfg.Addons {
 			if err := addon.ProcessRelease(ctx, destPaths); err != nil {
 				return nil, fmt.Errorf("process addon: %w", err)
@@ -235,7 +235,7 @@ func ProcessDir(
 		}
 	}
 
-	if err := trimDestDir(dc, destDir, op.ReadOnly()); err != nil {
+	if err := trimDestDir(dc, destDir, op.IsDryRun()); err != nil {
 		return nil, fmt.Errorf("trim: %w", err)
 	}
 
@@ -348,7 +348,7 @@ var _ FileSystemOperation = (*Move)(nil)
 var _ FileSystemOperation = (*Copy)(nil)
 
 type FileSystemOperation interface {
-	ReadOnly() bool
+	IsDryRun() bool
 	ProcessFile(dc DirContext, src, dest string) error
 	RemoveSrc(dc DirContext, limit string, src string) error
 }
@@ -365,7 +365,7 @@ type Move struct {
 	DryRun bool
 }
 
-func (m Move) ReadOnly() bool {
+func (m Move) IsDryRun() bool {
 	return m.DryRun
 }
 
@@ -436,7 +436,7 @@ type Copy struct {
 	DryRun bool
 }
 
-func (c Copy) ReadOnly() bool {
+func (c Copy) IsDryRun() bool {
 	return c.DryRun
 }
 
@@ -551,7 +551,7 @@ func processCover(
 		return filepath.Join(destDir, "cover"+filepath.Ext(p))
 	}
 
-	if !op.ReadOnly() && (cover == "" || cfg.UpgradeCover) {
+	if !op.IsDryRun() && (cover == "" || cfg.UpgradeCover) {
 		skipFunc := func(resp *http.Response) bool {
 			if resp.ContentLength > 8388608 /* 8 MiB */ {
 				return true // too big to download
