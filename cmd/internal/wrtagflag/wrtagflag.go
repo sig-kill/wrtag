@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"text/template"
 	"time"
 
 	"go.senan.xyz/flagconf"
@@ -66,8 +65,6 @@ func Config() *wrtag.Config {
 	var cfg wrtag.Config
 
 	flag.Var(&pathFormatParser{&cfg.PathFormat}, "path-format", "music directory and go templated path format to define music library layout")
-	flag.Var(&querierParser{&cfg.ResearchLinkQuerier}, "research-link", "define a helper url to help find information about an unmatched release")
-	flag.Var(&notificationsParser{&cfg.Notifications}, "notification-uri", "add a shoutrrr notification uri for an event")
 	flag.Var(&addonsParser{&cfg.Addons}, "addon", "add some extra metadata when importing tracks")
 
 	cfg.KeepFiles = map[string]struct{}{}
@@ -87,8 +84,20 @@ func Config() *wrtag.Config {
 	return &cfg
 }
 
+func Notifications() *notifications.Notifications {
+	var n notifications.Notifications
+	flag.Var(&notificationsParser{&n}, "notification-uri", "add a shoutrrr notification uri for an event")
+	return &n
+}
+
+func ResearchLinks() *researchlink.Builder {
+	var r researchlink.Builder
+	flag.Var(&researchLinkParser{&r}, "research-link", "define a helper url to help find information about an unmatched release")
+	return &r
+}
+
 var _ flag.Value = (*pathFormatParser)(nil)
-var _ flag.Value = (*querierParser)(nil)
+var _ flag.Value = (*researchLinkParser)(nil)
 var _ flag.Value = (*notificationsParser)(nil)
 var _ flag.Value = (*tagWeightsParser)(nil)
 var _ flag.Value = (*keepFileParser)(nil)
@@ -110,22 +119,22 @@ func (pf pathFormatParser) String() string {
 	return fmt.Sprintf("%s/...", pf.Root())
 }
 
-type querierParser struct{ *researchlink.Querier }
+type researchLinkParser struct{ *researchlink.Builder }
 
-func (q *querierParser) Set(value string) error {
+func (r *researchLinkParser) Set(value string) error {
 	name, value, _ := strings.Cut(value, " ")
 	name, value = strings.TrimSpace(name), strings.TrimSpace(value)
-	err := q.AddSource(name, value)
+	err := r.AddSource(name, value)
 	return err
 }
-func (q querierParser) String() string {
-	if q.Querier == nil {
+func (r researchLinkParser) String() string {
+	if r.Builder == nil {
 		return ""
 	}
 	var names []string
-	q.Querier.IterSources(func(s string, _ *template.Template) {
+	for s, _ := range r.Builder.IterSources() {
 		names = append(names, s)
-	})
+	}
 	return strings.Join(names, ", ")
 }
 

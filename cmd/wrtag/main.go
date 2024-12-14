@@ -24,6 +24,7 @@ import (
 	"go.senan.xyz/wrtag/cmd/internal/logging"
 	"go.senan.xyz/wrtag/cmd/internal/wrtagflag"
 	"go.senan.xyz/wrtag/fileutil"
+	"go.senan.xyz/wrtag/researchlink"
 )
 
 func init() {
@@ -48,7 +49,9 @@ func main() {
 	defer logging.Logging()()
 	wrtagflag.DefaultClient()
 	var (
-		cfg = wrtagflag.Config()
+		cfg                 = wrtagflag.Config()
+		notifications       = wrtagflag.Notifications()
+		researchLinkQuerier = wrtagflag.ResearchLinks()
 	)
 	wrtagflag.Parse()
 
@@ -93,7 +96,7 @@ func main() {
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer cancel()
 
-		if err := runOperation(ctx, cfg, parseOperation(command, *dryRun), dir, importCondition, *useMBID); err != nil {
+		if err := runOperation(ctx, cfg, researchLinkQuerier, parseOperation(command, *dryRun), dir, importCondition, *useMBID); err != nil {
 			slog.Error("running", "command", command, "err", err)
 			return
 		}
@@ -141,10 +144,10 @@ func main() {
 		switch {
 		case stats.errors.Load() > 0:
 			slog.Error("sync finished", "took", took, "", &stats)
-			cfg.Notifications.Sendf(ctx, notifSyncError, "sync finished in %v %v", took, &stats)
+			notifications.Sendf(ctx, notifSyncError, "sync finished in %v %v", took, &stats)
 		default:
 			slog.Info("sync finished", "took", took, "", &stats)
-			cfg.Notifications.Sendf(ctx, notifSyncComplete, "sync finished in %v %v", took, &stats)
+			notifications.Sendf(ctx, notifSyncComplete, "sync finished in %v %v", took, &stats)
 		}
 
 	default:
@@ -154,12 +157,12 @@ func main() {
 }
 
 func runOperation(
-	ctx context.Context, cfg *wrtag.Config,
+	ctx context.Context, cfg *wrtag.Config, researchLinks *researchlink.Builder,
 	op wrtag.FileSystemOperation, srcDir string, cond wrtag.ImportCondition, useMBID string,
 ) error {
-	r, err := wrtag.ProcessDir(ctx, cfg, op, srcDir, cond, useMBID)
-	if err != nil && !wrtag.IsNonFatalError(err) {
-		return fmt.Errorf("processing: %w", err)
+	r, searchErr := wrtag.ProcessDir(ctx, cfg, op, srcDir, cond, useMBID)
+	if searchErr != nil && !wrtag.IsNonFatalError(searchErr) {
+		return fmt.Errorf("processing: %w", searchErr)
 	}
 
 	slog.InfoContext(ctx, "matched",
@@ -175,12 +178,21 @@ func runOperation(
 		fmt.Fprintf(os.Stderr, "\t%s\n", row)
 	}
 
-	for _, link := range r.ResearchLinks {
+	links, err := researchLinks.Build(researchlink.Query{
+		Artist: r.Query.Artist,
+		Album:  r.Query.Release,
+		UPC:    r.Query.Barcode,
+		Date:   r.Query.Date,
+	})
+	if err != nil {
+		return fmt.Errorf("research search: %w", err)
+	}
+	for _, link := range links {
 		slog.InfoContext(ctx, "search with", "name", link.Name, "url", link.URL)
 	}
 
-	if err != nil {
-		return fmt.Errorf("processing: %w", err)
+	if searchErr != nil {
+		return fmt.Errorf("processing: %w", searchErr)
 	}
 	return nil
 }

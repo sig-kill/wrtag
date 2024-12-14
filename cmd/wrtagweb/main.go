@@ -56,11 +56,12 @@ func main() {
 	defer logging.Logging()()
 	wrtagflag.DefaultClient()
 	var (
-		cfg        = wrtagflag.Config()
-		listenAddr = flag.String("web-listen-addr", "", "listen addr for web interface")
-		apiKey     = flag.String("web-api-key", "", "api key for web interface")
-		dbPath     = flag.String("web-db-path", "wrtag.db", "db path for web interface")
-		publicURL  = flag.String("web-public-url", "", "public url for web interface (optional)")
+		cfg           = wrtagflag.Config()
+		notifications = wrtagflag.Notifications()
+		listenAddr    = flag.String("web-listen-addr", "", "listen addr for web interface")
+		apiKey        = flag.String("web-api-key", "", "api key for web interface")
+		dbPath        = flag.String("web-db-path", "wrtag.db", "db path for web interface")
+		publicURL     = flag.String("web-public-url", "", "public url for web interface (optional)")
 	)
 	wrtagflag.Parse()
 
@@ -146,7 +147,7 @@ func main() {
 			job.Error = err.Error()
 			if errors.Is(err, wrtag.ErrScoreTooLow) {
 				job.Status = StatusNeedsInput
-				go cfg.Notifications.Send(ctx, notifNeedsInput, jobNotificationMessage(*publicURL, *job))
+				go notifications.Send(ctx, notifNeedsInput, jobNotificationMessage(*publicURL, *job))
 			}
 			return nil
 		}
@@ -156,7 +157,7 @@ func main() {
 			return fmt.Errorf("gen dest dir: %w", err)
 		}
 
-		go cfg.Notifications.Send(ctx, notifComplete, jobNotificationMessage(*publicURL, *job))
+		go notifications.Send(ctx, notifComplete, jobNotificationMessage(*publicURL, *job))
 
 		// either if this was a copy or move job, subsequent re-imports should just be a move so we can retag
 		job.Operation = OperationMove

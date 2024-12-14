@@ -22,10 +22,8 @@ import (
 	"go.senan.xyz/wrtag/coverparse"
 	"go.senan.xyz/wrtag/fileutil"
 	"go.senan.xyz/wrtag/musicbrainz"
-	"go.senan.xyz/wrtag/notifications"
 	"go.senan.xyz/wrtag/originfile"
 	"go.senan.xyz/wrtag/pathformat"
-	"go.senan.xyz/wrtag/researchlink"
 	"go.senan.xyz/wrtag/tagmap"
 	"go.senan.xyz/wrtag/tags"
 )
@@ -50,12 +48,12 @@ const (
 )
 
 type SearchResult struct {
-	Release       *musicbrainz.Release
-	Score         float64
-	DestDir       string
-	Diff          []tagmap.Diff
-	ResearchLinks []researchlink.SearchResult
-	OriginFile    *originfile.OriginFile
+	Release    *musicbrainz.Release
+	Query      musicbrainz.ReleaseQuery
+	Score      float64
+	DestDir    string
+	Diff       []tagmap.Diff
+	OriginFile *originfile.OriginFile
 }
 
 type ImportCondition uint8
@@ -75,10 +73,8 @@ type Config struct {
 	CoverArtArchiveClient musicbrainz.CAAClient
 	PathFormat            pathformat.Format
 	TagWeights            tagmap.TagWeights
-	ResearchLinkQuerier   researchlink.Querier
 	KeepFiles             map[string]struct{}
 	Addons                []Addon
-	Notifications         notifications.Notifications
 	UpgradeCover          bool
 }
 
@@ -141,23 +137,12 @@ func ProcessDir(
 		return nil, fmt.Errorf("search musicbrainz: %w", err)
 	}
 
-	var researchLinks []researchlink.SearchResult
-	researchLinks, err = cfg.ResearchLinkQuerier.Search(researchlink.Query{
-		Artist: cmp.Or(searchTags.Read(tags.AlbumArtist), searchTags.Read(tags.Artist)),
-		Album:  searchTags.Read(tags.Album),
-		UPC:    searchTags.Read(tags.UPC),
-		Date:   searchTags.ReadTime(tags.Date),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("research querier search: %w", err)
-	}
-
 	releaseTracks := musicbrainz.FlatTracks(release.Media)
 
 	score, diff := tagmap.DiffRelease(cfg.TagWeights, release, releaseTracks, pathTags)
 
 	if len(pathTags) != len(releaseTracks) {
-		return &SearchResult{release, 0, "", diff, researchLinks, originFile}, fmt.Errorf("%w: %d remote / %d local", ErrTrackCountMismatch, len(releaseTracks), len(pathTags))
+		return &SearchResult{release, query, 0, "", diff, originFile}, fmt.Errorf("%w: %d remote / %d local", ErrTrackCountMismatch, len(releaseTracks), len(pathTags))
 	}
 
 	var shouldImport bool
@@ -171,7 +156,7 @@ func ProcessDir(
 	}
 
 	if !shouldImport {
-		return &SearchResult{release, score, "", diff, researchLinks, originFile}, ErrScoreTooLow
+		return &SearchResult{release, query, score, "", diff, originFile}, ErrScoreTooLow
 	}
 
 	destDir, err := DestDir(&cfg.PathFormat, release)
@@ -262,7 +247,7 @@ func ProcessDir(
 		}
 	}
 
-	return &SearchResult{release, score, destDir, diff, researchLinks, originFile}, nil
+	return &SearchResult{release, query, score, destDir, diff, originFile}, nil
 }
 
 type PathTags struct {

@@ -3,6 +3,7 @@ package researchlink
 import (
 	"errors"
 	"fmt"
+	"iter"
 	"strings"
 	texttemplate "text/template"
 	"time"
@@ -13,22 +14,26 @@ type source struct {
 	template *texttemplate.Template
 }
 
-type Querier struct {
+type Builder struct {
 	sources []source
 }
 
-func (q *Querier) IterSources(f func(string, *texttemplate.Template)) {
-	for _, s := range q.sources {
-		f(s.name, s.template)
+func (b *Builder) IterSources() iter.Seq2[string, *texttemplate.Template] {
+	return func(yield func(string, *texttemplate.Template) bool) {
+		for _, s := range b.sources {
+			if !yield(s.name, s.template) {
+				break
+			}
+		}
 	}
 }
 
-func (q *Querier) AddSource(name, templRaw string) error {
+func (b *Builder) AddSource(name, templRaw string) error {
 	templ, err := texttemplate.New("template").Funcs(funcMap).Parse(templRaw)
 	if err != nil {
 		return fmt.Errorf("parse template: %w", err)
 	}
-	q.sources = append(q.sources, source{
+	b.sources = append(b.sources, source{
 		name:     name,
 		template: templ,
 	})
@@ -46,7 +51,7 @@ type SearchResult struct {
 	Name, URL string
 }
 
-func (q *Querier) Search(query Query) ([]SearchResult, error) {
+func (q *Builder) Build(query Query) ([]SearchResult, error) {
 	var results []SearchResult
 	var buildErrs []error
 	for _, s := range q.sources {
