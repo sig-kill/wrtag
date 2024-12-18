@@ -59,7 +59,7 @@ const (
 
 func CanRead(absPath string) bool {
 	switch ext := strings.ToLower(filepath.Ext(absPath)); ext {
-	case ".mp3", ".flac", ".aac", ".m4a", ".m4b", ".ogg", ".opus", ".wma", ".wav", ".wv":
+	case ".mp3", ".flac", ".opus", ".aac", ".aiff", ".ape", ".m4a", ".m4b", ".mp2", ".mpc", ".oga", ".ogg", ".spx", ".tak", ".wav", ".wma", ".wv":
 		return true
 	}
 	return false
