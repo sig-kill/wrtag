@@ -28,10 +28,12 @@ import (
 	"go.senan.xyz/wrtag"
 	"go.senan.xyz/wrtag/cmd/internal/logging"
 	wrtagflag "go.senan.xyz/wrtag/cmd/internal/wrtagflag"
+	"go.senan.xyz/wrtag/researchlink"
 
 	_ "github.com/ncruces/go-sqlite3/driver"
 	_ "github.com/ncruces/go-sqlite3/embed"
 	"github.com/r3labs/sse/v2"
+	"github.com/rogpeppe/go-internal/txtar"
 	"go.senan.xyz/sqlb"
 	"golang.org/x/sync/errgroup"
 )
@@ -56,12 +58,13 @@ func main() {
 	defer logging.Logging()()
 	wrtagflag.DefaultClient()
 	var (
-		cfg           = wrtagflag.Config()
-		notifications = wrtagflag.Notifications()
-		listenAddr    = flag.String("web-listen-addr", "", "listen addr for web interface")
-		apiKey        = flag.String("web-api-key", "", "api key for web interface")
-		dbPath        = flag.String("web-db-path", "wrtag.db", "db path for web interface")
-		publicURL     = flag.String("web-public-url", "", "public url for web interface (optional)")
+		cfg                 = wrtagflag.Config()
+		notifications       = wrtagflag.Notifications()
+		researchLinkQuerier = wrtagflag.ResearchLinks()
+		listenAddr          = flag.String("web-listen-addr", "", "listen addr for web interface")
+		apiKey              = flag.String("web-api-key", "", "api key for web interface")
+		dbPath              = flag.String("web-db-path", "wrtag.db", "db path for web interface")
+		publicURL           = flag.String("web-public-url", "", "public url for web interface (optional)")
 	)
 	wrtagflag.Parse()
 
@@ -98,7 +101,7 @@ func main() {
 		})
 	}
 
-	if err := jobsMigrate(context.Background(), db); err != nil {
+	if err := dbMigrate(context.Background(), db); err != nil {
 		slog.Error("migrate db", "err", err)
 		return
 	}
@@ -140,12 +143,28 @@ func main() {
 		job.Error = ""
 		job.Status = StatusComplete
 
-		searchResult, err := wrtag.ProcessDir(ctx, cfg, wrtagOperation(job.Operation), job.SourcePath, ic, job.UseMBID)
+		searchResult, processErr := wrtag.ProcessDir(ctx, cfg, wrtagOperation(job.Operation), job.SourcePath, ic, job.UseMBID)
+
+		if searchResult != nil && searchResult.Query.Artist != "" {
+			researchLinks, err := researchLinkQuerier.Build(researchlink.Query{
+				Artist: searchResult.Query.Artist,
+				Album:  searchResult.Query.Release,
+				UPC:    searchResult.Query.Barcode,
+				Date:   searchResult.Query.Date,
+			})
+			if err != nil {
+				return fmt.Errorf("build links: %w", err)
+			}
+
+			job.ResearchLinks = sqlb.NewJSON(researchLinks)
+		}
+
 		job.SearchResult = sqlb.NewJSON(searchResult)
-		if err != nil {
+
+		if processErr != nil {
 			job.Status = StatusError
-			job.Error = err.Error()
-			if errors.Is(err, wrtag.ErrScoreTooLow) {
+			job.Error = processErr.Error()
+			if errors.Is(processErr, wrtag.ErrScoreTooLow) {
 				job.Status = StatusNeedsInput
 				go notifications.Send(ctx, notifNeedsInput, jobNotificationMessage(*publicURL, *job))
 			}
@@ -482,6 +501,7 @@ type Job struct {
 	UseMBID              string
 	SourcePath, DestPath string
 	SearchResult         sqlb.JSON[*wrtag.SearchResult]
+	ResearchLinks        sqlb.JSON[[]researchlink.SearchResult]
 }
 
 func (Job) PrimaryKey() string {
@@ -498,29 +518,35 @@ func (j Job) Values() []sql.NamedArg {
 		sql.Named("source_path", j.SourcePath),
 		sql.Named("dest_path", j.DestPath),
 		sql.Named("search_result", j.SearchResult),
+		sql.Named("research_links", j.ResearchLinks),
 	}
 }
 func (j *Job) ScanFrom(rows *sql.Rows) error {
-	return rows.Scan(&j.ID, &j.Status, &j.Error, &j.Operation, &j.Time, &j.UseMBID, &j.SourcePath, &j.DestPath, &j.SearchResult)
+	return rows.Scan(&j.ID, &j.Status, &j.Error, &j.Operation, &j.Time, &j.UseMBID, &j.SourcePath, &j.DestPath, &j.SearchResult, &j.ResearchLinks)
 }
 
-func jobsMigrate(ctx context.Context, db *sql.DB) error {
-	return sqlb.Exec(ctx, db, `
-		create table if not exists jobs (
-			id            integer primary key autoincrement,
-			status        text not null default "",
-			error         text not null default "",
-			operation     text not null,
-			time          timestamp not null,
-			use_mbid      text not null default "",
-			source_path   text not null,
-			dest_path     text not null default "",
-			search_result jsonb
-		);
+//go:embed schema.sql
+var schema []byte
 
-		create index if not exists idx_jobs_status on jobs (status);
-		create index if not exists idx_jobs_source_path on jobs (source_path);
-	`)
+func dbMigrate(ctx context.Context, db *sql.DB) error {
+	var currVer int
+	if err := sqlb.ScanRow(ctx, db, sqlb.Primative(&currVer), "pragma user_version"); err != nil {
+		return fmt.Errorf("get schema version: %w", err)
+	}
+
+	migrations := txtar.Parse(schema)
+	for i := currVer; i < len(migrations.Files); i++ {
+		migration := migrations.Files[i]
+		slog.InfoContext(ctx, "running migration", "name", migration.Name, "query", string(migration.Data))
+
+		if err := sqlb.Exec(ctx, db, string(migration.Data)); err != nil {
+			return fmt.Errorf("run migration %d: %w", i, err)
+		}
+		if err := sqlb.Exec(ctx, db, fmt.Sprintf("pragma user_version = %d", i+1)); err != nil {
+			return fmt.Errorf("run migration %d: %w", i, err)
+		}
+	}
+	return nil
 }
 
 func jobNotificationMessage(publicURL string, job Job) string {
