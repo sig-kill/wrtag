@@ -23,13 +23,13 @@ exec metadata clear -- a.flac
 ! stdout .
 
 -- exp-all --
-a.flac	a	1
-a.flac	a	2
-a.flac	a	3
-a.flac	b	4
-a.flac	b	5
-a.flac	b	6
+a.flac	A	1
+a.flac	A	2
+a.flac	A	3
+a.flac	B	4
+a.flac	B	5
+a.flac	B	6
 -- exp-only-a --
-a.flac	a	1
-a.flac	a	2
-a.flac	a	3
+a.flac	A	1
+a.flac	A	2
+a.flac	A	3

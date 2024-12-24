@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/araddon/dateparse"
 	"github.com/argusdusty/treelock"
 	"go.senan.xyz/natcmp"
 	"go.senan.xyz/wrtag/coverparse"
@@ -101,22 +102,22 @@ func ProcessDir(
 
 	searchTags := pathTags[0].Tags
 
-	var mbid = searchTags.Read(tags.MBReleaseID)
+	var mbid = searchTags.Get(tags.MBReleaseID)
 	if useMBID != "" {
 		mbid = useMBID
 	}
 
 	query := musicbrainz.ReleaseQuery{
 		MBReleaseID:      mbid,
-		MBArtistID:       searchTags.Read(tags.MBArtistID),
-		MBReleaseGroupID: searchTags.Read(tags.MBReleaseGroupID),
-		Release:          searchTags.Read(tags.Album),
-		Artist:           cmp.Or(searchTags.Read(tags.AlbumArtist), searchTags.Read(tags.Artist)),
-		Date:             searchTags.ReadTime(tags.Date),
-		Format:           searchTags.Read(tags.MediaFormat),
-		Label:            searchTags.Read(tags.Label),
-		CatalogueNum:     searchTags.Read(tags.CatalogueNum),
-		Barcode:          searchTags.Read(tags.UPC),
+		MBArtistID:       searchTags.Get(tags.MBArtistID),
+		MBReleaseGroupID: searchTags.Get(tags.MBReleaseGroupID),
+		Release:          searchTags.Get(tags.Album),
+		Artist:           cmp.Or(searchTags.Get(tags.AlbumArtist), searchTags.Get(tags.Artist)),
+		Date:             parseAnyTime(searchTags.Get(tags.Date)),
+		Format:           searchTags.Get(tags.MediaFormat),
+		Label:            searchTags.Get(tags.Label),
+		CatalogueNum:     searchTags.Get(tags.CatalogueNum),
+		Barcode:          searchTags.Get(tags.UPC),
 		NumTracks:        len(pathTags),
 	}
 
@@ -198,19 +199,14 @@ func ProcessDir(
 			return nil, fmt.Errorf("process path %q: %w", filepath.Base(pt.Path), err)
 		}
 
-		destTags := tags.Clone(pt.Tags)
-		tagmap.WriteTo(release, labelInfo, genres, i, &rt, destTags)
-
-		if tags.Equal(pt.Tags, destTags) {
-			continue
-		}
+		destTags := tagmap.ReleaseTags(release, labelInfo, genres, i, &rt)
 
 		if lvl, slog := slog.LevelDebug, slog.Default(); slog.Enabled(ctx, lvl) {
 			logTagChanges(ctx, pt.Path, lvl, pt.Tags, destTags)
 		}
 
 		if !op.IsDryRun() {
-			if err := tags.WriteTags(destPath, destTags); err != nil {
+			if err := tags.ReplaceTags(destPath, destTags); err != nil {
 				return nil, fmt.Errorf("write tag file: %w", err)
 			}
 		}
@@ -309,7 +305,7 @@ func ReadReleaseDir(dirPath string) (string, []PathTags, error) {
 		// then releases that consist only of untitled tracks may get mixed up
 		var haveNum, havePath bool = true, true
 		for _, pt := range pathTags {
-			if haveNum && pt.Read(tags.TrackNumber) == "" {
+			if haveNum && pt.Get(tags.TrackNumber) == "" {
 				haveNum = false
 			}
 			if havePath && !strings.ContainsFunc(filepath.Base(pt.Path), func(r rune) bool { return '0' <= r && r <= '9' }) {
@@ -323,10 +319,10 @@ func ReadReleaseDir(dirPath string) (string, []PathTags, error) {
 
 	slices.SortFunc(pathTags, func(a, b PathTags) int {
 		return cmp.Or(
-			natcmp.Compare(a.Read(tags.DiscNumber), b.Read(tags.DiscNumber)),   // disc mumbers like "1", "2", "disc 1", "disc 10"
-			natcmp.Compare(filepath.Dir(a.Path), filepath.Dir(b.Path)),         // might have disc folders instead of tags
-			natcmp.Compare(a.Read(tags.TrackNumber), b.Read(tags.TrackNumber)), // track numbers, could be "A1" "B1" "1" "10" "100" "1/10" "2/10"
-			natcmp.Compare(a.Path, b.Path),                                     // fallback to paths
+			natcmp.Compare(a.Get(tags.DiscNumber), b.Get(tags.DiscNumber)),   // disc mumbers like "1", "2", "disc 1", "disc 10"
+			natcmp.Compare(filepath.Dir(a.Path), filepath.Dir(b.Path)),       // might have disc folders instead of tags
+			natcmp.Compare(a.Get(tags.TrackNumber), b.Get(tags.TrackNumber)), // track numbers, could be "A1" "B1" "1" "10" "100" "1/10" "2/10"
+			natcmp.Compare(a.Path, b.Path),                                   // fallback to paths
 		)
 	})
 
@@ -682,10 +678,15 @@ func safeRemoveAll(src string, dryRun bool) error {
 	return nil
 }
 
+func parseAnyTime(str string) time.Time {
+	t, _ := dateparse.ParseAny(str)
+	return t
+}
+
 func logTagChanges(ctx context.Context, fileKey string, lvl slog.Level, before, after tags.Tags) {
 	fileKey = filepath.Base(fileKey)
 	for k := range after.Iter() {
-		if before, after := before.ReadMulti(k), after.ReadMulti(k); !slices.Equal(before, after) {
+		if before, after := before.Values(k), after.Values(k); !slices.Equal(before, after) {
 			slog.Log(ctx, lvl, "tag change", "file", fileKey, "key", k, "from", before, "to", after)
 		}
 	}

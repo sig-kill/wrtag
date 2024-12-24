@@ -4,9 +4,10 @@ import (
 	"bytes"
 	_ "embed"
 	"io"
+	"maps"
 	"os"
+	"strconv"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,60 +17,35 @@ func TestTrackNum(t *testing.T) {
 	t.Parallel()
 
 	path := newFile(t, emptyFLAC, ".flac")
-	withf(t, path, func(f Tags) {
-		f.WriteNum(TrackNumber, 69)
+	withf(t, path, func(f *Tags) {
+		f.Set(TrackNumber, strconv.Itoa(69))
 	})
-	withf(t, path, func(f Tags) {
-		f.WriteNum(TrackNumber, 69)
+	withf(t, path, func(f *Tags) {
+		f.Set(TrackNumber, strconv.Itoa(69))
 	})
-	withf(t, path, func(f Tags) {
-		assert.Equal(t, 69, f.ReadNum(TrackNumber))
+	withf(t, path, func(f *Tags) {
+		assert.Equal(t, "69", f.Get(TrackNumber))
 	})
-}
-
-func TestZero(t *testing.T) {
-	t.Parallel()
-
-	check := func(f Tags) {
-		var n int
-		for range f.Iter() {
-			n++
-		}
-		assert.Equal(t, 0, n)
-	}
-
-	for _, tf := range testFiles {
-		t.Run(tf.name, func(t *testing.T) {
-			path := newFile(t, tf.data, tf.ext)
-			withf(t, path, func(f Tags) {
-				f.Write("catalognumber", "")
-				check(f)
-			})
-			withf(t, path, func(f Tags) {
-				check(f)
-			})
-		})
-	}
 }
 
 func TestNormalise(t *testing.T) {
 	t.Parallel()
 
-	raw := map[string][]string{
-		"media":               {"CD"},
-		"trackc":              {"14"},
-		"year":                {"1967"},
-		"album artist credit": {"Steve"},
-	}
-	normalise(raw, alternatives)
+	got := NewTags(
+		"media", "CD",
+		"trackc", "14",
+		"year", "1967",
+		"album artist credit", "Steve",
+	)
 
 	exp := map[string][]string{
-		"media":              {"CD"},
-		"tracknumber":        {"14"},
-		"date":               {"1967"},
-		"albumartist_credit": {"Steve"},
+		"MEDIA":              {"CD"},
+		"TRACKNUMBER":        {"14"},
+		"DATE":               {"1967"},
+		"ALBUMARTIST_CREDIT": {"Steve"},
 	}
-	require.Equal(t, exp, raw)
+
+	require.Equal(t, exp, maps.Collect(got.Iter()))
 }
 
 func TestDoubleSave(t *testing.T) {
@@ -79,46 +55,27 @@ func TestDoubleSave(t *testing.T) {
 	f, err := ReadTags(path)
 	require.NoError(t, err)
 
-	f.Write(Album, "a")
-	require.NoError(t, WriteTags(path, f))
-	f.Write(Album, "b")
-	require.NoError(t, WriteTags(path, f))
-	f.Write(Album, "c")
-	require.NoError(t, WriteTags(path, f))
-}
-
-func TestExtract(t *testing.T) {
-	path := newFile(t, emptyFLAC, ".flac")
-	f, err := ReadTags(path)
-	require.NoError(t, err)
-
-	f.Write("v", "it's -0.244!")
-	require.Equal(t, -0.244, f.ReadFloat("v"))
-
-	f.Write("v", "2010-09-08")
-	require.Equal(t, time.Date(2010, time.September, 8, 0, 0, 0, 0, time.UTC), f.ReadTime("v"))
-
-	f.Write("v", "2/12")
-	require.Equal(t, 2, f.ReadNum("v"))
+	f.Set(Album, "a")
+	require.NoError(t, ReplaceTags(path, f))
+	f.Set(Album, "b")
+	require.NoError(t, ReplaceTags(path, f))
+	f.Set(Album, "c")
+	require.NoError(t, ReplaceTags(path, f))
 }
 
 func TestExtendedTags(t *testing.T) {
 	for _, tf := range testFiles {
 		t.Run(tf.name, func(t *testing.T) {
-			if tf.name == "m4a" {
-				t.Skip("need https://github.com/taglib/taglib/pull/1240")
-			}
-
 			p := newFile(t, tf.data, tf.ext)
-			withf(t, p, func(f Tags) {
-				f.Write(Artist, "1. steely dan")            // standard
-				f.Write(AlbumArtist, "2. steely dan")       // extended
-				f.Write(AlbumArtistCredit, "3. steely dan") // non standard
+			withf(t, p, func(f *Tags) {
+				f.Set(Artist, "1. steely dan")            // standard
+				f.Set(AlbumArtist, "2. steely dan")       // extended
+				f.Set(AlbumArtistCredit, "3. steely dan") // non standard
 			})
-			withf(t, p, func(f Tags) {
-				assert.Equal(t, "1. steely dan", f.Read(Artist))
-				assert.Equal(t, "2. steely dan", f.Read(AlbumArtist))
-				assert.Equal(t, "3. steely dan", f.Read(AlbumArtistCredit))
+			withf(t, p, func(f *Tags) {
+				assert.Equal(t, "1. steely dan", f.Get(Artist))
+				assert.Equal(t, "2. steely dan", f.Get(AlbumArtist))
+				assert.Equal(t, "3. steely dan", f.Get(AlbumArtistCredit))
 			})
 		})
 	}
@@ -158,11 +115,13 @@ func newFile(t *testing.T, data []byte, ext string) string {
 	return f.Name()
 }
 
-func withf(t *testing.T, path string, fn func(Tags)) {
+func withf(t *testing.T, path string, fn func(*Tags)) {
 	t.Helper()
 
-	f, err := ReadTags(path)
+	tags, err := ReadTags(path)
 	require.NoError(t, err)
-	fn(f)
-	require.NoError(t, WriteTags(path, f))
+
+	fn(&tags)
+
+	require.NoError(t, ReplaceTags(path, tags))
 }

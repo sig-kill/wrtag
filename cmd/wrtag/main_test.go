@@ -81,27 +81,24 @@ func mainTag() {
 			if err := ensureAudioFile(p); err != nil {
 				log.Fatalf("ensure flac: %v", err)
 			}
-		}
-
-		t, err := tags.ReadTags(p)
-		if err != nil {
-			log.Fatalf("open tag file: %v", err)
-		}
-
-		for k, vs := range pairs {
-			switch op {
-			case "write":
-				t.Write(k, vs...)
-			case "check":
-				if got := t.ReadMulti(k); !slices.Equal(vs, got) {
+			var t tags.Tags
+			for k, vs := range pairs {
+				t.Set(k, vs...)
+			}
+			if err := tags.WriteTags(p, t); err != nil {
+				log.Fatalf("write tag file: %v", err)
+			}
+		case "check":
+			t, err := tags.ReadTags(p)
+			if err != nil {
+				log.Fatalf("read tags: %v", err)
+			}
+			for k, vs := range pairs {
+				if got := t.Values(k); !slices.Equal(vs, got) {
 					log.Printf("%s exp %q got %q", p, vs, got)
 					exit = 1
 				}
 			}
-		}
-
-		if err := tags.WriteTags(p, t); err != nil {
-			log.Fatalf("write tag file: %v", err)
 		}
 	}
 

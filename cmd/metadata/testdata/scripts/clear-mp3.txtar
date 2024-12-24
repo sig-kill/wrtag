@@ -17,7 +17,7 @@ exec metadata read -- a.mp3
 ! stdout .
 
 -- exp-read --
-a.mp3	a	1
-a.mp3	a	2
-a.mp3	b	3
-a.mp3	b	4
+a.mp3	A	1
+a.mp3	A	2
+a.mp3	B	3
+a.mp3	B	4

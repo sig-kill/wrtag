@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -34,7 +35,7 @@ func (tw TagWeights) For(field string) float64 {
 	return 1
 }
 
-func DiffRelease[T interface{ Read(string) string }](weights TagWeights, release *musicbrainz.Release, tracks []musicbrainz.Track, tagFiles []T) (float64, []Diff) {
+func DiffRelease[T interface{ Get(string) string }](weights TagWeights, release *musicbrainz.Release, tracks []musicbrainz.Track, tagFiles []T) (float64, []Diff) {
 	if len(tracks) == 0 {
 		return 0, nil
 	}
@@ -48,19 +49,19 @@ func DiffRelease[T interface{ Read(string) string }](weights TagWeights, release
 	{
 		tf := tagFiles[0]
 		diffs = append(diffs,
-			diff("release", tf.Read(tags.Album), release.Title),
-			diff("artist", tf.Read(tags.AlbumArtist), musicbrainz.ArtistsString(release.Artists)),
-			diff("label", tf.Read(tags.Label), labelInfo.Label.Name),
-			diff("catalogue num", tf.Read(tags.CatalogueNum), labelInfo.CatalogNumber),
-			diff("upc", tf.Read(tags.UPC), release.Barcode),
-			diff("media format", tf.Read(tags.MediaFormat), release.Media[0].Format),
+			diff("release", tf.Get(tags.Album), release.Title),
+			diff("artist", tf.Get(tags.AlbumArtist), musicbrainz.ArtistsString(release.Artists)),
+			diff("label", tf.Get(tags.Label), labelInfo.Label.Name),
+			diff("catalogue num", tf.Get(tags.CatalogueNum), labelInfo.CatalogNumber),
+			diff("upc", tf.Get(tags.UPC), release.Barcode),
+			diff("media format", tf.Get(tags.MediaFormat), release.Media[0].Format),
 		)
 	}
 
 	for i := range max(len(tagFiles), len(tracks)) {
 		var a, b string
 		if i < len(tagFiles) {
-			a = strings.Join(deleteZero(tagFiles[i].Read(tags.Artist), tagFiles[i].Read(tags.Title)), " – ")
+			a = strings.Join(deleteZero(tagFiles[i].Get(tags.Artist), tagFiles[i].Get(tags.Title)), " – ")
 		}
 		if i < len(tracks) {
 			b = strings.Join(deleteZero(musicbrainz.ArtistsString(tracks[i].Artists), tracks[i].Title), " – ")
@@ -71,12 +72,10 @@ func DiffRelease[T interface{ Read(string) string }](weights TagWeights, release
 	return score, diffs
 }
 
-func WriteTo(
+func ReleaseTags(
 	release *musicbrainz.Release, labelInfo musicbrainz.LabelInfo, genres []musicbrainz.Genre,
-	i int, trk *musicbrainz.Track, t tags.Tags,
-) {
-	t.ClearUnknown()
-
+	i int, trk *musicbrainz.Track,
+) tags.Tags {
 	var genreNames []string
 	for _, g := range genres[:min(6, len(genres))] { // top 6 genre strings
 		genreNames = append(genreNames, g.Name)
@@ -85,36 +84,39 @@ func WriteTo(
 	disambiguationParts := deleteZero(release.ReleaseGroup.Disambiguation, release.Disambiguation)
 	disambiguation := strings.Join(disambiguationParts, ", ")
 
-	t.Write(tags.Album, release.Title)
-	t.Write(tags.AlbumArtist, musicbrainz.ArtistsString(release.Artists))
-	t.Write(tags.AlbumArtists, musicbrainz.ArtistsNames(release.Artists)...)
-	t.Write(tags.AlbumArtistCredit, musicbrainz.ArtistsCreditString(release.Artists))
-	t.Write(tags.AlbumArtistsCredit, musicbrainz.ArtistsCreditNames(release.Artists)...)
-	t.Write(tags.Date, formatDate(release.Date.Time))
-	t.Write(tags.OriginalDate, formatDate(release.ReleaseGroup.FirstReleaseDate.Time))
-	t.Write(tags.MediaFormat, release.Media[0].Format)
-	t.Write(tags.Label, labelInfo.Label.Name)
-	t.Write(tags.CatalogueNum, labelInfo.CatalogNumber)
-	t.Write(tags.UPC, release.Barcode)
-	t.Write(tags.Compilation, formatBool(musicbrainz.IsCompilation(release.ReleaseGroup)))
+	var t tags.Tags
+	t.Set(tags.Album, release.Title)
+	t.Set(tags.AlbumArtist, musicbrainz.ArtistsString(release.Artists))
+	t.Set(tags.AlbumArtists, musicbrainz.ArtistsNames(release.Artists)...)
+	t.Set(tags.AlbumArtistCredit, musicbrainz.ArtistsCreditString(release.Artists))
+	t.Set(tags.AlbumArtistsCredit, musicbrainz.ArtistsCreditNames(release.Artists)...)
+	t.Set(tags.Date, formatDate(release.Date.Time))
+	t.Set(tags.OriginalDate, formatDate(release.ReleaseGroup.FirstReleaseDate.Time))
+	t.Set(tags.MediaFormat, release.Media[0].Format)
+	t.Set(tags.Label, labelInfo.Label.Name)
+	t.Set(tags.CatalogueNum, labelInfo.CatalogNumber)
+	t.Set(tags.UPC, release.Barcode)
+	t.Set(tags.Compilation, formatBool(musicbrainz.IsCompilation(release.ReleaseGroup)))
 
-	t.Write(tags.MBReleaseID, release.ID)
-	t.Write(tags.MBReleaseGroupID, release.ReleaseGroup.ID)
-	t.Write(tags.MBAlbumArtistID, mapFunc(release.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID })...)
-	t.Write(tags.MBAlbumComment, disambiguation)
+	t.Set(tags.MBReleaseID, release.ID)
+	t.Set(tags.MBReleaseGroupID, release.ReleaseGroup.ID)
+	t.Set(tags.MBAlbumArtistID, mapFunc(release.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID })...)
+	t.Set(tags.MBAlbumComment, disambiguation)
 
-	t.Write(tags.Title, trk.Title)
-	t.Write(tags.Artist, musicbrainz.ArtistsString(trk.Artists))
-	t.Write(tags.Artists, musicbrainz.ArtistsNames(trk.Artists)...)
-	t.Write(tags.ArtistCredit, musicbrainz.ArtistsCreditString(trk.Artists))
-	t.Write(tags.ArtistsCredit, musicbrainz.ArtistsCreditNames(trk.Artists)...)
-	t.Write(tags.Genre, cmp.Or(genreNames...))
-	t.Write(tags.Genres, genreNames...)
-	t.WriteNum(tags.TrackNumber, i+1)
-	t.WriteNum(tags.DiscNumber, 1)
+	t.Set(tags.Title, trk.Title)
+	t.Set(tags.Artist, musicbrainz.ArtistsString(trk.Artists))
+	t.Set(tags.Artists, musicbrainz.ArtistsNames(trk.Artists)...)
+	t.Set(tags.ArtistCredit, musicbrainz.ArtistsCreditString(trk.Artists))
+	t.Set(tags.ArtistsCredit, musicbrainz.ArtistsCreditNames(trk.Artists)...)
+	t.Set(tags.Genre, cmp.Or(genreNames...))
+	t.Set(tags.Genres, genreNames...)
+	t.Set(tags.TrackNumber, strconv.Itoa(i+1))
+	t.Set(tags.DiscNumber, strconv.Itoa(1))
 
-	t.Write(tags.MBRecordingID, trk.Recording.ID)
-	t.Write(tags.MBArtistID, mapFunc(trk.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID })...)
+	t.Set(tags.MBRecordingID, trk.Recording.ID)
+	t.Set(tags.MBArtistID, mapFunc(trk.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID })...)
+
+	return t
 }
 
 func Differ(weights TagWeights, score *float64) func(field string, a, b string) Diff {

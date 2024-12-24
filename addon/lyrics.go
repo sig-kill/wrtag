@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -45,19 +44,23 @@ func (l LyricsAddon) ProcessRelease(ctx context.Context, paths []string) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			pathErrs[i] = tags.UpdateTags(path, func(t tags.Tags) {
-				if t.Read(tags.Lyrics) != "" {
-					return
+			pathErrs[i] = func() error {
+				t, err := tags.ReadTags(path)
+				if err != nil {
+					return fmt.Errorf("read first: %w", err)
 				}
-
-				lyricData, err := l.source.Search(ctx, t.Read(tags.ArtistCredit), t.Read(tags.Title))
+				if t.Get(tags.Lyrics) != "" {
+					return nil
+				}
+				lyricData, err := l.source.Search(ctx, t.Get(tags.ArtistCredit), t.Get(tags.Title))
 				if err != nil && !errors.Is(err, lyrics.ErrLyricsNotFound) {
-					slog.ErrorContext(ctx, "fetch lyrics", "path", path, "err", err)
-					return
+					return err
 				}
-
-				t.Write(tags.Lyrics, lyricData)
-			})
+				if err := tags.WriteTags(tags.Lyrics, tags.NewTags(tags.Lyrics, lyricData)); err != nil {
+					return fmt.Errorf("write new lyrics: %w", err)
+				}
+				return nil
+			}()
 		}()
 	}
 

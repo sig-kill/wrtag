@@ -8,6 +8,6 @@ exec metadata read -- a.flac
 cmp stdout exp
 
 -- exp --
-a.flac	x	one two
-a.flac	x	three
-a.flac	y	okay
+a.flac	X	one two
+a.flac	X	three
+a.flac	Y	okay

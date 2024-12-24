@@ -99,22 +99,20 @@ func read(path string, withProperties bool, keys map[string]struct{}) error {
 		return fmt.Errorf("read: %w", err)
 	}
 
-	wantKey := func(k string) bool {
-		if len(keys) == 0 {
-			return true
+	if len(keys) == 0 {
+		for k, vs := range t.Iter() {
+			for _, v := range vs {
+				fmt.Printf("%s\t%s\t%s\n", path, k, v)
+			}
 		}
-		_, want := keys[k]
-		return want
+	} else {
+		for k := range keys {
+			for _, v := range t.Values(k) {
+				fmt.Printf("%s\t%s\t%s\n", path, tags.NormKey(k), v)
+			}
+		}
 	}
 
-	for k, vs := range t.Iter() {
-		if !wantKey(k) {
-			continue
-		}
-		for _, v := range vs {
-			fmt.Printf("%s\t%s\t%s\n", path, k, v)
-		}
-	}
 	if !withProperties {
 		return nil
 	}
@@ -124,45 +122,54 @@ func read(path string, withProperties bool, keys map[string]struct{}) error {
 		return err
 	}
 
-	if k := "length"; wantKey(k) {
+	wantProperty := func(k string) bool {
+		if len(keys) == 0 {
+			return true
+		}
+		_, want := keys[k]
+		return want
+	}
+
+	if k := "length"; wantProperty(k) {
 		fmt.Printf("%s\t%s\t%s\n", path, k, formatDuration(properties.Length))
 	}
-	if k := "bitrate"; wantKey(k) {
+	if k := "bitrate"; wantProperty(k) {
 		fmt.Printf("%s\t%s\t%d\n", path, k, properties.Bitrate)
 	}
-	if k := "sample_rate"; wantKey(k) {
+	if k := "sample_rate"; wantProperty(k) {
 		fmt.Printf("%s\t%s\t%d\n", path, k, properties.SampleRate)
 	}
-	if k := "channels"; wantKey(k) {
+	if k := "channels"; wantProperty(k) {
 		fmt.Printf("%s\t%s\t%d\n", path, k, properties.Channels)
 	}
+
 	return nil
 }
 
 func write(path string, keyValues map[string][]string) error {
-	err := tags.UpdateTags(path, func(t tags.Tags) {
-		for k, vs := range keyValues {
-			t.Write(k, vs...)
-		}
-	})
-	if err != nil {
+	var t tags.Tags
+	for k, vs := range keyValues {
+		t.Set(k, vs...)
+	}
+	if err := tags.WriteTags(path, t); err != nil {
 		return fmt.Errorf("save: %w", err)
 	}
 	return nil
 }
 
 func clear(path string, keys map[string]struct{}) error {
-	err := tags.UpdateTags(path, func(t tags.Tags) {
-		if len(keys) == 0 {
-			t.ClearAll()
-			return
+	if len(keys) == 0 {
+		if err := tags.ReplaceTags(path, tags.Tags{}); err != nil {
+			return err
 		}
-		for k := range keys {
-			t.Clear(k)
-		}
-	})
-	if err != nil {
-		return fmt.Errorf("save: %w", err)
+		return nil
+	}
+	var t tags.Tags
+	for k := range keys {
+		t.Set(k)
+	}
+	if err := tags.WriteTags(path, t); err != nil {
+		return err
 	}
 	return nil
 }
