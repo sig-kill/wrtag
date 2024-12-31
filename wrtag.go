@@ -300,7 +300,7 @@ func ReadReleaseDir(dirPath string) (string, []PathTags, error) {
 		}
 	}
 
-	{
+	if len(pathTags) >= 2 {
 		// validate that we have track numbers, or track numbers in filenames to sort on. if we don't any
 		// then releases that consist only of untitled tracks may get mixed up
 		var haveNum, havePath bool = true, true
