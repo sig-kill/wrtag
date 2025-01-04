@@ -205,10 +205,16 @@ func ProcessDir(
 			logTagChanges(ctx, pt.Path, lvl, pt.Tags, destTags)
 		}
 
-		if !op.IsDryRun() {
-			if err := tags.ReplaceTags(destPath, destTags); err != nil {
-				return nil, fmt.Errorf("write tag file: %w", err)
-			}
+		if op.IsDryRun() {
+			continue
+		}
+		if tags.Equal(pt.Tags, destTags) {
+			// try avoid more io if we can
+			continue
+		}
+
+		if err := tags.ReplaceTags(destPath, destTags); err != nil {
+			return nil, fmt.Errorf("write tag file: %w", err)
 		}
 	}
 

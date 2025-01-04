@@ -123,6 +123,10 @@ func (t Tags) Values(key string) []string {
 	return t.t[NormKey(key)]
 }
 
+func Equal(a, b Tags) bool {
+	return maps.EqualFunc(a.t, b.t, slices.Equal)
+}
+
 func NormKey(k string) string {
 	k = strings.ToUpper(k)
 	if nk, ok := alternatives[k]; ok {
