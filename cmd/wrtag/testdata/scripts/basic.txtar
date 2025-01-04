@@ -70,6 +70,17 @@ cmp stdout exp-layout
 
 cmp 'albums/Jeff Mills/(1997) Kat Moda/01.03 Alarms.flac' tr-1-copy
 
+# move again to the same dir should be a no-op, with debug logging and check no tag changes
+env WRTAG_LOG_LEVEL=debug
+
+exec wrtag move 'albums/Jeff Mills/(1997) Kat Moda/'
+stderr 'score=100.00%'
+stderr 'level=DEBUG msg=response.*status=200' # make sure we have debug output
+
+! stderr 'level=DEBUG msg=\"tag change\".*key=COMPILATION'              # didn't change
+! stderr 'level=DEBUG msg=\"tag change\".*key=MUSICBRAINZ_ALBUMCOMMENT' # didn't change
+! stderr 'level=DEBUG msg=\"tag change\".*key=UPC'                      # didn't change
+
 -- exp-layout --
 albums
 albums/Jeff Mills

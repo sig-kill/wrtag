@@ -61,10 +61,10 @@ func DiffRelease[T interface{ Get(string) string }](weights TagWeights, release 
 	for i := range max(len(tagFiles), len(tracks)) {
 		var a, b string
 		if i < len(tagFiles) {
-			a = strings.Join(deleteZero(tagFiles[i].Get(tags.Artist), tagFiles[i].Get(tags.Title)), " – ")
+			a = strings.Join(trim(tagFiles[i].Get(tags.Artist), tagFiles[i].Get(tags.Title)), " – ")
 		}
 		if i < len(tracks) {
-			b = strings.Join(deleteZero(musicbrainz.ArtistsString(tracks[i].Artists), tracks[i].Title), " – ")
+			b = strings.Join(trim(musicbrainz.ArtistsString(tracks[i].Artists), tracks[i].Title), " – ")
 		}
 		diffs = append(diffs, diff(fmt.Sprintf("track %d", i+1), a, b))
 	}
@@ -81,40 +81,40 @@ func ReleaseTags(
 		genreNames = append(genreNames, g.Name)
 	}
 
-	disambiguationParts := deleteZero(release.ReleaseGroup.Disambiguation, release.Disambiguation)
+	disambiguationParts := trim(release.ReleaseGroup.Disambiguation, release.Disambiguation)
 	disambiguation := strings.Join(disambiguationParts, ", ")
 
 	var t tags.Tags
-	t.Set(tags.Album, release.Title)
-	t.Set(tags.AlbumArtist, musicbrainz.ArtistsString(release.Artists))
-	t.Set(tags.AlbumArtists, musicbrainz.ArtistsNames(release.Artists)...)
-	t.Set(tags.AlbumArtistCredit, musicbrainz.ArtistsCreditString(release.Artists))
-	t.Set(tags.AlbumArtistsCredit, musicbrainz.ArtistsCreditNames(release.Artists)...)
-	t.Set(tags.Date, formatDate(release.Date.Time))
-	t.Set(tags.OriginalDate, formatDate(release.ReleaseGroup.FirstReleaseDate.Time))
-	t.Set(tags.MediaFormat, release.Media[0].Format)
-	t.Set(tags.Label, labelInfo.Label.Name)
-	t.Set(tags.CatalogueNum, labelInfo.CatalogNumber)
-	t.Set(tags.UPC, release.Barcode)
-	t.Set(tags.Compilation, formatBool(musicbrainz.IsCompilation(release.ReleaseGroup)))
+	t.Set(tags.Album, trim(release.Title)...)
+	t.Set(tags.AlbumArtist, trim(musicbrainz.ArtistsString(release.Artists))...)
+	t.Set(tags.AlbumArtists, trim(musicbrainz.ArtistsNames(release.Artists)...)...)
+	t.Set(tags.AlbumArtistCredit, trim(musicbrainz.ArtistsCreditString(release.Artists))...)
+	t.Set(tags.AlbumArtistsCredit, trim(musicbrainz.ArtistsCreditNames(release.Artists)...)...)
+	t.Set(tags.Date, trim(formatDate(release.Date.Time))...)
+	t.Set(tags.OriginalDate, trim(formatDate(release.ReleaseGroup.FirstReleaseDate.Time))...)
+	t.Set(tags.MediaFormat, trim(release.Media[0].Format)...)
+	t.Set(tags.Label, trim(labelInfo.Label.Name)...)
+	t.Set(tags.CatalogueNum, trim(labelInfo.CatalogNumber)...)
+	t.Set(tags.UPC, trim(release.Barcode)...)
+	t.Set(tags.Compilation, trim(formatBool(musicbrainz.IsCompilation(release.ReleaseGroup)))...)
 
-	t.Set(tags.MBReleaseID, release.ID)
-	t.Set(tags.MBReleaseGroupID, release.ReleaseGroup.ID)
-	t.Set(tags.MBAlbumArtistID, mapFunc(release.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID })...)
-	t.Set(tags.MBAlbumComment, disambiguation)
+	t.Set(tags.MBReleaseID, trim(release.ID)...)
+	t.Set(tags.MBReleaseGroupID, trim(release.ReleaseGroup.ID)...)
+	t.Set(tags.MBAlbumArtistID, trim(mapFunc(release.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID })...)...)
+	t.Set(tags.MBAlbumComment, trim(disambiguation)...)
 
-	t.Set(tags.Title, trk.Title)
-	t.Set(tags.Artist, musicbrainz.ArtistsString(trk.Artists))
-	t.Set(tags.Artists, musicbrainz.ArtistsNames(trk.Artists)...)
-	t.Set(tags.ArtistCredit, musicbrainz.ArtistsCreditString(trk.Artists))
-	t.Set(tags.ArtistsCredit, musicbrainz.ArtistsCreditNames(trk.Artists)...)
-	t.Set(tags.Genre, cmp.Or(genreNames...))
-	t.Set(tags.Genres, genreNames...)
-	t.Set(tags.TrackNumber, strconv.Itoa(i+1))
-	t.Set(tags.DiscNumber, strconv.Itoa(1))
+	t.Set(tags.Title, trim(trk.Title)...)
+	t.Set(tags.Artist, trim(musicbrainz.ArtistsString(trk.Artists))...)
+	t.Set(tags.Artists, trim(musicbrainz.ArtistsNames(trk.Artists)...)...)
+	t.Set(tags.ArtistCredit, trim(musicbrainz.ArtistsCreditString(trk.Artists))...)
+	t.Set(tags.ArtistsCredit, trim(musicbrainz.ArtistsCreditNames(trk.Artists)...)...)
+	t.Set(tags.Genre, trim(cmp.Or(genreNames...))...)
+	t.Set(tags.Genres, trim(genreNames...)...)
+	t.Set(tags.TrackNumber, trim(strconv.Itoa(i+1))...)
+	t.Set(tags.DiscNumber, trim(strconv.Itoa(1))...)
 
-	t.Set(tags.MBRecordingID, trk.Recording.ID)
-	t.Set(tags.MBArtistID, mapFunc(trk.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID })...)
+	t.Set(tags.MBRecordingID, trim(trk.Recording.ID)...)
+	t.Set(tags.MBArtistID, trim(mapFunc(trk.Artists, func(_ int, v musicbrainz.ArtistCredit) string { return v.Artist.ID })...)...)
 
 	return t
 }
@@ -191,7 +191,7 @@ func filterFunc[T any](elms []T, f func(T) bool) []T {
 	return res
 }
 
-func deleteZero[T comparable](elms ...T) []T {
+func trim[T comparable](elms ...T) []T {
 	var zero T
 	return slices.DeleteFunc(elms, func(t T) bool { return t == zero })
 }
