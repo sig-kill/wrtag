@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.0](https://www.github.com/sentriz/wrtag/compare/v0.6.1...v0.7.0) (2025-01-04)
+
+
+### Features
+
+* **wrtag:** avoid more IO when no tag changes ([b4da400](https://www.github.com/sentriz/wrtag/commit/b4da4000fa4c597cf4fd1bd5c9771260bcb953ca))
+
+
+### Bug Fixes
+
+* **tagmap:** normalise empty vs null tags ([676d640](https://www.github.com/sentriz/wrtag/commit/676d6404176cb4708a8c85d9a912005fb18550c1))
+* **wrtag:** don't wipe unknown metadata ([1a9f99e](https://www.github.com/sentriz/wrtag/commit/1a9f99ea3a0c267323bcd7ef3b90b9a3d5950779))
+
 ### [0.6.1](https://www.github.com/sentriz/wrtag/compare/v0.6.0...v0.6.1) (2024-12-11)
 
 
