@@ -36,15 +36,15 @@ func TestMain(m *testing.M) {
 	os.Setenv("WRTAG_CAA_BASE_URL", "file:///testdata/responses/coverartarchive")
 	os.Setenv("WRTAG_CAA_RATE_LIMIT", "0")
 
-	os.Exit(testscript.RunMain(m, map[string]func() int{
-		"wrtag":    func() int { main(); return 0 },
-		"tag":      func() int { mainTag(); return 0 },
-		"find":     func() int { mainFind(); return 0 },
-		"touch":    func() int { mainTouch(); return 0 },
-		"mime":     func() int { mainMIME(); return 0 },
-		"mod-time": func() int { mainModTime(); return 0 },
-		"rand":     func() int { mainRand(); return 0 },
-	}))
+	testscript.Main(m, map[string]func(){
+		"wrtag":    main,
+		"tag":      mainTag,
+		"find":     mainFind,
+		"touch":    mainTouch,
+		"mime":     mainMIME,
+		"mod-time": mainModTime,
+		"rand":     mainRand,
+	})
 }
 
 func TestScripts(t *testing.T) {

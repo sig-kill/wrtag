@@ -14,10 +14,10 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	os.Exit(testscript.RunMain(m, map[string]func() int{
-		"metadata":           func() int { main(); return 0 },
-		"create-audio-files": func() int { mainCreateAudioFiles(); return 0 },
-	}))
+	testscript.Main(m, map[string]func(){
+		"metadata":           main,
+		"create-audio-files": mainCreateAudioFiles,
+	})
 }
 
 func TestScripts(t *testing.T) {
