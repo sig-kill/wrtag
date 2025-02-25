@@ -9,10 +9,10 @@ require (
 	github.com/containrrr/shoutrrr v0.8.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
-	github.com/ncruces/go-sqlite3 v0.23.0
+	github.com/ncruces/go-sqlite3 v0.23.3
 	github.com/r3labs/sse/v2 v2.10.0
 	github.com/rainycape/unidecode v0.0.0-20150907023854-cb7f23ec59be
-	github.com/rogpeppe/go-internal v1.13.2-0.20241226121412-a5dc8ff20d0a
+	github.com/rogpeppe/go-internal v1.14.1
 	github.com/sergi/go-diff v1.3.1
 	github.com/stretchr/testify v1.10.0
 	go.senan.xyz/flagconf v0.1.9
@@ -36,7 +36,7 @@ require (
 	github.com/ncruces/julianday v1.0.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/tetratelabs/wazero v1.8.2 // indirect
+	github.com/tetratelabs/wazero v1.9.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/tools v0.30.0 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
