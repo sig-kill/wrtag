@@ -344,12 +344,7 @@ func ArtistsCreditString(credits []ArtistCredit) string {
 }
 
 func IsCompilation(rg ReleaseGroup) bool {
-	for _, st := range rg.SecondaryTypes {
-		if st == Compilation {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(rg.SecondaryTypes, Compilation)
 }
 
 func FlatTracks(media []Media) []Track {
