@@ -343,8 +343,20 @@ func ArtistsCreditString(credits []ArtistCredit) string {
 	return sb.String()
 }
 
+// https://musicbrainz.org/artist/89ad4ac3-39f7-470e-963a-56509c5463
+// https://musicbrainz.org/tag/special%20purpose
+const variousArtistsMBID = "89ad4ac3-39f7-470e-963a-56509c546377"
+
 func IsCompilation(rg ReleaseGroup) bool {
-	return slices.Contains(rg.SecondaryTypes, Compilation)
+	if hasComp := slices.Contains(rg.SecondaryTypes, Compilation); hasComp {
+		return true
+	}
+	if hasVA := slices.ContainsFunc(rg.Artists, func(ac ArtistCredit) bool {
+		return ac.Artist.ID == variousArtistsMBID
+	}); hasVA {
+		return true
+	}
+	return false
 }
 
 func FlatTracks(media []Media) []Track {
