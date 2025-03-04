@@ -1,0 +1,9 @@
+#!/usr/bin/env fish
+
+begin
+    echo "|CLI argument|Environment variable|Config file key|Description|"
+    echo "|---|---|---|---|"
+    untree | sed -nE "s/(Options|Usage of [a-z]+): \-([^ ]+)( \w+)?\t\s+(.*)/\2\t\4/p" | sed "s@$XDG_CONFIG_HOME@\$XDG_CONFIG_HOME@g" | while read key desc
+        printf "|-%s|WRTAG_%s|%s|%s|\n" "$key" (echo "$key" | tr "[:lower:]-" "[:upper:]_") "$key" "$desc"
+    end
+end | prettier --parser markdown

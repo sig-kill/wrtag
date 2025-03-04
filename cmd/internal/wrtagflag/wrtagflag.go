@@ -64,20 +64,20 @@ func Parse() {
 func Config() *wrtag.Config {
 	var cfg wrtag.Config
 
-	flag.Var(&pathFormatParser{&cfg.PathFormat}, "path-format", "music directory and go templated path format to define music library layout")
-	flag.Var(&addonsParser{&cfg.Addons}, "addon", "add some extra metadata when importing tracks")
+	flag.Var(&pathFormatParser{&cfg.PathFormat}, "path-format", "path to root music directory including path format rules (see [path format](#path-format))")
+	flag.Var(&addonsParser{&cfg.Addons}, "addon", "define an addon for extra metadata writing (see [addons](#addons)) (stackable)")
 
 	cfg.KeepFiles = map[string]struct{}{}
-	flag.Var(&keepFileParser{cfg.KeepFiles}, "keep-file", "files to keep from source directories")
+	flag.Var(&keepFileParser{cfg.KeepFiles}, "keep-file", "define an extra file path to kept when moving/copying to root dir (stackable)")
 
 	cfg.TagWeights = tagmap.TagWeights{}
-	flag.Var(&tagWeightsParser{cfg.TagWeights}, "tag-weight", "adjust distance weighting for a tag between. 0 to ignore")
+	flag.Var(&tagWeightsParser{cfg.TagWeights}, "tag-weight", "adjust distance weighting for a tag (0 to ignore) (stackable)")
 
-	flag.StringVar(&cfg.MusicBrainzClient.BaseURL, "mb-base-url", `https://musicbrainz.org/ws/2/`, "musicbrainz base url")
-	flag.DurationVar(&cfg.MusicBrainzClient.RateLimit, "mb-rate-limit", 1*time.Second, "musicbrainz rate limit duration")
+	flag.StringVar(&cfg.MusicBrainzClient.BaseURL, "mb-base-url", `https://musicbrainz.org/ws/2/`, "MusicBrainz base URL")
+	flag.DurationVar(&cfg.MusicBrainzClient.RateLimit, "mb-rate-limit", 1*time.Second, "MusicBrainz rate limit duration")
 
-	flag.StringVar(&cfg.CoverArtArchiveClient.BaseURL, "caa-base-url", `https://coverartarchive.org/`, "coverartarchive base url")
-	flag.DurationVar(&cfg.CoverArtArchiveClient.RateLimit, "caa-rate-limit", 0, "coverartarchive rate limit duration")
+	flag.StringVar(&cfg.CoverArtArchiveClient.BaseURL, "caa-base-url", `https://coverartarchive.org/`, "CoverArtArchive base URL")
+	flag.DurationVar(&cfg.CoverArtArchiveClient.RateLimit, "caa-rate-limit", 0, "CoverArtArchive rate limit duration")
 
 	flag.BoolVar(&cfg.UpgradeCover, "cover-upgrade", false, "fetch new cover art even if it exists locally")
 
@@ -86,13 +86,13 @@ func Config() *wrtag.Config {
 
 func Notifications() *notifications.Notifications {
 	var n notifications.Notifications
-	flag.Var(&notificationsParser{&n}, "notification-uri", "add a shoutrrr notification uri for an event")
+	flag.Var(&notificationsParser{&n}, "notification-uri", "add a shoutrrr notification uri for an event (see [notifications](#notifications)) (stackable)")
 	return &n
 }
 
 func ResearchLinks() *researchlink.Builder {
 	var r researchlink.Builder
-	flag.Var(&researchLinkParser{&r}, "research-link", "define a helper url to help find information about an unmatched release")
+	flag.Var(&researchLinkParser{&r}, "research-link", "define a helper url to help find information about an unmatched release (stackable)")
 	return &r
 }
 
