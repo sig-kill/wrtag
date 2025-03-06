@@ -39,10 +39,10 @@ func Parse() {
 	}
 
 	defaultConfigPath := filepath.Join(userConfig, wrtag.Name, "config")
-	configPath := flag.String("config-path", defaultConfigPath, "path config file")
+	configPath := flag.String("config-path", defaultConfigPath, "Path to config file")
 
-	printVersion := flag.Bool("version", false, "print the version")
-	printConfig := flag.Bool("config", false, "print the parsed config")
+	printVersion := flag.Bool("version", false, "Print the version and exit")
+	printConfig := flag.Bool("config", false, "Print the parsed config and exit")
 
 	flag.Parse()
 	flagconf.ReadEnvPrefix = func(_ *flag.FlagSet) string { return wrtag.Name }
@@ -64,14 +64,14 @@ func Parse() {
 func Config() *wrtag.Config {
 	var cfg wrtag.Config
 
-	flag.Var(&pathFormatParser{&cfg.PathFormat}, "path-format", "path to root music directory including path format rules (see [path format](#path-format))")
-	flag.Var(&addonsParser{&cfg.Addons}, "addon", "define an addon for extra metadata writing (see [addons](#addons)) (stackable)")
+	flag.Var(&pathFormatParser{&cfg.PathFormat}, "path-format", "Path to root music directory including path format rules (see [Path format](#path-format))")
+	flag.Var(&addonsParser{&cfg.Addons}, "addon", "Define an addon for extra metadata writing (see [Addons](#addons)) (stackable)")
 
 	cfg.KeepFiles = map[string]struct{}{}
-	flag.Var(&keepFileParser{cfg.KeepFiles}, "keep-file", "define an extra file path to kept when moving/copying to root dir (stackable)")
+	flag.Var(&keepFileParser{cfg.KeepFiles}, "keep-file", "Define an extra file path to kept when moving/copying to root dir (stackable)")
 
 	cfg.TagWeights = tagmap.TagWeights{}
-	flag.Var(&tagWeightsParser{cfg.TagWeights}, "tag-weight", "adjust distance weighting for a tag (0 to ignore) (stackable)")
+	flag.Var(&tagWeightsParser{cfg.TagWeights}, "tag-weight", "Adjust distance weighting for a tag (0 to ignore) (stackable)")
 
 	flag.StringVar(&cfg.MusicBrainzClient.BaseURL, "mb-base-url", `https://musicbrainz.org/ws/2/`, "MusicBrainz base URL")
 	flag.DurationVar(&cfg.MusicBrainzClient.RateLimit, "mb-rate-limit", 1*time.Second, "MusicBrainz rate limit duration")
@@ -79,20 +79,20 @@ func Config() *wrtag.Config {
 	flag.StringVar(&cfg.CoverArtArchiveClient.BaseURL, "caa-base-url", `https://coverartarchive.org/`, "CoverArtArchive base URL")
 	flag.DurationVar(&cfg.CoverArtArchiveClient.RateLimit, "caa-rate-limit", 0, "CoverArtArchive rate limit duration")
 
-	flag.BoolVar(&cfg.UpgradeCover, "cover-upgrade", false, "fetch new cover art even if it exists locally")
+	flag.BoolVar(&cfg.UpgradeCover, "cover-upgrade", false, "Fetch new cover art even if it exists locally")
 
 	return &cfg
 }
 
 func Notifications() *notifications.Notifications {
 	var n notifications.Notifications
-	flag.Var(&notificationsParser{&n}, "notification-uri", "add a shoutrrr notification uri for an event (see [notifications](#notifications)) (stackable)")
+	flag.Var(&notificationsParser{&n}, "notification-uri", "Add a shoutrrr notification URI for an event (see [Notifications](#notifications)) (stackable)")
 	return &n
 }
 
 func ResearchLinks() *researchlink.Builder {
 	var r researchlink.Builder
-	flag.Var(&researchLinkParser{&r}, "research-link", "define a helper url to help find information about an unmatched release (stackable)")
+	flag.Var(&researchLinkParser{&r}, "research-link", "Define a helper URL to help find information about an unmatched release (stackable)")
 	return &r
 }
 
@@ -132,7 +132,7 @@ func (r researchLinkParser) String() string {
 		return ""
 	}
 	var names []string
-	for s, _ := range r.Builder.IterSources() {
+	for s := range r.Builder.IterSources() {
 		names = append(names, s)
 	}
 	return strings.Join(names, ", ")

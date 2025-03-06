@@ -69,9 +69,9 @@ func main() {
 	case "move", "copy":
 		flag := flag.NewFlagSet(command, flag.ExitOnError)
 		var (
-			yes     = flag.Bool("yes", false, "use the found release anyway despite a low score")
-			useMBID = flag.String("mbid", "", "overwrite matched mbid")
-			dryRun  = flag.Bool("dry-run", false, "dry run")
+			yes     = flag.Bool("yes", false, "Use the found release anyway despite a low score")
+			useMBID = flag.String("mbid", "", "Overwrite matched mbid")
+			dryRun  = flag.Bool("dry-run", false, "Do a dry run of imports")
 		)
 		flag.Parse(args)
 
@@ -104,10 +104,10 @@ func main() {
 	case "sync":
 		flag := flag.NewFlagSet(command, flag.ExitOnError)
 		var (
-			ageYounger = flag.Duration("age-younger", 0, "min duration a release should be left unsynced")
-			ageOlder   = flag.Duration("age-older", 0, "max duration a release should be left unsynced")
-			dryRun     = flag.Bool("dry-run", false, "do a dry run of imports")
-			numWorkers = flag.Int("num-workers", runtime.NumCPU(), "number of directories to process concurrently")
+			ageYounger = flag.Duration("age-younger", 0, "Minimum duration a release should be left unsynced")
+			ageOlder   = flag.Duration("age-older", 0, "Maximum duration a release should be left unsynced")
+			dryRun     = flag.Bool("dry-run", false, "Do a dry run of imports")
+			numWorkers = flag.Int("num-workers", runtime.NumCPU(), "Number of directories to process concurrently")
 		)
 		flag.Parse(args)
 

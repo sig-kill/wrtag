@@ -63,7 +63,7 @@ func main() {
 	case "read":
 		flag := flag.NewFlagSet(command, flag.ExitOnError)
 		var (
-			withProperties = flag.Bool("properties", false, "read file properties like length and bitrate")
+			withProperties = flag.Bool("properties", false, "Read file properties like length and bitrate")
 		)
 		flag.Parse(args)
 
