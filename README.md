@@ -34,6 +34,9 @@ To describe the general workflow:
      - [Config file](#config-file)
 4. [Installation](#installation)
 5. [Addons](#addons)
+   - [Lyrics](#lyrics)
+   - [ReplayGain](#replaygain)
+   - [Subprocess](#subprocess)
 6. [Notifications](#notifications)
 7. [Path format](#path-format)
 8. [Goals and non-goals](#goals-and-non-goals)
@@ -267,7 +270,7 @@ For stackable (repeatable) arguments, provide the same key multiple times. For e
 
 ```
 addon replaygain
-addon lyrics genius musicbrainz
+addon lyrics genius musixmatch
 ```
 
 See the [example config](./config.example) for more.
@@ -280,11 +283,61 @@ See the [example config](./config.example) for more.
 
 # Addons
 
-> TODO
+Addons can be used to fetch/compute additional metadata after the MusicBrainz match has been applied and the files have been tagged.
+
+They are configured as part of the [global configuration](#global-configuration) using a [config format](#format).
+
+For example:
+
+- `$ wrtag -addon "lyrics a b c" -addon "replaygain x y z"`
+- `$ WRTAG_ADDON="lyrics a b c,replaygain" wrtag`
+- or repeating the `addon` clause in the config file
+
+## Lyrics
+
+The `lyrics` addon can fetch and embed lyric information from [Genius](https://genius.com/) and [Musixmatch](https://www.musixmatch.com/) in your tracks.
+
+The format of the addon config is `lyrics <source>...` where source is one of `genius` or `musixmatch`. For example `"lyrics genius musixmatch"`. Note, sources will be tried in the order they are specified.
+
+## ReplayGain
+
+The `replaygain` addon computes and adds [ReplayGain 2.0](https://wiki.hydrogenaud.io/index.php?title=ReplayGain_2.0_specification) information to your files. Great for normalising the perceived loudness of audio in your tracks.
+
+The format of the addon config is `replaygain <opts>...` where opts can be `true-peak` and `force`. If the force option is passed, ReplayGain information is recomputed even if it’s already present in the files.
+
+## Subprocess
+
+The subprocess addon is for running a user provided program.
+
+The format of the addon config is `subproc <path> <args>...`, where `path` is the path to the program, or the program name itself if it’s in your `$PATH`. `args` are extra command line arguments to pass the program. One of the `args` should be a special placeholder named `<files>`. This will be expanded to the paths to the files that were just processed by wrtag.
+
+For example, the addon `"subproc my-program a --b 'c d' <files>"` might call `my-program` with arguments `["a", "--b", "c d", "track 1.flac", "track 2.flac", "track 3.flac"]` after importing a release with 3 tracks.
 
 # Notifications
 
-> TODO
+Notifications can be used to notify you or another system of events such as importing or syncing. For example sending an email when user input is needed to import a release. Or notifying your [music server](https://github.com/sentriz/gonic) after a sync has completed.
+
+The possible events are:
+
+| Tool       | Name            | Description                                    |
+| ---------- | --------------- | ---------------------------------------------- |
+| `wrtagweb` | `complete`      | Executed when a release is imported            |
+| `wrtagweb` | `needs-input`   | Executed when a release requires input         |
+| `wrtag`    | `sync-complete` | Executed when a sync has completed             |
+| `wrtag`    | `sync-error`    | Executed when a sync has completed with errors |
+
+wrtag uses [shoutrrr](https://github.com/containrrr/shoutrrr) to provide upstream notifications over SMTP, HTTP, etc.
+
+For example:
+
+- `smtp://username:password@host:port/?from=from@example.com&to=recipient@example.com`
+- `generic+https://my.subsonic.com/rest/startScan.view?c=wrtag&v=1.16&u=user&p=password`
+
+See [the shoutrrr documentation](https://containrrr.dev/shoutrrr/v0.8/services/overview/) for the list of providers.
+
+Notifications are configured as part of the [global configuration](#global-configuration). The format is `<eventspec> <shoutrrr uri>`. `eventspec` is a comma separated list of event names.
+
+For example `"complete,sync-complete smtp://example.com"`. Multiple eventspec and URIs and be configured by stacking the config option according to the [config format](#format).
 
 # Path format
 
