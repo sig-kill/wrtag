@@ -21,7 +21,6 @@ To describe the general workflow:
    - [Tool `wrtag`](#tool-wrtag)
      - [Importing new music](#importing-new-music)
      - [Re-tagging already imported music](#re-tagging-already-imported-music)
-     - [Re-tagging in bulk](#re-tagging-in-bulk)
    - [Tool `wrtagweb`](#tool-wrtagweb)
      - [API](#api)
      - [Configuration](#configuration)
@@ -91,7 +90,9 @@ $ wrtag copy -mbid "abc" -yes    # overwrite matched MusicBrainz release UUID ev
 
 ### Re-tagging already imported music
 
-Re-tagging your music can be useful for a few reasons. For example, if your path-format configuration has changed, or the metadata in the MusicBrainz database has changed.
+Re-tagging your music can be useful for a few reasons. For example, if your [path-format](#path-format) configuration has changed, or the metadata in the MusicBrainz database has changed.
+
+#### Re-tagging a single release
 
 Since a `move` operation always cleans up the source directory - and is smart about the music already being in place - a re-tag is just a move pointed at some music that is already in place:
 
@@ -101,7 +102,7 @@ $ wrtag move "/my/music/Tame Impala/(2010) Innerspeaker"
 # now has updated tags, and moved again if needed
 ```
 
-### Re-tagging in bulk
+#### Re-tagging in bulk
 
 Bulk operations are done with the `sync` subcommand. Unlike the `copy` and `move` commands which operate on single releases, the `sync` command works on your already imported and tagged library.
 
