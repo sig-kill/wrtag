@@ -34,6 +34,10 @@ To describe the general workflow:
      - [Environment variables](#environment-variables)
      - [Config file](#config-file)
 5. [Path format](#path-format)
+   - [Basic structure](#basic-structure)
+   - [Available template data](#available-template-data)
+   - [Helper functions](#helper-functions)
+   - [Example formats](#example-formats)
 6. [Addons](#addons)
    - [Addon Lyrics](#addon-lyrics)
    - [Addon ReplayGain](#addon-replaygain)
@@ -289,7 +293,110 @@ See the [example config](./config.example) for more.
 
 # Path format
 
-> TODO
+The `path-format` configuration option defines both the root music directory and the template for organizing your music files. This template uses Go's text/template syntax and is populated with MusicBrainz release data.
+
+## Basic structure
+
+In order to minimise potential release conflict, the path format should include at least three path segments:
+
+1. The root music directory (where all your music will be stored).
+2. Artist/release organization (typically artist name and album details).
+3. Track naming format (including track numbers and titles).
+
+For example:
+
+```
+path-format /music/library/{{ <some artist format> }}/({{ <some release format> }}/{{ <track format> }}
+```
+
+This could format a release like:
+
+```
+/music/library/Tame Impala/(2010) Innerspeaker/01. It Is Not Meant to Be.flac
+/music/library/Tame Impala/(2010) Innerspeaker/02. Desire Be Desire Go.flac
+/music/library/Tame Impala/(2010) Innerspeaker/03. Alter Ego.flac
+...
+```
+
+On Windows, you can use drive letters and backslashes:
+
+```
+path-format C:\User\John\Music\{{ <some artist format> }}\({{ <some release format> }}\{{ <track format> }}
+```
+
+## Available template data
+
+The template has access to the following data:
+
+- `.Release` - The full MusicBrainz release object (see [`type Release struct {`](https://github.com/sentriz/wrtag/blob/master/musicbrainz/musicbrainz.go))
+- `.Track` - The current track being processed (see [`type Track struct {`](https://github.com/sentriz/wrtag/blob/master/musicbrainz/musicbrainz.go))
+- `.TrackNum` - The track number (integer)
+- `.IsCompilation` - Boolean indicating if this is a compilation album
+- `.Ext` - The file extension including the dot (e.g., ".flac")
+
+## Helper functions
+
+Several helper functions are available to format your paths:
+
+| Function              | Description                            | Example                                       |
+| --------------------- | -------------------------------------- | --------------------------------------------- |
+| `join`                | Joins strings with a delimiter         | `{{ artists .Release.Artists \| join "; " }}` |
+| `pad0`                | Zero-pads a number to specified width  | `{{ pad0 2 .TrackNum }}` → "01"               |
+| `sort`                | Sorts a string array                   | `{{ artists .Release.Artists \| sort }}`      |
+| `safepath`            | Makes a string safe for filesystem use | `{{ .Track.Title \| safepath }}`              |
+| `flatTracks`          | Flattens tracks from all media         | `{{ flatTracks .Release.Media \| len }}`      |
+| `artists`             | Gets artist names from artist credits  | `{{ artists .Release.Artists }}`              |
+| `artistsString`       | Formats artists as a string            | `{{ artistsString .Track.Artists }}`          |
+| `artistsCredit`       | Gets credit names from artist credits  | `{{ artistsCredit .Release.Artists }}`        |
+| `artistsCreditString` | Formats artist credits as a string     | `{{ artistsCreditString .Release.Artists }}`  |
+| `disambig`            | Gets disambiguation text for a release | `{{ disambig .Release }}`                     |
+
+## Example formats
+
+### The recommended format
+
+Including multi album artist support, release group year, release group and release disambiguations, track numbers, total track numbers, artist names the release is a compilation album
+
+```
+/music/{{ artists .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}{{ if not (eq (disambig .Release) "") }} ({{ disambig .Release | safepath }}){{ end }}/{{ pad0 2 .TrackNum }}.{{ flatTracks .Release.Media | len | pad0 2 }} {{ if .IsCompilation }}{{ artistsString .Track.Artists | safepath }} - {{ end }}{{ .Track.Title | safepath }}{{ .Ext }}
+```
+
+### A basic format
+
+```
+/music/{{ artists .Release.Artists | join "; " | safepath }}/{{ .Release.Title | safepath }}/{{ pad0 2 .TrackNum }} {{ .Track.Title | safepath }}{{ .Ext }}
+```
+
+### With year and disambiguation
+
+```
+/music/{{ artists .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}{{ if not (eq (disambig .Release) "") }} ({{ disambig .Release | safepath }}){{ end }}/{{ pad0 2 .TrackNum }} {{ .Track.Title | safepath }}{{ .Ext }}
+```
+
+### With compilation handling
+
+```
+/music/{{ artists .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}/{{ pad0 2 .TrackNum }} {{ if .IsCompilation }}{{ artistsString .Track.Artists | safepath }} - {{ end }}{{ .Track.Title | safepath }}{{ .Ext }}
+```
+
+### With disc and track numbers
+
+```
+/music/{{ artists .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}/{{ pad0 2 .TrackNum }}.{{ flatTracks .Release.Media | len | pad0 2 }} {{ .Track.Title | safepath }}{{ .Ext }}
+```
+
+## Validation
+
+The path format is validated to ensure:
+
+1. It contains at least three path segments
+2. Different tracks from the same release get different paths
+3. Tracks with the same name from different releases get different paths
+4. No paths end with a trailing slash or contain double slashes
+
+This validation helps prevent file conflicts and ensures a consistent library structure.
+
+The path format is validated to ensure:
 
 # Addons
 
