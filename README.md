@@ -354,7 +354,7 @@ In addition to what's provided by Go [text/template](https://pkg.go.dev/text/tem
 ## Example formats
 
 > [!NOTE]
-> If you need help with creating custom path formats, please see the provided playground [here](https://go.dev/play/p/0x29MbxFT8a)
+> If you need help with creating custom path formats, please see the provided playground [here](https://go.dev/play/p/hbmSFWoq81G)
 
 ### The recommended format
 
