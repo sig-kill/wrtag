@@ -353,6 +353,9 @@ Several helper functions are available to format your paths:
 
 ## Example formats
 
+> [!NOTE]
+> If you need help with creating custom path formats, please see the provided playground [here](https://go.dev/play/p/0x29MbxFT8a)
+
 ### The recommended format
 
 Including multi album artist support, release group year, release group and release disambiguations, track numbers, total track numbers, artist names the release is a compilation album
