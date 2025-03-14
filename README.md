@@ -388,19 +388,6 @@ Including multi album artist support, release group year, release group and rele
 /music/{{ artists .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}/{{ pad0 2 .TrackNum }}.{{ len .Tracks | pad0 2 }} {{ .Track.Title | safepath }}{{ .Ext }}
 ```
 
-## Validation
-
-The path format is validated to ensure:
-
-1. It contains at least three path segments
-2. Different tracks from the same release get different paths
-3. Tracks with the same name from different releases get different paths
-4. No paths end with a trailing slash or contain double slashes
-
-This validation helps prevent file conflicts and ensures a consistent library structure.
-
-The path format is validated to ensure:
-
 # Addons
 
 Addons can be used to fetch/compute additional metadata after the MusicBrainz match has been applied and the files have been tagged.
