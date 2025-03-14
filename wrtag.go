@@ -167,7 +167,6 @@ func ProcessDir(
 
 	labelInfo := musicbrainz.AnyLabelInfo(release)
 	genres := musicbrainz.AnyGenres(release)
-	isCompilation := musicbrainz.IsCompilation(release.ReleaseGroup)
 
 	// lock both source and destination directories
 	unlock := lockPaths(
@@ -177,11 +176,8 @@ func ProcessDir(
 
 	// calculate new paths
 	destPaths := make([]string, 0, len(pathTags))
-	for i := range len(pathTags) {
-		pt, rt := pathTags[i], releaseTracks[i]
-
-		pathFormatData := pathformat.Data{Release: release, Track: &rt, TrackNum: i + 1, Ext: strings.ToLower(filepath.Ext(pt.Path)), IsCompilation: isCompilation}
-		destPath, err := cfg.PathFormat.Execute(pathFormatData)
+	for i, pt := range pathTags {
+		destPath, err := cfg.PathFormat.Execute(release, i, strings.ToLower(filepath.Ext(pt.Path)))
 		if err != nil {
 			return nil, fmt.Errorf("create path: %w", err)
 		}
@@ -336,8 +332,7 @@ func ReadReleaseDir(dirPath string) (string, []PathTags, error) {
 }
 
 func DestDir(pathFormat *pathformat.Format, release *musicbrainz.Release) (string, error) {
-	dummyTrack := &musicbrainz.Track{Title: "track"}
-	path, err := pathFormat.Execute(pathformat.Data{Release: release, Track: dummyTrack, TrackNum: 1, Ext: ".eg"})
+	path, err := pathFormat.Execute(release, 0, ".eg")
 	if err != nil {
 		return "", fmt.Errorf("create path: %w", err)
 	}

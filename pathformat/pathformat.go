@@ -18,14 +18,6 @@ var ErrBadData = errors.New("bad data")
 
 const delimL, delimR = "{{", "}}"
 
-type Data struct {
-	Release       *musicbrainz.Release
-	Track         *musicbrainz.Track
-	TrackNum      int
-	IsCompilation bool
-	Ext           string
-}
-
 type Format struct {
 	tt   texttemplate.Template
 	root string
@@ -63,17 +55,38 @@ func (pf *Format) Root() string {
 	return pf.root
 }
 
-func (pf *Format) Execute(data Data) (string, error) {
+func (pf *Format) Execute(release *musicbrainz.Release, index int, ext string) (string, error) {
 	if len(pf.tt.Templates()) == 0 {
 		return "", fmt.Errorf("not initialised yet")
 	}
 
+	flatTracks := musicbrainz.FlatTracks(release.Media)
+
+	var d Data
+	d.Release = *release
+	d.Index = index
+	d.Ext = ext
+	d.Track = flatTracks[index]
+	d.Tracks = flatTracks
+	d.TrackNum = index + 1
+	d.IsCompilation = musicbrainz.IsCompilation(release.ReleaseGroup)
+	{
+		var parts []string
+		if release.ReleaseGroup.Disambiguation != "" {
+			parts = append(parts, release.ReleaseGroup.Disambiguation)
+		}
+		if release.Disambiguation != "" {
+			parts = append(parts, release.Disambiguation)
+		}
+		d.ReleaseDisambiguation = strings.Join(parts, ", ")
+	}
+
 	// make sure these are not used
-	data.Track.Number = ""
-	data.Track.Position = -1
+	d.Track.Number = ""
+	d.Track.Position = -1
 
 	var buff strings.Builder
-	if err := pf.tt.Execute(&buff, data); err != nil {
+	if err := pf.tt.Execute(&buff, d); err != nil {
 		return "", fmt.Errorf("create path: %w", err)
 	}
 	destPath := buff.String()
@@ -88,22 +101,39 @@ func (pf *Format) Execute(data Data) (string, error) {
 	return destPath, nil
 }
 
+type Data struct {
+	Release               musicbrainz.Release
+	ReleaseDisambiguation string
+	Index                 int
+	Ext                   string
+	Track                 musicbrainz.Track
+	Tracks                []musicbrainz.Track
+	TrackNum              int
+	IsCompilation         bool
+}
+
 func validate(f Format) error {
-	release := func(artist, name string) *musicbrainz.Release {
+	release := func(artist, name string, tracks ...string) *musicbrainz.Release {
 		var release musicbrainz.Release
 		release.Title = name
 		release.Artists = append(release.Artists, musicbrainz.ArtistCredit{Name: artist, Artist: musicbrainz.Artist{Name: artist}})
+
+		var media musicbrainz.Media
+		for _, t := range tracks {
+			media.Tracks = append(media.Tracks, musicbrainz.Track{
+				Title: t,
+			})
+			media.TrackCount++
+		}
+		release.Media = append(release.Media, media)
 		return &release
 	}
-	track := func(title string) *musicbrainz.Track {
-		return &musicbrainz.Track{Title: title}
-	}
-	compare := func(d1, d2 Data) (bool, error) {
-		path1, err := f.Execute(d1)
+	compare := func(r1 *musicbrainz.Release, i1 int, r2 *musicbrainz.Release, i2 int) (bool, error) {
+		path1, err := f.Execute(r1, i1, "")
 		if err != nil {
 			return false, fmt.Errorf("execute data 1: %w", err)
 		}
-		path2, err := f.Execute(d2)
+		path2, err := f.Execute(r2, i2, "")
 		if err != nil {
 			return false, fmt.Errorf("execute data 2: %w", err)
 		}
@@ -111,8 +141,8 @@ func validate(f Format) error {
 	}
 
 	eq, err := compare(
-		Data{release("ar", "release-same"), track("track 1"), 1, false, ""},
-		Data{release("ar", "release-same"), track("track 2"), 2, false, ""},
+		release("ar", "release-same", "track 1", "track 1"), 0,
+		release("ar", "release-same", "track 2", "track 2"), 1,
 	)
 	if err != nil {
 		return err
@@ -122,8 +152,8 @@ func validate(f Format) error {
 	}
 
 	eq, err = compare(
-		Data{release("ar", "release 1"), track("track-same"), 1, false, ""},
-		Data{release("ar", "release 2"), track("track-same"), 1, false, ""},
+		release("ar", "release 1", "track same"), 0,
+		release("ar", "release 2", "track same"), 0,
 	)
 	if err != nil {
 		return err
@@ -140,21 +170,8 @@ var funcMap = texttemplate.FuncMap{
 	"sort":     func(strings []string) []string { sort.Strings(strings); return strings },
 	"safepath": func(p string) string { return fileutil.SafePath(p) },
 
-	"flatTracks": musicbrainz.FlatTracks,
-
 	"artists":             musicbrainz.ArtistsNames,
 	"artistsString":       musicbrainz.ArtistsString,
 	"artistsCredit":       musicbrainz.ArtistsCreditNames,
 	"artistsCreditString": musicbrainz.ArtistsCreditString,
-
-	"disambig": func(r musicbrainz.Release) string {
-		var parts []string
-		if r.ReleaseGroup.Disambiguation != "" {
-			parts = append(parts, r.ReleaseGroup.Disambiguation)
-		}
-		if r.Disambiguation != "" {
-			parts = append(parts, r.Disambiguation)
-		}
-		return strings.Join(parts, ", ")
-	},
 }

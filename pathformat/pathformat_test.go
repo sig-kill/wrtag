@@ -14,7 +14,7 @@ func TestValidation(t *testing.T) {
 	t.Parallel()
 
 	var pf pathformat.Format
-	_, err := pf.Execute(pathformat.Data{})
+	_, err := pf.Execute(nil, 0, "")
 	assert.Error(t, err) // we didn't initalise with Parse() yet
 
 	// bad/ambiguous format
@@ -41,12 +41,12 @@ func TestPathFormat(t *testing.T) {
 	t.Parallel()
 
 	var pf pathformat.Format
-	require.NoError(t, pf.Parse(`/music/albums/{{ artists .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}{{ if not (eq (disambig .Release) "") }} ({{ disambig .Release | safepath }}){{ end }}/{{ pad0 2 .TrackNum }}.{{ flatTracks .Release.Media | len | pad0 2 }} {{ .Track.Title | safepath }}{{ .Ext }}`))
+	require.NoError(t, pf.Parse(`/music/albums/{{ artists .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}{{ if not (eq .ReleaseDisambiguation "") }} ({{ .ReleaseDisambiguation | safepath }}){{ end }}/{{ pad0 2 .TrackNum }}.{{ len .Tracks | pad0 2 }} {{ .Track.Title | safepath }}{{ .Ext }}`))
 
 	track := musicbrainz.Track{
 		Title: "Sharon's Tone",
 	}
-	release := musicbrainz.Release{
+	release := &musicbrainz.Release{
 		Title: "Valvable",
 		ReleaseGroup: musicbrainz.ReleaseGroup{
 			FirstReleaseDate: musicbrainz.AnyTime{Time: time.Date(2019, time.January, 0, 0, 0, 0, 0, time.UTC)},
@@ -66,13 +66,13 @@ func TestPathFormat(t *testing.T) {
 		}},
 	}
 
-	path, err := pf.Execute(pathformat.Data{Release: &release, Track: &track, TrackNum: 1, Ext: ".flac"})
+	path, err := pf.Execute(release, 0, ".flac")
 	require.NoError(t, err)
 	assert.Equal(t, `/music/albums/Luke Vibert/(2018) Valvable/01.01 Sharon's Tone.flac`, path)
 
 	release.ReleaseGroup.Disambiguation = "Deluxe Edition"
 
-	path, err = pf.Execute(pathformat.Data{Release: &release, Track: &track, TrackNum: 1, Ext: ".flac"})
+	path, err = pf.Execute(release, 0, ".flac")
 	require.NoError(t, err)
 	assert.Equal(t, `/music/albums/Luke Vibert/(2018) Valvable (Deluxe Edition)/01.01 Sharon's Tone.flac`, path)
 }

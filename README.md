@@ -330,13 +330,15 @@ The template has access to the following data:
 
 - `.Release` - The full MusicBrainz release object (see [`type Release struct {`](https://github.com/sentriz/wrtag/blob/master/musicbrainz/musicbrainz.go))
 - `.Track` - The current track being processed (see [`type Track struct {`](https://github.com/sentriz/wrtag/blob/master/musicbrainz/musicbrainz.go))
-- `.TrackNum` - The track number (integer)
+- `.TrackNum` - The track number (integer, starting at 1)
+- `.Tracks` - The list of tracks in the release
+- `.ReleaseDisambiguation` - A string for release and release group disambiguation
 - `.IsCompilation` - Boolean indicating if this is a compilation album
-- `.Ext` - The file extension including the dot (e.g., ".flac")
+- `.Ext` - The file extension for the current track, including the dot (e.g., ".flac")
 
 ## Helper functions
 
-Several helper functions are available to format your paths:
+In addition to what's provided by Go [text/template](https://pkg.go.dev/text/template), several helper functions are available to format your paths:
 
 | Function              | Description                            | Example                                       |
 | --------------------- | -------------------------------------- | --------------------------------------------- |
@@ -344,12 +346,10 @@ Several helper functions are available to format your paths:
 | `pad0`                | Zero-pads a number to specified width  | `{{ pad0 2 .TrackNum }}` → "01"               |
 | `sort`                | Sorts a string array                   | `{{ artists .Release.Artists \| sort }}`      |
 | `safepath`            | Makes a string safe for filesystem use | `{{ .Track.Title \| safepath }}`              |
-| `flatTracks`          | Flattens tracks from all media         | `{{ flatTracks .Release.Media \| len }}`      |
 | `artists`             | Gets artist names from artist credits  | `{{ artists .Release.Artists }}`              |
 | `artistsString`       | Formats artists as a string            | `{{ artistsString .Track.Artists }}`          |
 | `artistsCredit`       | Gets credit names from artist credits  | `{{ artistsCredit .Release.Artists }}`        |
 | `artistsCreditString` | Formats artist credits as a string     | `{{ artistsCreditString .Release.Artists }}`  |
-| `disambig`            | Gets disambiguation text for a release | `{{ disambig .Release }}`                     |
 
 ## Example formats
 
@@ -361,7 +361,7 @@ Several helper functions are available to format your paths:
 Including multi album artist support, release group year, release group and release disambiguations, track numbers, total track numbers, artist names the release is a compilation album
 
 ```
-/music/{{ artists .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}{{ if not (eq (disambig .Release) "") }} ({{ disambig .Release | safepath }}){{ end }}/{{ pad0 2 .TrackNum }}.{{ flatTracks .Release.Media | len | pad0 2 }} {{ if .IsCompilation }}{{ artistsString .Track.Artists | safepath }} - {{ end }}{{ .Track.Title | safepath }}{{ .Ext }}
+/music/{{ artists .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}{{ if not (eq .ReleaseDisambiguation "") }} ({{ .ReleaseDisambiguation | safepath }}){{ end }}/{{ pad0 2 .TrackNum }}.{{ len .Tracks | pad0 2 }} {{ if .IsCompilation }}{{ artistsString .Track.Artists | safepath }} - {{ end }}{{ .Track.Title | safepath }}{{ .Ext }}
 ```
 
 ### A basic format
@@ -373,7 +373,7 @@ Including multi album artist support, release group year, release group and rele
 ### With year and disambiguation
 
 ```
-/music/{{ artists .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}{{ if not (eq (disambig .Release) "") }} ({{ disambig .Release | safepath }}){{ end }}/{{ pad0 2 .TrackNum }} {{ .Track.Title | safepath }}{{ .Ext }}
+/music/{{ artists .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}{{ if not (eq .ReleaseDisambiguation "") }} ({{ .ReleaseDisambiguation | safepath }}){{ end }}/{{ pad0 2 .TrackNum }} {{ .Track.Title | safepath }}{{ .Ext }}
 ```
 
 ### With compilation handling
@@ -385,7 +385,7 @@ Including multi album artist support, release group year, release group and rele
 ### With disc and track numbers
 
 ```
-/music/{{ artists .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}/{{ pad0 2 .TrackNum }}.{{ flatTracks .Release.Media | len | pad0 2 }} {{ .Track.Title | safepath }}{{ .Ext }}
+/music/{{ artists .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}/{{ pad0 2 .TrackNum }}.{{ len .Tracks | pad0 2 }} {{ .Track.Title | safepath }}{{ .Ext }}
 ```
 
 ## Validation
