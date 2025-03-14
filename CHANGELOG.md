@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.8.0](https://www.github.com/sentriz/wrtag/compare/v0.7.0...v0.8.0) (2025-03-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* **pathformat:** tidy up keys
+
+### Features
+
+* **musicbrainz:** compilation if VA or compilation secondary types ([c38bc59](https://www.github.com/sentriz/wrtag/commit/c38bc5906b15ed191f99895c2a7d6e403b980e63))
+
+
+### Code Refactoring
+
+* **pathformat:** tidy up keys ([58ea3a8](https://www.github.com/sentriz/wrtag/commit/58ea3a810fd98856c68d53d591a9970c561c6fbd)), closes [#80](https://www.github.com/sentriz/wrtag/issues/80)
+
 ## [0.7.0](https://www.github.com/sentriz/wrtag/compare/v0.6.1...v0.7.0) (2025-01-04)
 
 
