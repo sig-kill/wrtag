@@ -310,7 +310,17 @@ Environment variables are prefixed with `WRTAG_` usually. For example, `WRTAG_LO
 
 ### Config file
 
-The config file can be used instead of CLI arguments or environment variables. The format follows ([flagconf](https://pkg.go.dev/go.senan.xyz/flagconf?utm_source=godoc#hdr-usage)), which works like:
+The config file can be used instead of CLI arguments or environment variables, but can be overwritten with the `-config-path` CLI argument or `WRTAG_CONFIG_PATH` environment variable.
+
+Note the default config file locations:
+
+| OS      | Path                                             |
+| ------- | ------------------------------------------------ |
+| Linux   | `$XDG_CONFIG_HOME/wrtag/config`                  |
+| Windows | `%AppData%\wrtag\config`                         |
+| macOS   | `$HOME/Library/Application Support/wrtag/config` |
+
+The format follows ([flagconf](https://pkg.go.dev/go.senan.xyz/flagconf?utm_source=godoc#hdr-usage)), which looks something like:
 
 ```
 some-key argument
