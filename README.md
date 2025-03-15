@@ -146,7 +146,10 @@ flowchart LR
 
 Jobs are added to the queue with an HTTP request like `POST <wrtag.host>/op/<copy|move>` with form value `path=<absolute path to directory>`. The form value can be an `application/x-www-form-urlencoded` form body, or URL query parameter.
 
-Authentication is via HTTP basic auth password, configured by `web-api-key`.
+Authentication is done via HTTP a basic auth password (without a username), and is configured by `web-api-key`.
+
+> [!WARNING]
+> HTTP Basic Authentication is only as secure as the transport layer it runs on. Make sure `wrtagweb` is secured using TLS behind your reverse proxy.
 
 <details>
 <summary><b>Example with <i>cURL</i></b></summary>
@@ -265,9 +268,42 @@ For more, see `metadata -h` and `metadata read -h`
 
 # Installation
 
-- You can find static/portable binaries (wrtag, wrtagweb, metadata) on the [releases page](https://github.com/sentriz/wrtag/releases) for Windows, macOS, and Linux.
-- Docker images for many architectures are available on [Docker Hub](https://hub.docker.com/r/sentriz/wrtag). The Docker image by default starts `wrtagweb`, but has the `wrtag` tools included too.
-- To install from source, install a recent [Go](https://go.dev/) toolchain, clone the repo, and run `go install ./cmd/...` from inside.
+## Download a release
+
+You can find static/portable binaries (wrtag, wrtagweb, metadata) on the [releases page](https://github.com/sentriz/wrtag/releases) for Windows, macOS, and Linux.
+
+## Build from source
+
+To install from source, install a recent [Go](https://go.dev/) toolchain, clone the repo, and run `go install ./cmd/...` from inside.
+
+## Using Docker
+
+Docker images for many architectures are available on [Docker Hub](https://hub.docker.com/r/sentriz/wrtag) and [GitHub](https://github.com/sentriz/wrtag/pkgs/container/wrtag). The Docker image by default starts `wrtagweb`, but has the `wrtag` tools included too.
+
+If you're using Docker Compose and `wrtagweb`, you can use this `compose.yml` to get started:
+
+```yaml
+services:
+  wrtag:
+    image: sentriz/wrtag
+    environment:
+      - WRTAG_WEB_API_KEY= # change this
+      - WRTAG_WEB_LISTEN_ADDR=:80
+      - WRTAG_WEB_PUBLIC_URL=https://wrtag.example.com
+      - WRTAG_WEB_DB_PATH=/data/wrtag.db
+      - WRTAG_LOG_LEVEL=debug
+      # add more config options, like mentioned in the docs above
+      # - WRTAG_PATH_FORMAT=...
+      # - WRTAG_ADDON=...,...
+      # - WRTAG_RESEARCH_LINK=...,...
+      # or, use the config file if you use wrtag outside the container. make sure to add it to `volumes:` too
+      # - WRTAG_CONFIG_PATH=/config
+    expose:
+      - 80
+    volumes:
+      - ./data:/data # for the wrtagweb job queue DB
+      - /path/to/music:/path/to/music
+```
 
 # Global configuration
 
