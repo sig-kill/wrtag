@@ -276,6 +276,8 @@ You can find static/portable binaries (wrtag, wrtagweb, metadata) on the [releas
 
 To install from source, install a recent [Go](https://go.dev/) toolchain, clone the repo, and run `go install ./cmd/...` from inside.
 
+For packagers, CGO is _not_ required, so you can build with `CGO_ENABLED=0` to produce a static binary.
+
 ## Using Docker
 
 Docker images for many architectures are available on [Docker Hub](https://hub.docker.com/r/sentriz/wrtag) and [GitHub](https://github.com/sentriz/wrtag/pkgs/container/wrtag). The Docker image by default starts `wrtagweb`, but has the `wrtag` tools included too.
