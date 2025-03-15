@@ -215,7 +215,7 @@ Configuration for `wrtagweb` works the same as [Global configuration](#global-co
 
 ### Options
 
-<!-- gen with `go run ./cmd/wrtagweb -h 2>&1 | ./gen-docs | wl-copy` -->
+<!-- gen with ```go run ./cmd/wrtagweb -h 2>&1 | ./gen-docs | wl-copy``` -->
 
 | CLI argument     | Environment variable  | Config file key | Description                                                  |
 | ---------------- | --------------------- | --------------- | ------------------------------------------------------------ |
@@ -226,7 +226,42 @@ Configuration for `wrtagweb` works the same as [Global configuration](#global-co
 
 ## Tool `metadata`
 
-> TODO
+<img align="right" width="300" src=".github/screenshot-metadata.png">
+
+The metadata tool is a standalone helper program for reading and writing track metadata. It can write multiple tags (each with multiple values) to multiple files in a single invocation.
+
+Since it uses the same tag normalisation as `wrtag` itself, it works well with the `subproc` addon. This allows for custom metadata read and write after the main release process has completed.
+
+### Usage
+
+```console
+  $ metadata [<options>] read  <tag>... -- <path>...
+  $ metadata [<options>] write ( <tag> <value>... , )... -- <path>...
+  $ metadata [<options>] clear <tag>... -- <path>...
+
+  # <tag> is an audio metadata tag key
+  # <value> is an audio metadata tag value
+  # <path> is path(s) to audio files, dir(s) to find audio files in, or "-" for list audio file paths from stdin
+```
+
+### Examples
+
+```console
+  $ metadata read -- a.flac b.flac c.flac
+  $ metadata read artist title -- a.flac
+  $ metadata read -properties -- a.flac
+  $ metadata read -properties title length -- a.flac
+  $ metadata write album "album name" -- x.flac
+  $ metadata write artist "Sensient" , genres "psy" "minimal" "techno" -- dir/*.flac
+  $ metadata write artist "Sensient" , genres "psy" "minimal" "techno" -- dir/
+  $ metadata clear -- a.flac
+  $ metadata clear lyrics artist_credit -- *.flac
+  $ find x/ -type f | metadata write artist "Sensient" b -
+  $ find y/ -type f | metadata read artist title -
+  $ find y/ -type f -name "*extended*" | metadata read -properties length -
+```
+
+For more, see `metadata -h` and `metadata read -h`
 
 # Installation
 
@@ -240,7 +275,7 @@ Global configuration is used by all tools. Any option can be provided with a CLI
 
 ### Options
 
-<!-- gen with `go run ./cmd/wrtag -h 2>&1 | ./gen-docs | wl-copy` -->
+<!-- gen with ```go run ./cmd/wrtag -h 2>&1 | ./gen-docs | wl-copy``` -->
 
 | CLI argument      | Environment variable   | Config file key  | Description                                                                                    |
 | ----------------- | ---------------------- | ---------------- | ---------------------------------------------------------------------------------------------- |
@@ -250,8 +285,8 @@ Global configuration is used by all tools. Any option can be provided with a CLI
 | -config           | WRTAG_CONFIG           | config           | Print the parsed config and exit                                                               |
 | -config-path      | WRTAG_CONFIG_PATH      | config-path      | Path to config file (default "$XDG_CONFIG_HOME/wrtag/config")                                  |
 | -cover-upgrade    | WRTAG_COVER_UPGRADE    | cover-upgrade    | Fetch new cover art even if it exists locally                                                  |
-| -keep-file        | WRTAG_KEEP_FILE        | keep-file        | Define an extra file path to kept when moving/copying to root dir (stackable)                  |
-| -log-level        | WRTAG_LOG_LEVEL        | log-level        | set the logging level (default INFO)                                                           |
+| -keep-file        | WRTAG_KEEP_FILE        | keep-file        | Define an extra file path to keep when moving/copying to root dir (stackable)                  |
+| -log-level        | WRTAG_LOG_LEVEL        | log-level        | Set the logging level (default INFO)                                                           |
 | -mb-base-url      | WRTAG_MB_BASE_URL      | mb-base-url      | MusicBrainz base URL (default "<https://musicbrainz.org/ws/2/>")                               |
 | -mb-rate-limit    | WRTAG_MB_RATE_LIMIT    | mb-rate-limit    | MusicBrainz rate limit duration (default 1s)                                                   |
 | -notification-uri | WRTAG_NOTIFICATION_URI | notification-uri | Add a shoutrrr notification URI for an event (see [Notifications](#notifications)) (stackable) |
@@ -293,14 +328,14 @@ See the [example config](./config.example) for more.
 
 # Path format
 
-The `path-format` configuration option defines both the root music directory and the template for organizing your music files. This template uses Go's text/template syntax and is populated with MusicBrainz release data.
+The `path-format` configuration option defines both the root music directory and the template for organising your music files. This template uses Go's text/template syntax and is populated with MusicBrainz release data.
 
 ## Basic structure
 
 In order to minimise potential release conflict, the path format should include at least three path segments:
 
 1. The root music directory (where all your music will be stored).
-2. Artist/release organization (typically artist name and album details).
+2. Artist/release organisation (typically artist name and album details).
 3. Track naming format (including track numbers and titles).
 
 For example:
@@ -358,7 +393,7 @@ In addition to what's provided by Go [text/template](https://pkg.go.dev/text/tem
 
 ### The recommended format
 
-Including multi album artist support, release group year, release group and release disambiguations, track numbers, total track numbers, artist names the release is a compilation album
+Including multi-album artist support, release group year, release group and release disambiguations, track numbers, total track numbers, artist names if the release is a compilation album:
 
 ```
 /music/{{ artists .Release.Artists | sort | join "; " | safepath }}/({{ .Release.ReleaseGroup.FirstReleaseDate.Year }}) {{ .Release.Title | safepath }}{{ if not (eq .ReleaseDisambiguation "") }} ({{ .ReleaseDisambiguation | safepath }}){{ end }}/{{ pad0 2 .TrackNum }}.{{ len .Tracks | pad0 2 }} {{ if .IsCompilation }}{{ artistsString .Track.Artists | safepath }} - {{ end }}{{ .Track.Title | safepath }}{{ .Ext }}

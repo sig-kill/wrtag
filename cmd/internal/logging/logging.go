@@ -10,7 +10,7 @@ import (
 
 func Logging() (exit func()) {
 	var logLevel slog.LevelVar
-	flag.TextVar(&logLevel, "log-level", &logLevel, "set the logging level")
+	flag.TextVar(&logLevel, "log-level", &logLevel, "Set the logging level")
 
 	h := &slogErrorHandler{
 		Handler: slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: &logLevel}),
