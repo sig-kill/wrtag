@@ -56,7 +56,7 @@ func (l LyricsAddon) ProcessRelease(ctx context.Context, paths []string) error {
 				if err != nil && !errors.Is(err, lyrics.ErrLyricsNotFound) {
 					return err
 				}
-				if err := tags.WriteTags(tags.Lyrics, tags.NewTags(tags.Lyrics, lyricData)); err != nil {
+				if err := tags.WriteTags(path, tags.NewTags(tags.Lyrics, lyricData)); err != nil {
 					return fmt.Errorf("write new lyrics: %w", err)
 				}
 				return nil
