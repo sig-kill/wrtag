@@ -1,5 +1,12 @@
 # Changelog
 
+### [0.8.1](https://www.github.com/sentriz/wrtag/compare/v0.8.0...v0.8.1) (2025-03-16)
+
+
+### Bug Fixes
+
+* **lyrics:** write to file not lyrics string ([47d83a4](https://www.github.com/sentriz/wrtag/commit/47d83a42b7b74d96b9c22b2c078d90766df19957)), closes [#81](https://www.github.com/sentriz/wrtag/issues/81)
+
 ## [0.8.0](https://www.github.com/sentriz/wrtag/compare/v0.7.0...v0.8.0) (2025-03-14)
 
 
