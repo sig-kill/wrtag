@@ -52,7 +52,7 @@ func (c *MBClient) request(ctx context.Context, r *http.Request, dest any) error
 func (c *MBClient) GetRelease(ctx context.Context, mbid string) (*Release, error) {
 	urlV := url.Values{}
 	urlV.Set("fmt", "json")
-	urlV.Set("inc", "recordings+artist-credits+labels+release-groups+genres")
+	urlV.Set("inc", "recordings+artist-credits+labels+release-groups+genres+aliases")
 
 	url, _ := url.Parse(joinPath(c.BaseURL, "release", mbid))
 	url.RawQuery = urlV.Encode()
@@ -175,6 +175,7 @@ type Artist struct {
 	Type           string  `json:"type"`
 	Genres         []Genre `json:"genres"`
 	Disambiguation string  `json:"disambiguation"`
+	Aliases        []Alias `json:"aliases"`
 }
 
 type Genre struct {
@@ -182,6 +183,18 @@ type Genre struct {
 	Name           string `json:"name"`
 	Disambiguation string `json:"disambiguation"`
 	Count          int    `json:"count"`
+}
+
+type Alias struct {
+	Locale   string `json:"locale"`
+	Primary  bool   `json:"primary"`
+	Ended    bool   `json:"ended"`
+	Type     string `json:"type"`
+	TypeID   string `json:"type-id"`
+	Begin    any    `json:"begin"`
+	Name     string `json:"name"`
+	End      any    `json:"end"`
+	SortName string `json:"sort-name"`
 }
 
 type Track struct {
@@ -320,10 +333,29 @@ func ArtistsNames(credits []ArtistCredit) []string {
 	}
 	return r
 }
+
 func ArtistsString(credits []ArtistCredit) string {
 	var sb strings.Builder
 	for _, c := range credits {
-		fmt.Fprintf(&sb, "%s%s", c.Artist.Name, c.JoinPhrase)
+		sb.WriteString(c.Artist.Name)
+		sb.WriteString(c.JoinPhrase)
+	}
+	return sb.String()
+}
+
+func ArtistsEnNames(credits []ArtistCredit) []string {
+	var r []string
+	for _, c := range credits {
+		r = append(r, artistEnName(c.Artist))
+	}
+	return r
+}
+
+func ArtistsEnString(credits []ArtistCredit) string {
+	var sb strings.Builder
+	for _, c := range credits {
+		sb.WriteString(artistEnName(c.Artist))
+		sb.WriteString(c.JoinPhrase)
 	}
 	return sb.String()
 }
@@ -335,12 +367,25 @@ func ArtistsCreditNames(credits []ArtistCredit) []string {
 	}
 	return r
 }
+
 func ArtistsCreditString(credits []ArtistCredit) string {
 	var sb strings.Builder
 	for _, c := range credits {
-		fmt.Fprintf(&sb, "%s%s", c.Name, c.JoinPhrase)
+		sb.WriteString(c.Name)
+		sb.WriteString(c.JoinPhrase)
 	}
 	return sb.String()
+}
+
+const enLocale = "en"
+
+func artistEnName(artist Artist) string {
+	for _, a := range artist.Aliases {
+		if a.Locale == enLocale {
+			return a.Name
+		}
+	}
+	return artist.Name
 }
 
 // https://musicbrainz.org/artist/89ad4ac3-39f7-470e-963a-56509c5463

@@ -1,0 +1,24 @@
+env WRTAG_PATH_FORMAT='albums/{{ artistsEnString .Release.Artists }}/{{ .Release.Title }}/{{ .Track.Title }}{{ .Ext }}'
+
+exec tag write ship_scope/1.flac
+exec tag write ship_scope/2.flac
+exec tag write ship_scope/3.flac
+exec tag write ship_scope/4.flac
+
+exec tag write ship_scope/*.flac musicbrainz_albumid '21a03203-91a4-4948-ae1e-2d0977f1bdbc'
+
+exec wrtag move -yes ship_scope
+
+exec find albums
+
+# `artistsEnString` should have moved the files to  "Shinichi Atobe/" dir, not `跡部進一/`
+cmp stdout exp-out
+
+-- exp-out --
+albums
+albums/Shinichi Atobe
+albums/Shinichi Atobe/Ship-Scope
+albums/Shinichi Atobe/Ship-Scope/Plug and Delay.flac
+albums/Shinichi Atobe/Ship-Scope/Rainstick.flac
+albums/Shinichi Atobe/Ship-Scope/Ship-Scope.flac
+albums/Shinichi Atobe/Ship-Scope/The Red Line.flac

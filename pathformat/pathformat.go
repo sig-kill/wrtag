@@ -172,6 +172,8 @@ var funcMap = texttemplate.FuncMap{
 
 	"artists":             musicbrainz.ArtistsNames,
 	"artistsString":       musicbrainz.ArtistsString,
+	"artistsEn":           musicbrainz.ArtistsEnNames,
+	"artistsEnString":     musicbrainz.ArtistsEnString,
 	"artistsCredit":       musicbrainz.ArtistsCreditNames,
 	"artistsCreditString": musicbrainz.ArtistsCreditString,
 }
