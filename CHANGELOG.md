@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://www.github.com/sentriz/wrtag/compare/v0.8.1...v0.9.0) (2025-03-23)
+
+
+### Features
+
+* **wrtag:** support using english locale paths in path-format ([62b776e](https://www.github.com/sentriz/wrtag/commit/62b776e5ff42c5f963fc53ae2a08f6938f024277)), closes [#85](https://www.github.com/sentriz/wrtag/issues/85)
+
 ### [0.8.1](https://www.github.com/sentriz/wrtag/compare/v0.8.0...v0.8.1) (2025-03-16)
 
 
