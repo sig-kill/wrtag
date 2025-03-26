@@ -143,7 +143,12 @@ func main() {
 		job.Error = ""
 		job.Status = StatusComplete
 
-		searchResult, processErr := wrtag.ProcessDir(ctx, cfg, wrtagOperation(job.Operation), job.SourcePath, ic, job.UseMBID)
+		op, err := wrtag.OperationByName(job.Operation, false)
+		if err != nil {
+			return fmt.Errorf("find operation: %w", err)
+		}
+
+		searchResult, processErr := wrtag.ProcessDir(ctx, cfg, op, job.SourcePath, ic, job.UseMBID)
 
 		if searchResult != nil && searchResult.Query.Artist != "" {
 			researchLinks, err := researchLinkQuerier.Build(researchlink.Query{
@@ -259,8 +264,7 @@ func main() {
 
 	mux.HandleFunc("POST /jobs", func(w http.ResponseWriter, r *http.Request) {
 		operationStr := r.FormValue("operation")
-		operation, err := parseOperation(operationStr)
-		if err != nil {
+		if _, err := wrtag.OperationByName(operationStr, false); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -276,7 +280,7 @@ func main() {
 		path = filepath.Clean(path)
 
 		var job Job
-		if err := sqlb.ScanRow(r.Context(), db, &job, "insert into jobs (source_path, operation, time) values (?, ?, ?) returning *", path, operation, time.Now()); err != nil {
+		if err := sqlb.ScanRow(r.Context(), db, &job, "insert into jobs (source_path, operation, time) values (?, ?, ?) returning *", path, operationStr, time.Now()); err != nil {
 			http.Error(w, fmt.Sprintf("error saving job: %v", err), http.StatusInternalServerError)
 			return
 		}
@@ -338,7 +342,7 @@ func main() {
 			jobsListing
 			Operation string
 		}{
-			jl, "copy",
+			jl, OperationCopy,
 		})
 	})
 
@@ -346,8 +350,8 @@ func main() {
 
 	// external API
 	mux.HandleFunc("POST /op/{operation}", func(w http.ResponseWriter, r *http.Request) {
-		operation, err := parseOperation(r.PathValue("operation"))
-		if err != nil {
+		operationStr := r.PathValue("operation")
+		if _, err := wrtag.OperationByName(operationStr, false); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -362,7 +366,7 @@ func main() {
 		}
 		path = filepath.Clean(path)
 		var job Job
-		if err := sqlb.ScanRow(r.Context(), db, &job, "insert into jobs (source_path, operation, time) values (?, ?, ?) returning *", path, operation, time.Now()); err != nil {
+		if err := sqlb.ScanRow(r.Context(), db, &job, "insert into jobs (source_path, operation, time) values (?, ?, ?) returning *", path, operationStr, time.Now()); err != nil {
 			http.Error(w, fmt.Sprintf("error saving job: %v", err), http.StatusInternalServerError)
 			return
 		}
@@ -463,40 +467,16 @@ const (
 	StatusComplete   JobStatus = "complete"
 )
 
-type Operation string
-
 const (
-	OperationCopy Operation = "copy"
-	OperationMove Operation = "move"
+	OperationCopy = "copy"
+	OperationMove = "move"
 )
-
-func parseOperation(str string) (Operation, error) {
-	switch str {
-	case "copy":
-		return OperationCopy, nil
-	case "move":
-		return OperationMove, nil
-	default:
-		return "", fmt.Errorf("invalid operation %q", str)
-	}
-}
-
-func wrtagOperation(op Operation) wrtag.FileSystemOperation {
-	switch op {
-	case OperationCopy:
-		return wrtag.Copy{}
-	case OperationMove:
-		return wrtag.Move{}
-	default:
-		panic(fmt.Errorf("unknown operation: %q", op))
-	}
-}
 
 type Job struct {
 	ID                   uint64
 	Status               JobStatus
 	Error                string
-	Operation            Operation
+	Operation            string
 	Time                 time.Time
 	UseMBID              string
 	SourcePath, DestPath string
