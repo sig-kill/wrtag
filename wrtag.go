@@ -514,28 +514,44 @@ func trimDestDir(dc DirContext, dest string, dryRun bool) error {
 }
 
 func copyFile(src, dest string) (err error) {
-	defer func() {
-		if err != nil {
-			if rerr := os.Remove(dest); rerr != nil {
-				err = errors.Join(err, rerr)
-			}
-		}
-	}()
-
 	srcf, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("open src: %w", err)
 	}
 	defer srcf.Close()
 
-	destf, err := os.Create(dest)
+	tmp, err := os.CreateTemp(filepath.Dir(dest), "")
 	if err != nil {
-		return fmt.Errorf("open dest: %w", err)
+		return err
 	}
-	defer destf.Close()
+	defer func() {
+		if err != nil {
+			if rerr := os.Remove(tmp.Name()); rerr != nil {
+				err = errors.Join(err, rerr)
+			}
+		}
+	}()
 
-	if _, err := io.Copy(destf, srcf); err != nil {
+	if _, err := io.Copy(tmp, srcf); err != nil {
 		return fmt.Errorf("do copy: %w", err)
+	}
+
+	if st, err := srcf.Stat(); err == nil {
+		if err := tmp.Chmod(st.Mode()); err != nil {
+			return fmt.Errorf("chmod tmp: %w", err)
+		}
+	}
+
+	if err := tmp.Sync(); err != nil {
+		return fmt.Errorf("sync tmp: %w", err)
+	}
+
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("close tmp: %w", err)
+	}
+
+	if err := os.Rename(tmp.Name(), dest); err != nil {
+		return fmt.Errorf("do rename: %w", err)
 	}
 	return nil
 }
