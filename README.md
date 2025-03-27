@@ -21,6 +21,7 @@ To describe the general workflow:
    - [Tool `wrtag`](#tool-wrtag)
      - [Importing new music](#importing-new-music)
      - [Re-tagging already imported music](#re-tagging-already-imported-music)
+     - [Available operations](#available-operations)
    - [Tool `wrtagweb`](#tool-wrtagweb)
      - [API](#api)
      - [Configuration](#configuration)
@@ -105,6 +106,16 @@ Since a `move` operation always cleans up the source directory - and is smart ab
 $ wrtag move "/my/music/Tame Impala/(2010) Innerspeaker"
 # now has updated tags, and moved again if needed
 ```
+
+### Available operations
+
+The full list of core `wrtag` operations. They can be used in other tools like `wrtagweb` too.
+
+| Name      | Description                                                                                                     |
+| --------- | --------------------------------------------------------------------------------------------------------------- |
+| `move`    | Moves files from the source to the destination directory.                                                       |
+| `copy`    | Copies files from the source to the destination directory.                                                      |
+| `reflink` | On supported filesystems, creates a reflink (copy-on-write) clone of a file from the source to the destination. |
 
 #### Re-tagging in bulk
 
