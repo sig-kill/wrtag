@@ -1,3 +1,7 @@
+// Package wrtag provides functionality for music file tagging and organisation.
+// It allows for automatic lookup of music metadata from MusicBrainz, tagging files
+// with proper metadata, and organising files in a directory structure based on
+// a configurable path format.
 package wrtag
 
 import (
@@ -31,55 +35,116 @@ import (
 )
 
 var (
-	ErrScoreTooLow        = errors.New("score too low")
+	// ErrScoreTooLow is returned when the match confidence between local tracks and
+	// MusicBrainz data is below the required threshold.
+	ErrScoreTooLow = errors.New("score too low")
+
+	// ErrTrackCountMismatch is returned when the number of tracks in the local directory
+	// doesn't match the number of tracks in the MusicBrainz release.
 	ErrTrackCountMismatch = errors.New("track count mismatch")
-	ErrNoTracks           = errors.New("no tracks in dir")
-	ErrNotSortable        = errors.New("tracks in dir can't be sorted")
-	ErrSelfCopy           = errors.New("can't copy self to self")
+
+	// ErrNoTracks is returned when no audio tracks are found in the source directory.
+	ErrNoTracks = errors.New("no tracks in dir")
+
+	// ErrNotSortable is returned when the tracks in a directory cannot be reliably sorted
+	// due to missing track numbers or numerical identifiers in filenames.
+	ErrNotSortable = errors.New("tracks in dir can't be sorted")
+
+	// ErrSelfCopy is returned when attempting to copy a file to itself.
+	ErrSelfCopy = errors.New("can't copy self to self")
 )
 
+// IsNonFatalError determines whether an error is non-fatal during processing.
+// Non-fatal errors include low match scores and track count mismatches.
 func IsNonFatalError(err error) bool {
 	return errors.Is(err, ErrScoreTooLow) || errors.Is(err, ErrTrackCountMismatch)
 }
 
+// The minimum score required for a MusicBrainz match to be considered valid.
 const minScore = 95
 
 const (
-	thresholdSizeClean uint64 = 20 * 1e6   // 20 MB
-	thresholdSizeTrim  uint64 = 3000 * 1e6 // 3000 MB
+	// thresholdSizeClean is the maximum size (20MB) of a directory that can be
+	// automatically cleaned up.
+	thresholdSizeClean uint64 = 20 * 1e6 // 20 MB
+
+	// thresholdSizeTrim is the maximum size (3GB) of files that can be automatically
+	// trimmed from a destination directory.
+	thresholdSizeTrim uint64 = 3000 * 1e6 // 3000 MB
 )
 
+// SearchResult contains the results of a MusicBrainz lookup and potential import operation.
 type SearchResult struct {
-	Release    *musicbrainz.Release
-	Query      musicbrainz.ReleaseQuery
-	Score      float64
-	DestDir    string
-	Diff       []tagmap.Diff
+	// Release contains the matched MusicBrainz release data
+	Release *musicbrainz.Release
+
+	// Query contains the search parameters used for the MusicBrainz lookup
+	Query musicbrainz.ReleaseQuery
+
+	// Score indicates the confidence of the match (0-100)
+	Score float64
+
+	// DestDir is the destination directory path where files were or would be placed
+	DestDir string
+
+	// Diff contains the differences between local tags and MusicBrainz tags
+	Diff []tagmap.Diff
+
+	// OriginFile contains information from any gazelle-origin file found in the source directory
 	OriginFile *originfile.OriginFile
 }
 
+// ImportCondition defines the conditions under which a release will be imported.
 type ImportCondition uint8
 
 const (
+	// HighScore requires the match to have a high confidence score
 	HighScore ImportCondition = iota
+
+	// HighScoreOrMBID accepts either a high score or a matching MusicBrainz ID
 	HighScoreOrMBID
+
+	// Confirm always imports regardless of score
 	Confirm
 )
 
+// Addon represents a plugin that can process files after the main import operation.
 type Addon interface {
+	// ProcessRelease is called with the paths of the processed files after a successful import.
 	ProcessRelease(context.Context, []string) error
 }
 
+// Config contains configuration options for processing music directories.
 type Config struct {
-	MusicBrainzClient     musicbrainz.MBClient
+	// MusicBrainzClient is used to search and retrieve release data from MusicBrainz
+	MusicBrainzClient musicbrainz.MBClient
+
+	// CoverArtArchiveClient is used to retrieve cover art
 	CoverArtArchiveClient musicbrainz.CAAClient
-	PathFormat            pathformat.Format
-	TagWeights            tagmap.TagWeights
-	KeepFiles             map[string]struct{}
-	Addons                []Addon
-	UpgradeCover          bool
+
+	// PathFormat defines the directory structure for organising music files
+	PathFormat pathformat.Format
+
+	// TagWeights defines the relative importance of different tags when calculating match scores
+	TagWeights tagmap.TagWeights
+
+	// KeepFiles specifies files that should be preserved during processing
+	KeepFiles map[string]struct{}
+
+	// Addons are plugins that can perform additional processing after the main import
+	Addons []Addon
+
+	// UpgradeCover specifies whether to attempt to replace existing covers with better versions
+	UpgradeCover bool
 }
 
+// ProcessDir processes a music directory by looking up metadata on MusicBrainz and
+// either moving, copying, or reflinking the files to a new location with proper tags.
+// It returns a SearchResult containing information about the match and operation.
+//
+// The srcDir must be an absolute path.
+// The cond parameter determines the conditions under which the import will proceed.
+// The useMBID parameter can be used to force a specific MusicBrainz release ID.
 func ProcessDir(
 	ctx context.Context, cfg *Config,
 	op FileSystemOperation, srcDir string, cond ImportCondition, useMBID string,
@@ -206,7 +271,7 @@ func ProcessDir(
 			continue
 		}
 		if tags.Equal(pt.Tags, destTags) {
-			// try avoid more io if we can
+			// try to avoid more io if we can
 			continue
 		}
 
@@ -249,11 +314,18 @@ func ProcessDir(
 	return &SearchResult{release, query, score, destDir, diff, originFile}, nil
 }
 
+// PathTags associates a file path with its tags.
 type PathTags struct {
+	// Path is the file path
 	Path string
+
+	// Tags contains the audio file's metadata tags
 	tags.Tags
 }
 
+// ReadReleaseDir reads a directory containing music files and extracts tags from each file.
+// It returns the path to the cover image (if found) and a slice of PathTags for each audio file.
+// Files are sorted by disc number, directory, track number, and finally path.
 func ReadReleaseDir(dirPath string) (string, []PathTags, error) {
 	mainPaths, err := fileutil.GlobDir(dirPath, "*")
 	if err != nil {
@@ -322,7 +394,7 @@ func ReadReleaseDir(dirPath string) (string, []PathTags, error) {
 
 	slices.SortFunc(pathTags, func(a, b PathTags) int {
 		return cmp.Or(
-			natcmp.Compare(a.Get(tags.DiscNumber), b.Get(tags.DiscNumber)),   // disc mumbers like "1", "2", "disc 1", "disc 10"
+			natcmp.Compare(a.Get(tags.DiscNumber), b.Get(tags.DiscNumber)),   // disc numbers like "1", "2", "disc 1", "disc 10"
 			natcmp.Compare(filepath.Dir(a.Path), filepath.Dir(b.Path)),       // might have disc folders instead of tags
 			natcmp.Compare(a.Get(tags.TrackNumber), b.Get(tags.TrackNumber)), // track numbers, could be "A1" "B1" "1" "10" "100" "1/10" "2/10"
 			natcmp.Compare(a.Path, b.Path),                                   // fallback to paths
@@ -332,6 +404,7 @@ func ReadReleaseDir(dirPath string) (string, []PathTags, error) {
 	return string(cover), pathTags, nil
 }
 
+// DestDir generates the destination directory path for a release based on the given path format.
 func DestDir(pathFormat *pathformat.Format, release *musicbrainz.Release) (string, error) {
 	path, err := pathFormat.Execute(release, 0, ".eg")
 	if err != nil {
@@ -343,7 +416,7 @@ func DestDir(pathFormat *pathformat.Format, release *musicbrainz.Release) (strin
 }
 
 // FileSystemOperation defines operations that can be performed on files during the import/tagging process.
-// Implementations handle different ways to transfer files (move, copy, reflink) while maintaining consistent behaviors.
+// Implementations handle different ways to transfer files (move, copy, reflink) while maintaining consistent behaviours.
 type FileSystemOperation interface {
 	// CanModifyDest returns whether this operation can modify existing destination files.
 	// If true (typically in dry-run mode), files in the destination won't be modified.
@@ -352,7 +425,7 @@ type FileSystemOperation interface {
 
 	// ProcessPath handles transferring a file from src to dest path.
 	// It ensures the destination directory exists and records the path in the DirContext.
-	// The exact behavior (move/copy/reflink) depends on the specific implementation.
+	// The exact behaviour (move/copy/reflink) depends on the specific implementation.
 	// Returns an error if the operation fails.
 	ProcessPath(dc DirContext, src, dest string) error
 
@@ -364,29 +437,35 @@ type FileSystemOperation interface {
 	PostSource(dc DirContext, limit string, src string) error
 }
 
-// DirContext tracks known files in the destination directory. After a release is put in place, unknown files not in the DirContext will be deleted.
+// DirContext tracks known files in the destination directory. After a release is put in place,
+// unknown files not in the DirContext will be deleted.
 type DirContext struct {
 	knownDestPaths map[string]struct{}
 }
 
+// NewDirContext creates a new DirContext to track destination paths.
 func NewDirContext() DirContext {
 	return DirContext{knownDestPaths: map[string]struct{}{}}
 }
 
-var _ FileSystemOperation = (*Move)(nil)
-var _ FileSystemOperation = (*Copy)(nil)
-var _ FileSystemOperation = (*Reflink)(nil)
-
+// Move implements FileSystemOperation to move files from source to destination.
 type Move struct {
 	dryRun bool
 }
 
+// NewMove creates a new Move operation with the specified dry-run mode.
+// If dryRun is true, no files will actually be moved.
 func NewMove(dryRun bool) Move { return Move{dryRun: dryRun} }
 
+// CanModifyDest returns whether this operation can modify destination files.
+// For Move operations, this is determined by the dryRun setting.
 func (m Move) CanModifyDest() bool {
 	return m.dryRun
 }
 
+// ProcessPath moves a file from src to dest, ensuring the destination directory exists.
+// If the operation is in dry-run mode, it will only log the intended action.
+// If src and dest are the same, no action is taken.
 func (m Move) ProcessPath(dc DirContext, src, dest string) error {
 	dc.knownDestPaths[dest] = struct{}{}
 
@@ -423,6 +502,8 @@ func (m Move) ProcessPath(dc DirContext, src, dest string) error {
 	return nil
 }
 
+// PostSource cleans up the source directory after all files have been moved.
+// It removes empty directories up to the specified limit directory.
 func (m Move) PostSource(dc DirContext, limit string, src string) error {
 	if limit == "" {
 		panic("empty limit dir")
@@ -450,16 +531,24 @@ func (m Move) PostSource(dc DirContext, limit string, src string) error {
 	return nil
 }
 
+// Copy implements FileSystemOperation to copy files from source to destination.
 type Copy struct {
 	dryRun bool
 }
 
+// NewCopy creates a new Copy operation with the specified dry-run mode.
+// If dryRun is true, no files will actually be copied.
 func NewCopy(dryRun bool) Copy { return Copy{dryRun: dryRun} }
 
+// CanModifyDest returns whether this operation can modify destination files.
+// For Copy operations, this is determined by the dryRun setting.
 func (c Copy) CanModifyDest() bool {
 	return c.dryRun
 }
 
+// ProcessPath copies a file from src to dest, ensuring the destination directory exists.
+// If the operation is in dry-run mode, it will only log the intended action.
+// If src and dest are the same, it returns ErrSelfCopy.
 func (c Copy) ProcessPath(dc DirContext, src, dest string) error {
 	dc.knownDestPaths[dest] = struct{}{}
 
@@ -484,20 +573,30 @@ func (c Copy) ProcessPath(dc DirContext, src, dest string) error {
 	return nil
 }
 
+// PostSource performs any necessary cleanup of the source directory.
+// For Copy operations, this is a no-op since the source files remain in place.
 func (Copy) PostSource(dc DirContext, limit string, src string) error {
 	return nil
 }
 
+// Reflink implements FileSystemOperation to copy files using reflink (copy-on-write) when supported.
 type Reflink struct {
 	dryRun bool
 }
 
+// NewReflink creates a new Reflink operation with the specified dry-run mode.
+// If dryRun is true, no files will actually be reflinked.
 func NewReflink(dryRun bool) Reflink { return Reflink{dryRun: dryRun} }
 
+// CanModifyDest returns whether this operation can modify destination files.
+// For Reflink operations, this is determined by the dryRun setting.
 func (c Reflink) CanModifyDest() bool {
 	return c.dryRun
 }
 
+// ProcessPath creates a reflink (copy-on-write) clone of a file from src to dest.
+// If the operation is in dry-run mode, it will only log the intended action.
+// If src and dest are the same, it returns ErrSelfCopy.
 func (c Reflink) ProcessPath(dc DirContext, src, dest string) error {
 	dc.knownDestPaths[dest] = struct{}{}
 
@@ -522,6 +621,8 @@ func (c Reflink) ProcessPath(dc DirContext, src, dest string) error {
 	return nil
 }
 
+// PostSource performs any necessary cleanup of the source directory.
+// For Reflink operations, this is a no-op since the source files remain in place.
 func (Reflink) PostSource(dc DirContext, limit string, src string) error {
 	return nil
 }
@@ -553,7 +654,7 @@ func trimDestDir(dc DirContext, dest string, dryRun bool) error {
 		toDelete = append(toDelete, path)
 	}
 	if size > thresholdSizeTrim {
-		return fmt.Errorf("extra files were too big remove: %d/%d", size, thresholdSizeTrim)
+		return fmt.Errorf("extra files were too big to remove: %d/%d", size, thresholdSizeTrim)
 	}
 
 	var deleteErrs []error
@@ -683,7 +784,7 @@ func tryDownloadMusicBrainzCover(ctx context.Context, caa *musicbrainz.CAAClient
 	}
 	defer resp.Body.Close()
 
-	// try avoid downloading
+	// try to avoid downloading
 	if skipFunc(resp) {
 		return "", nil
 	}
