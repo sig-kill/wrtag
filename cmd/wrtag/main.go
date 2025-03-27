@@ -70,7 +70,7 @@ func main() {
 		flag := flag.NewFlagSet(command, flag.ExitOnError)
 		var (
 			yes     = flag.Bool("yes", false, "Use the found release anyway despite a low score")
-			useMBID = flag.String("mbid", "", "Overwrite matched mbid")
+			useMBID = flag.String("mbid", "", "Overwrite matched MusicBrainz release UUID")
 			dryRun  = flag.Bool("dry-run", false, "Do a dry run of imports")
 		)
 		flag.Parse(args)
