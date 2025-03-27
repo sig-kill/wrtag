@@ -31,8 +31,7 @@ func init() {
 	flag := flag.CommandLine
 	flag.Usage = func() {
 		fmt.Fprintf(flag.Output(), "Usage:\n")
-		fmt.Fprintf(flag.Output(), "  $ %s [<options>] move [<move options>] <path>\n", flag.Name())
-		fmt.Fprintf(flag.Output(), "  $ %s [<options>] copy|reflink [<copy options>] <path>\n", flag.Name())
+		fmt.Fprintf(flag.Output(), "  $ %s [<options>] move|copy|reflink [<operation options>] <path>\n", flag.Name())
 		fmt.Fprintf(flag.Output(), "  $ %s [<options>] sync [<sync options>] <path>...\n", flag.Name())
 		fmt.Fprintf(flag.Output(), "\n")
 		fmt.Fprintf(flag.Output(), "Options:\n")
