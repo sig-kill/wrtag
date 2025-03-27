@@ -143,7 +143,7 @@ func main() {
 		job.Error = ""
 		job.Status = StatusComplete
 
-		op, err := wrtag.OperationByName(job.Operation, false)
+		op, err := wrtagflag.OperationByName(job.Operation, false)
 		if err != nil {
 			return fmt.Errorf("find operation: %w", err)
 		}
@@ -264,7 +264,7 @@ func main() {
 
 	mux.HandleFunc("POST /jobs", func(w http.ResponseWriter, r *http.Request) {
 		operationStr := r.FormValue("operation")
-		if _, err := wrtag.OperationByName(operationStr, false); err != nil {
+		if _, err := wrtagflag.OperationByName(operationStr, false); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -351,7 +351,7 @@ func main() {
 	// external API
 	mux.HandleFunc("POST /op/{operation}", func(w http.ResponseWriter, r *http.Request) {
 		operationStr := r.PathValue("operation")
-		if _, err := wrtag.OperationByName(operationStr, false); err != nil {
+		if _, err := wrtagflag.OperationByName(operationStr, false); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}

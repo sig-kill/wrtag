@@ -192,7 +192,7 @@ func ProcessDir(
 	for i := range len(pathTags) {
 		pt, rt, destPath := pathTags[i], releaseTracks[i], destPaths[i]
 
-		if err := op.ProcessFile(dc, pt.Path, destPath); err != nil {
+		if err := op.ProcessPath(dc, pt.Path, destPath); err != nil {
 			return nil, fmt.Errorf("process path %q: %w", filepath.Base(pt.Path), err)
 		}
 
@@ -202,7 +202,7 @@ func ProcessDir(
 			logTagChanges(ctx, pt.Path, lvl, pt.Tags, destTags)
 		}
 
-		if op.IsDryRun() {
+		if op.CanModifyDest() {
 			continue
 		}
 		if tags.Equal(pt.Tags, destTags) {
@@ -220,7 +220,7 @@ func ProcessDir(
 	}
 
 	// process addons with new files
-	if !op.IsDryRun() {
+	if !op.CanModifyDest() {
 		for _, addon := range cfg.Addons {
 			if err := addon.ProcessRelease(ctx, destPaths); err != nil {
 				return nil, fmt.Errorf("process addon: %w", err)
@@ -229,19 +229,19 @@ func ProcessDir(
 	}
 
 	for kf := range cfg.KeepFiles {
-		if err := op.ProcessFile(dc, filepath.Join(srcDir, kf), filepath.Join(destDir, kf)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := op.ProcessPath(dc, filepath.Join(srcDir, kf), filepath.Join(destDir, kf)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("process keep file %q: %w", kf, err)
 		}
 	}
 
-	if err := trimDestDir(dc, destDir, op.IsDryRun()); err != nil {
+	if err := trimDestDir(dc, destDir, op.CanModifyDest()); err != nil {
 		return nil, fmt.Errorf("trim: %w", err)
 	}
 
 	unlock()
 
 	if srcDir != destDir {
-		if err := op.RemoveSrc(dc, cfg.PathFormat.Root(), srcDir); err != nil {
+		if err := op.PostSource(dc, cfg.PathFormat.Root(), srcDir); err != nil {
 			return nil, fmt.Errorf("clean: %w", err)
 		}
 	}
@@ -342,16 +342,29 @@ func DestDir(pathFormat *pathformat.Format, release *musicbrainz.Release) (strin
 	return dir, nil
 }
 
-var _ FileSystemOperation = (*Move)(nil)
-var _ FileSystemOperation = (*Copy)(nil)
-var _ FileSystemOperation = (*Reflink)(nil)
-
+// FileSystemOperation defines operations that can be performed on files during the import/tagging process.
+// Implementations handle different ways to transfer files (move, copy, reflink) while maintaining consistent behaviors.
 type FileSystemOperation interface {
-	IsDryRun() bool
-	ProcessFile(dc DirContext, src, dest string) error
-	RemoveSrc(dc DirContext, limit string, src string) error
+	// CanModifyDest returns whether this operation can modify existing destination files.
+	// If true (typically in dry-run mode), files in the destination won't be modified.
+	// Note: If down the line some sort of "in place" tagging operation is needed, then a `CanModifySource` may be appropriate too.
+	CanModifyDest() bool
+
+	// ProcessPath handles transferring a file from src to dest path.
+	// It ensures the destination directory exists and records the path in the DirContext.
+	// The exact behavior (move/copy/reflink) depends on the specific implementation.
+	// Returns an error if the operation fails.
+	ProcessPath(dc DirContext, src, dest string) error
+
+	// PostSource performs any cleanup or post-processing on the source directory
+	// after all files have been processed. For example, removing empty directories
+	// after a move operation.
+	// The limit parameter specifies a boundary directory that should not be removed.
+	// Returns an error if the cleanup operation fails.
+	PostSource(dc DirContext, limit string, src string) error
 }
 
+// DirContext tracks known files in the destination directory. After a release is put in place, unknown files not in the DirContext will be deleted.
 type DirContext struct {
 	knownDestPaths map[string]struct{}
 }
@@ -360,22 +373,28 @@ func NewDirContext() DirContext {
 	return DirContext{knownDestPaths: map[string]struct{}{}}
 }
 
+var _ FileSystemOperation = (*Move)(nil)
+var _ FileSystemOperation = (*Copy)(nil)
+var _ FileSystemOperation = (*Reflink)(nil)
+
 type Move struct {
-	DryRun bool
+	dryRun bool
 }
 
-func (m Move) IsDryRun() bool {
-	return m.DryRun
+func NewMove(dryRun bool) Move { return Move{dryRun: dryRun} }
+
+func (m Move) CanModifyDest() bool {
+	return m.dryRun
 }
 
-func (m Move) ProcessFile(dc DirContext, src, dest string) error {
+func (m Move) ProcessPath(dc DirContext, src, dest string) error {
 	dc.knownDestPaths[dest] = struct{}{}
 
 	if filepath.Clean(src) == filepath.Clean(dest) {
 		return nil
 	}
 
-	if m.DryRun {
+	if m.dryRun {
 		slog.Info("move", "from", src, "to", dest)
 		return nil
 	}
@@ -404,7 +423,7 @@ func (m Move) ProcessFile(dc DirContext, src, dest string) error {
 	return nil
 }
 
-func (m Move) RemoveSrc(dc DirContext, limit string, src string) error {
+func (m Move) PostSource(dc DirContext, limit string, src string) error {
 	if limit == "" {
 		panic("empty limit dir")
 	}
@@ -423,7 +442,7 @@ func (m Move) RemoveSrc(dc DirContext, limit string, src string) error {
 	defer unlock()
 
 	for _, p := range toRemove {
-		if err := safeRemoveAll(p, m.DryRun); err != nil {
+		if err := safeRemoveAll(p, m.dryRun); err != nil {
 			return fmt.Errorf("safe remove all: %w", err)
 		}
 	}
@@ -432,21 +451,23 @@ func (m Move) RemoveSrc(dc DirContext, limit string, src string) error {
 }
 
 type Copy struct {
-	DryRun bool
+	dryRun bool
 }
 
-func (c Copy) IsDryRun() bool {
-	return c.DryRun
+func NewCopy(dryRun bool) Copy { return Copy{dryRun: dryRun} }
+
+func (c Copy) CanModifyDest() bool {
+	return c.dryRun
 }
 
-func (c Copy) ProcessFile(dc DirContext, src, dest string) error {
+func (c Copy) ProcessPath(dc DirContext, src, dest string) error {
 	dc.knownDestPaths[dest] = struct{}{}
 
 	if filepath.Clean(src) == filepath.Clean(dest) {
 		return ErrSelfCopy
 	}
 
-	if c.DryRun {
+	if c.dryRun {
 		slog.Info("copy", "from", src, "to", dest)
 		return nil
 	}
@@ -463,40 +484,28 @@ func (c Copy) ProcessFile(dc DirContext, src, dest string) error {
 	return nil
 }
 
-func (Copy) RemoveSrc(dc DirContext, limit string, src string) error {
+func (Copy) PostSource(dc DirContext, limit string, src string) error {
 	return nil
 }
 
-// this will probably need to live with the cmd packages later to keep generic config out of this package
-func OperationByName(name string, dryRun bool) (FileSystemOperation, error) {
-	switch name {
-	case "copy":
-		return Copy{DryRun: dryRun}, nil
-	case "move":
-		return Move{DryRun: dryRun}, nil
-	case "reflink":
-		return Reflink{DryRun: dryRun}, nil
-	default:
-		return nil, fmt.Errorf("unknown operation")
-	}
-}
-
 type Reflink struct {
-	DryRun bool
+	dryRun bool
 }
 
-func (c Reflink) IsDryRun() bool {
-	return c.DryRun
+func NewReflink(dryRun bool) Reflink { return Reflink{dryRun: dryRun} }
+
+func (c Reflink) CanModifyDest() bool {
+	return c.dryRun
 }
 
-func (c Reflink) ProcessFile(dc DirContext, src, dest string) error {
+func (c Reflink) ProcessPath(dc DirContext, src, dest string) error {
 	dc.knownDestPaths[dest] = struct{}{}
 
 	if filepath.Clean(src) == filepath.Clean(dest) {
 		return ErrSelfCopy
 	}
 
-	if c.DryRun {
+	if c.dryRun {
 		slog.Info("reflink", "from", src, "to", dest)
 		return nil
 	}
@@ -513,7 +522,7 @@ func (c Reflink) ProcessFile(dc DirContext, src, dest string) error {
 	return nil
 }
 
-func (Reflink) RemoveSrc(dc DirContext, limit string, src string) error {
+func (Reflink) PostSource(dc DirContext, limit string, src string) error {
 	return nil
 }
 
@@ -616,7 +625,7 @@ func processCover(
 		return filepath.Join(destDir, "cover"+filepath.Ext(p))
 	}
 
-	if !op.IsDryRun() && (cover == "" || cfg.UpgradeCover) {
+	if !op.CanModifyDest() && (cover == "" || cfg.UpgradeCover) {
 		skipFunc := func(resp *http.Response) bool {
 			if resp.ContentLength > 8388608 /* 8 MiB */ {
 				return true // too big to download
@@ -636,7 +645,7 @@ func processCover(
 			return fmt.Errorf("maybe fetch better cover: %w", err)
 		}
 		if coverTmp != "" {
-			if err := (Move{}).ProcessFile(dc, coverTmp, coverPath(coverTmp)); err != nil {
+			if err := (Move{}).ProcessPath(dc, coverTmp, coverPath(coverTmp)); err != nil {
 				return fmt.Errorf("move new cover to dest: %w", err)
 			}
 			return nil
@@ -645,7 +654,7 @@ func processCover(
 
 	// process any existing cover if we didn't fetch (or find) any from musicbrainz
 	if cover != "" {
-		if err := op.ProcessFile(dc, cover, coverPath(cover)); err != nil {
+		if err := op.ProcessPath(dc, cover, coverPath(cover)); err != nil {
 			return fmt.Errorf("move file to dest: %w", err)
 		}
 	}

@@ -96,6 +96,19 @@ func ResearchLinks() *researchlink.Builder {
 	return &r
 }
 
+func OperationByName(name string, dryRun bool) (wrtag.FileSystemOperation, error) {
+	switch name {
+	case "copy":
+		return wrtag.NewCopy(dryRun), nil
+	case "move":
+		return wrtag.NewMove(dryRun), nil
+	case "reflink":
+		return wrtag.NewReflink(dryRun), nil
+	default:
+		return nil, fmt.Errorf("unknown operation")
+	}
+}
+
 var _ flag.Value = (*pathFormatParser)(nil)
 var _ flag.Value = (*researchLinkParser)(nil)
 var _ flag.Value = (*notificationsParser)(nil)

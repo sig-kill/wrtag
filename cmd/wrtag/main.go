@@ -97,7 +97,7 @@ func main() {
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer cancel()
 
-		op, err := wrtag.OperationByName(command, *dryRun)
+		op, err := wrtagflag.OperationByName(command, *dryRun)
 		if err != nil {
 			slog.Error("get operation by name", "err", err)
 			return
@@ -232,7 +232,7 @@ func runSync(ctx context.Context, cfg *wrtag.Config, stats *syncStats, dirs []st
 			defer wg.Done()
 			ctxConsume(ctx, leaves, func(dir string) {
 				stats.saw.Add(1)
-				r, err := syncDir(ctx, cfg, ageYounger, ageOlder, wrtag.Move{DryRun: dryRun}, dir)
+				r, err := syncDir(ctx, cfg, ageYounger, ageOlder, wrtag.NewMove(dryRun), dir)
 				if err != nil && !errors.Is(err, context.Canceled) {
 					stats.errors.Add(1)
 					slog.ErrorContext(ctx, "processing dir", "dir", dir, "err", err)
