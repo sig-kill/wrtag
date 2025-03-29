@@ -267,7 +267,7 @@ func ProcessDir(
 			logTagChanges(ctx, pt.Path, lvl, pt.Tags, destTags)
 		}
 
-		if op.CanModifyDest() {
+		if !op.CanModifyDest() {
 			continue
 		}
 		if tags.Equal(pt.Tags, destTags) {
@@ -285,7 +285,7 @@ func ProcessDir(
 	}
 
 	// process addons with new files
-	if !op.CanModifyDest() {
+	if op.CanModifyDest() {
 		for _, addon := range cfg.Addons {
 			if err := addon.ProcessRelease(ctx, destPaths); err != nil {
 				return nil, fmt.Errorf("process addon: %w", err)
@@ -419,7 +419,6 @@ func DestDir(pathFormat *pathformat.Format, release *musicbrainz.Release) (strin
 // Implementations handle different ways to transfer files (move, copy, reflink) while maintaining consistent behaviours.
 type FileSystemOperation interface {
 	// CanModifyDest returns whether this operation can modify existing destination files.
-	// If true (typically in dry-run mode), files in the destination won't be modified.
 	// Note: If down the line some sort of "in place" tagging operation is needed, then a `CanModifySource` may be appropriate too.
 	CanModifyDest() bool
 
@@ -460,7 +459,7 @@ func NewMove(dryRun bool) Move { return Move{dryRun: dryRun} }
 // CanModifyDest returns whether this operation can modify destination files.
 // For Move operations, this is determined by the dryRun setting.
 func (m Move) CanModifyDest() bool {
-	return m.dryRun
+	return !m.dryRun
 }
 
 // ProcessPath moves a file from src to dest, ensuring the destination directory exists.
@@ -543,7 +542,7 @@ func NewCopy(dryRun bool) Copy { return Copy{dryRun: dryRun} }
 // CanModifyDest returns whether this operation can modify destination files.
 // For Copy operations, this is determined by the dryRun setting.
 func (c Copy) CanModifyDest() bool {
-	return c.dryRun
+	return !c.dryRun
 }
 
 // ProcessPath copies a file from src to dest, ensuring the destination directory exists.
@@ -591,7 +590,7 @@ func NewReflink(dryRun bool) Reflink { return Reflink{dryRun: dryRun} }
 // CanModifyDest returns whether this operation can modify destination files.
 // For Reflink operations, this is determined by the dryRun setting.
 func (c Reflink) CanModifyDest() bool {
-	return c.dryRun
+	return !c.dryRun
 }
 
 // ProcessPath creates a reflink (copy-on-write) clone of a file from src to dest.
@@ -628,9 +627,9 @@ func (Reflink) PostSource(dc DirContext, limit string, src string) error {
 }
 
 // trimDestDir deletes all items in a destination dir that don't look like they should be there
-func trimDestDir(dc DirContext, dest string, dryRun bool) error {
+func trimDestDir(dc DirContext, dest string, canModifyDest bool) error {
 	entries, err := os.ReadDir(dest)
-	if dryRun && errors.Is(err, os.ErrNotExist) {
+	if !canModifyDest && errors.Is(err, os.ErrNotExist) {
 		// this is fine if we're only doing a dry run
 	} else if err != nil {
 		return fmt.Errorf("read dir: %w", err)
@@ -659,7 +658,7 @@ func trimDestDir(dc DirContext, dest string, dryRun bool) error {
 
 	var deleteErrs []error
 	for _, p := range toDelete {
-		if dryRun {
+		if !canModifyDest {
 			slog.Info("delete extra file", "path", p)
 			continue
 		}
@@ -726,7 +725,7 @@ func processCover(
 		return filepath.Join(destDir, "cover"+filepath.Ext(p))
 	}
 
-	if !op.CanModifyDest() && (cover == "" || cfg.UpgradeCover) {
+	if op.CanModifyDest() && (cover == "" || cfg.UpgradeCover) {
 		skipFunc := func(resp *http.Response) bool {
 			if resp.ContentLength > 8388608 /* 8 MiB */ {
 				return true // too big to download
