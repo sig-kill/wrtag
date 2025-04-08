@@ -6,7 +6,6 @@ import (
 	"crypto/subtle"
 	"database/sql"
 	"embed"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -32,7 +31,6 @@ import (
 
 	_ "github.com/ncruces/go-sqlite3/driver"
 	_ "github.com/ncruces/go-sqlite3/embed"
-	"github.com/r3labs/sse/v2"
 	"github.com/rogpeppe/go-internal/txtar"
 	"go.senan.xyz/sqlb"
 	"golang.org/x/sync/errgroup"
@@ -61,9 +59,9 @@ func main() {
 		cfg                 = wrtagflag.Config()
 		notifications       = wrtagflag.Notifications()
 		researchLinkQuerier = wrtagflag.ResearchLinks()
-		listenAddr          = flag.String("web-listen-addr", "", "Listen address for web interface")
 		apiKey              = flag.String("web-api-key", "", "API key for web interface")
-		dbPath              = flag.String("web-db-path", "wrtag.db", "Path to database path for web interface")
+		listenAddr          = flag.String("web-listen-addr", ":7373", "Listen address for web interface (optional)")
+		dbPath              = flag.String("web-db-path", "", "Path to persistent database path for web interface (optional)")
 		publicURL           = flag.String("web-public-url", "", "Public URL for web interface (optional)")
 	)
 	wrtagflag.Parse()
@@ -73,21 +71,32 @@ func main() {
 		return
 	}
 
-	if *listenAddr == "" {
-		slog.Error("need a listen addr")
-		return
-	}
 	if *apiKey == "" {
 		slog.Error("need an api key")
 		return
 	}
-	if *dbPath == "" {
-		slog.Error("need a db path")
+	if *listenAddr == "" {
+		slog.Error("need a listen addr")
 		return
 	}
 
+	if *dbPath == "" {
+		tmpf, err := os.CreateTemp("", "wrtagweb*.db")
+		if err != nil {
+			slog.Error("error creating tmp file", "error", err)
+			return
+		}
+
+		*dbPath = tmpf.Name()
+
+		defer func() {
+			_ = tmpf.Close()
+			_ = os.Remove(tmpf.Name())
+		}()
+	}
+
 	dbURI, _ := url.Parse("file://?cache=shared&_fk=1")
-	dbURI.Opaque = *dbPath
+	dbURI.Path = *dbPath
 	db, err := sql.Open("sqlite3", dbURI.String())
 	if err != nil {
 		slog.Error("open db template", "err", err)
@@ -106,46 +115,29 @@ func main() {
 		return
 	}
 
-	sseServ := sse.New()
-	sseServ.AutoReplay = false
-	defer sseServ.Close()
+	var sse broadcast[uint64]
 
-	jobStream := sseServ.CreateStream("jobs")
-
-	var (
-		eventAllJobs = func() string { return "jobs" }
-		eventJob     = func(id uint64) string { return fmt.Sprintf("job-%d", id) }
-	)
-
-	emit := func(events ...string) {
-		for _, eventName := range events {
-			sseServ.Publish(jobStream.ID, &sse.Event{Event: []byte(eventName), Data: []byte{0}})
+	processNextJob := func(ctx context.Context) error {
+		var job Job
+		err := sqlb.ScanRow(ctx, db, &job, "update jobs set status=? where id=(select id from jobs where status=? limit 1) returning *", StatusInProgress, StatusEnqueued)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
 		}
-		// remove when hx-trigger="sse:jobs queue:all" works again
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	processJob := func(ctx context.Context, job *Job, ic wrtag.ImportCondition) error {
-		job.Status = StatusInProgress
-		if err := sqlb.ScanRow(ctx, db, job, "update jobs set ? where id=? returning *", sqlb.UpdateSQL(job), job.ID); err != nil {
-			return fmt.Errorf("update job: %w", err)
+		if err != nil {
+			return err
 		}
-		emit(eventJob(job.ID), eventAllJobs())
 
-		defer func() {
-			if err := sqlb.ScanRow(ctx, db, job, "update jobs set ? where id=? returning *", sqlb.UpdateSQL(job), job.ID); err != nil {
-				slog.Error("update job", "job_id", job.ID, "err", err)
-				return
-			}
-			emit(eventJob(job.ID), eventAllJobs())
-		}()
-
-		job.Error = ""
-		job.Status = StatusComplete
+		sse.send(job.ID)
+		defer sse.send(job.ID)
 
 		op, err := wrtagflag.OperationByName(job.Operation, false)
 		if err != nil {
 			return fmt.Errorf("find operation: %w", err)
+		}
+
+		var ic wrtag.ImportCondition
+		if job.Confirm {
+			ic = wrtag.Confirm
 		}
 
 		searchResult, processErr := wrtag.ProcessDir(ctx, cfg, op, job.SourcePath, ic, job.UseMBID)
@@ -164,28 +156,40 @@ func main() {
 			job.ResearchLinks = sqlb.NewJSON(researchLinks)
 		}
 
+		if searchResult != nil && searchResult.Release != nil {
+			job.DestPath, err = wrtag.DestDir(&cfg.PathFormat, searchResult.Release)
+			if err != nil {
+				return fmt.Errorf("gen dest dir: %w", err)
+			}
+		}
+
 		job.SearchResult = sqlb.NewJSON(searchResult)
+		job.Confirm = false
 
 		if processErr != nil {
 			job.Status = StatusError
 			job.Error = processErr.Error()
 			if errors.Is(processErr, wrtag.ErrScoreTooLow) {
 				job.Status = StatusNeedsInput
-				go notifications.Send(ctx, notifNeedsInput, jobNotificationMessage(*publicURL, *job))
 			}
-			return nil
+		} else {
+			job.Status = StatusComplete
+			job.Error = ""
+			job.UseMBID = ""
+			job.Operation = OperationMove // allow re-tag from dest
+			job.SourcePath = job.DestPath
 		}
 
-		job.DestPath, err = wrtag.DestDir(&cfg.PathFormat, job.SearchResult.Data.Release)
-		if err != nil {
-			return fmt.Errorf("gen dest dir: %w", err)
+		if err := sqlb.ScanRow(ctx, db, &job, "update jobs set ? where id=? returning *", sqlb.UpdateSQL(job), job.ID); err != nil {
+			return err
 		}
 
-		go notifications.Send(ctx, notifComplete, jobNotificationMessage(*publicURL, *job))
-
-		// either if this was a copy or move job, subsequent re-imports should just be a move so we can retag
-		job.Operation = OperationMove
-		job.SourcePath = job.DestPath
+		switch job.Status {
+		case StatusComplete:
+			go notifications.Send(context.Background(), notifComplete, jobNotificationMessage(*publicURL, job))
+		case StatusNeedsInput:
+			go notifications.Send(context.Background(), notifNeedsInput, jobNotificationMessage(*publicURL, job))
+		}
 
 		return nil
 	}
@@ -196,7 +200,7 @@ func main() {
 		defer buffPool.Put(buff)
 		buff.Reset()
 
-		if err := uiTmpl.ExecuteTemplate(w, name, data); err != nil {
+		if err := uiTmpl.ExecuteTemplate(buff, name, data); err != nil {
 			slog.Error("in template", "err", err)
 			return
 		}
@@ -248,7 +252,21 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle("GET /events", sseServ)
+
+	mux.HandleFunc("GET /sse", func(w http.ResponseWriter, r *http.Request) {
+		rc := http.NewResponseController(w)
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		w.WriteHeader(http.StatusOK)
+		rc.Flush()
+
+		for id := range sse.receive(r.Context(), 0) {
+			fmt.Fprintf(w, "data: %d\n\n", id)
+			rc.Flush()
+		}
+	})
 
 	mux.HandleFunc("GET /jobs", func(w http.ResponseWriter, r *http.Request) {
 		search := r.URL.Query().Get("search")
@@ -284,8 +302,10 @@ func main() {
 			http.Error(w, fmt.Sprintf("error saving job: %v", err), http.StatusInternalServerError)
 			return
 		}
+
 		respTmpl(w, "job-import", struct{ Operation string }{Operation: operationStr})
-		emit(eventAllJobs())
+
+		sse.send(0)
 	})
 
 	mux.HandleFunc("GET /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -300,36 +320,32 @@ func main() {
 
 	mux.HandleFunc("PUT /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(r.PathValue("id"))
-		var ic wrtag.ImportCondition
-		if confirm, _ := strconv.ParseBool(r.FormValue("confirm")); confirm {
-			ic = wrtag.Confirm
-		}
+
+		confirm, _ := strconv.ParseBool(r.FormValue("confirm"))
+
 		useMBID := r.FormValue("mbid")
 		if strings.Contains(useMBID, "/") {
 			useMBID = filepath.Base(useMBID) // accept release URL
 		}
 
 		var job Job
-		if err := sqlb.ScanRow(r.Context(), db, &job, "select * from jobs where id=?", id); err != nil {
+		if err := sqlb.ScanRow(r.Context(), db, &job, "update jobs set confirm=?, use_mbid=?, status=? where id=? and status<>? returning *", confirm, useMBID, StatusEnqueued, id, StatusInProgress); err != nil {
 			respErrf(w, http.StatusInternalServerError, "error getting job")
 			return
 		}
-		job.UseMBID = useMBID
-		if err := processJob(r.Context(), &job, ic); err != nil {
-			respErrf(w, http.StatusInternalServerError, "error in job")
-			return
-		}
+
 		respTmpl(w, "job", job)
-		emit(eventAllJobs())
+
+		sse.send(0)
 	})
 
 	mux.HandleFunc("DELETE /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(r.PathValue("id"))
-		if err := sqlb.Exec(r.Context(), db, "delete from jobs where id=?", id); err != nil {
+		if err := sqlb.Exec(r.Context(), db, "delete from jobs where id=? and status<>?", id, StatusInProgress); err != nil {
 			respErrf(w, http.StatusInternalServerError, "error getting job")
 			return
 		}
-		emit(eventAllJobs())
+		sse.send(0)
 	})
 
 	mux.HandleFunc("/{$}", func(w http.ResponseWriter, r *http.Request) {
@@ -365,46 +381,14 @@ func main() {
 			return
 		}
 		path = filepath.Clean(path)
+
 		var job Job
 		if err := sqlb.ScanRow(r.Context(), db, &job, "insert into jobs (source_path, operation, time) values (?, ?, ?) returning *", path, operationStr, time.Now()); err != nil {
 			http.Error(w, fmt.Sprintf("error saving job: %v", err), http.StatusInternalServerError)
 			return
 		}
-		emit(eventAllJobs())
-	})
 
-	mux.HandleFunc("GET /db", func(w http.ResponseWriter, r *http.Request) {
-		var jobs []*Job
-		if err := sqlb.Scan(r.Context(), db, &jobs, "select * from jobs"); err != nil {
-			http.Error(w, "error scanning", http.StatusInternalServerError)
-			return
-		}
-		if err := json.NewEncoder(w).Encode(jobs); err != nil {
-			http.Error(w, "error encoding", http.StatusInternalServerError)
-			return
-		}
-	})
-
-	mux.HandleFunc("POST /db", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
-		var jobs []*Job
-		if err := json.NewDecoder(r.Body).Decode(&jobs); err != nil {
-			http.Error(w, "error decoding", http.StatusInternalServerError)
-			return
-		}
-
-		var jobErrors []error
-		for _, job := range jobs {
-			if err := sqlb.Exec(r.Context(), db, "insert into jobs ?", sqlb.InsertSQL(job)); err != nil {
-				jobErrors = append(jobErrors, err)
-				continue
-			}
-		}
-
-		if err := errors.Join(jobErrors...); err != nil {
-			http.Error(w, fmt.Sprintf("error inserting: %v", jobErrors), http.StatusBadRequest)
-			return
-		}
+		sse.send(0)
 	})
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -412,15 +396,24 @@ func main() {
 	errgrp, ctx := errgroup.WithContext(ctx)
 
 	errgrp.Go(func() error {
-		defer logJob("http")()
+		defer logJob("http", "addr", *listenAddr)()
 
 		var h http.Handler
 		h = mux
 		h = authMiddleware(*apiKey)(h)
 
 		server := &http.Server{Addr: *listenAddr, Handler: h}
-		errgrp.Go(func() error { <-ctx.Done(); return server.Shutdown(context.Background()) })
-		errgrp.Go(func() error { <-ctx.Done(); sseServ.Close(); return nil })
+
+		errgrp.Go(func() error {
+			<-ctx.Done()
+			_ = server.Shutdown(context.Background())
+			return nil
+		})
+		errgrp.Go(func() error {
+			<-ctx.Done()
+			sse.close()
+			return nil
+		})
 
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return err
@@ -431,24 +424,19 @@ func main() {
 	errgrp.Go(func() error {
 		defer logJob("process jobs")()
 
-		tick := func(ctx context.Context) error {
-			var job Job
-			switch err := sqlb.ScanRow(ctx, db, &job, "select * from jobs where status=? limit 1", StatusEnqueued); {
-			case errors.Is(err, sql.ErrNoRows):
-				return nil
-			case err != nil:
-				return fmt.Errorf("find next job: %w", err)
-			}
-			return processJob(ctx, &job, wrtag.HighScore)
-		}
+		t := time.NewTicker(1 * time.Second)
+		defer t.Stop()
 
-		ctxTick(ctx, 2*time.Second, func() {
-			if err := tick(ctx); err != nil {
-				slog.ErrorContext(ctx, "in job", "err", err)
-				return
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-t.C:
+				if err := processNextJob(ctx); err != nil {
+					return fmt.Errorf("next job: %w", err)
+				}
 			}
-		})
-		return nil
+		}
 	})
 
 	if err := errgrp.Wait(); err != nil {
@@ -472,37 +460,19 @@ const (
 	OperationMove = "move"
 )
 
+//go:generate go tool sqlbgen Job
 type Job struct {
-	ID                   uint64
-	Status               JobStatus
-	Error                string
-	Operation            string
-	Time                 time.Time
-	UseMBID              string
-	SourcePath, DestPath string
-	SearchResult         sqlb.JSON[*wrtag.SearchResult]
-	ResearchLinks        sqlb.JSON[[]researchlink.SearchResult]
-}
-
-func (Job) PrimaryKey() string {
-	return "id"
-}
-func (j Job) Values() []sql.NamedArg {
-	return []sql.NamedArg{
-		sql.Named("id", j.ID),
-		sql.Named("status", j.Status),
-		sql.Named("error", j.Error),
-		sql.Named("operation", j.Operation),
-		sql.Named("time", j.Time),
-		sql.Named("use_mbid", j.UseMBID),
-		sql.Named("source_path", j.SourcePath),
-		sql.Named("dest_path", j.DestPath),
-		sql.Named("search_result", j.SearchResult),
-		sql.Named("research_links", j.ResearchLinks),
-	}
-}
-func (j *Job) ScanFrom(rows *sql.Rows) error {
-	return rows.Scan(&j.ID, &j.Status, &j.Error, &j.Operation, &j.Time, &j.UseMBID, &j.SourcePath, &j.DestPath, &j.SearchResult, &j.ResearchLinks)
+	ID            uint64
+	Status        JobStatus
+	Error         string
+	Operation     string
+	Time          time.Time
+	UseMBID       string
+	SourcePath    string
+	DestPath      string
+	SearchResult  sqlb.JSON[*wrtag.SearchResult]
+	ResearchLinks sqlb.JSON[[]researchlink.SearchResult]
+	Confirm       bool
 }
 
 //go:embed schema.sql
@@ -571,8 +541,8 @@ var funcMap = htmltemplate.FuncMap{
 	"panic": func(msg string) string { panic(msg) },
 }
 
-func logJob(jobName string) func() {
-	slog.Info("starting job", "job", jobName)
+func logJob(jobName string, args ...any) func() {
+	slog.Info("starting job", append([]any{"job", jobName}, args...)...)
 	return func() { slog.Info("stopping job", "job", jobName) }
 }
 
@@ -598,16 +568,46 @@ func authMiddleware(apiKey string) func(next http.Handler) http.Handler {
 	}
 }
 
-func ctxTick(ctx context.Context, interval time.Duration, f func()) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+type broadcast[T any] struct {
+	mu       sync.Mutex
+	closed   bool
+	channels map[chan T]struct{}
+}
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			f()
-		}
+func (b *broadcast[T]) send(t T) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for c := range b.channels {
+		c <- t
 	}
+}
+
+func (b *broadcast[T]) close() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for c := range b.channels {
+		close(c)
+	}
+	clear(b.channels)
+	b.closed = true
+}
+
+func (b *broadcast[T]) receive(ctx context.Context, buff int) chan T {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.channels == nil {
+		b.channels = map[chan T]struct{}{}
+	}
+	ch := make(chan T, buff)
+	b.channels[ch] = struct{}{}
+	context.AfterFunc(ctx, func() {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		if b.closed {
+			return
+		}
+		delete(b.channels, ch)
+		close(ch)
+	})
+	return ch
 }
