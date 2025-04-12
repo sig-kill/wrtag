@@ -24,14 +24,11 @@ type LyricsAddon struct {
 func NewLyricsAddon(conf string) (LyricsAddon, error) {
 	var sources lyrics.MultiSource
 	for _, arg := range strings.Fields(conf) {
-		switch arg {
-		case "genius":
-			sources = append(sources, &lyrics.Genius{RateLimit: 500 * time.Millisecond})
-		case "musixmatch":
-			sources = append(sources, &lyrics.Musixmatch{RateLimit: 500 * time.Millisecond})
-		default:
+		source, err := lyrics.NewSource(arg, 500*time.Millisecond)
+		if err != nil {
 			return LyricsAddon{}, fmt.Errorf("unknown lyrics source %q", arg)
 		}
+		sources = append(sources, source)
 	}
 	if len(sources) == 0 {
 		return LyricsAddon{}, fmt.Errorf("no lyrics sources provided")

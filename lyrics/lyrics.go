@@ -15,34 +15,22 @@ import (
 	"golang.org/x/net/html"
 )
 
-var ErrLyricsNotFound = errors.New("lyrics not found")
-
 type Source interface {
 	Search(ctx context.Context, artist, song string) (string, error)
 }
 
-type MultiSource []Source
-
-func (ms MultiSource) Search(ctx context.Context, artist, song string) (string, error) {
-	for _, src := range ms {
-		lyricData, err := src.Search(ctx, artist, song)
-		if err != nil && !errors.Is(err, ErrLyricsNotFound) {
-			return "", err
-		}
-		if lyricData != "" {
-			return lyricData, nil
-		}
+func NewSource(name string, rateLimit time.Duration) (Source, error) {
+	switch name {
+	case "genius":
+		return &Genius{RateLimit: 500 * time.Millisecond}, nil
+	case "musixmatch":
+		return &Musixmatch{RateLimit: 500 * time.Millisecond}, nil
+	default:
+		return nil, fmt.Errorf("unknown source")
 	}
-	return "", ErrLyricsNotFound
 }
 
-func (ms MultiSource) String() string {
-	var parts []string
-	for _, s := range ms {
-		parts = append(parts, fmt.Sprint(s))
-	}
-	return strings.Join(parts, ", ")
-}
+var ErrLyricsNotFound = errors.New("lyrics not found")
 
 var musixmatchBaseURL = `https://www.musixmatch.com/lyrics`
 var musixmatchSelectContent = cascadia.MustCompile(`div.r-1v1z2uz:nth-child(1)`)
@@ -175,4 +163,27 @@ func iterText(n *html.Node, buf *strings.Builder) {
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		iterText(c, buf)
 	}
+}
+
+type MultiSource []Source
+
+func (ms MultiSource) Search(ctx context.Context, artist, song string) (string, error) {
+	for _, src := range ms {
+		lyricData, err := src.Search(ctx, artist, song)
+		if err != nil && !errors.Is(err, ErrLyricsNotFound) {
+			return "", err
+		}
+		if lyricData != "" {
+			return lyricData, nil
+		}
+	}
+	return "", ErrLyricsNotFound
+}
+
+func (ms MultiSource) String() string {
+	var parts []string
+	for _, s := range ms {
+		parts = append(parts, fmt.Sprint(s))
+	}
+	return strings.Join(parts, ", ")
 }
