@@ -29,6 +29,8 @@ func NewReplayGainAddon(conf string) (ReplayGainAddon, error) {
 			a.truePeak = true
 		case "force":
 			a.force = true
+		default:
+			return ReplayGainAddon{}, fmt.Errorf("unknown option %q", arg)
 		}
 	}
 	return a, nil

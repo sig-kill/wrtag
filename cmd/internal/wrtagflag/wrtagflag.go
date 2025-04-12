@@ -229,7 +229,7 @@ func (a *addonsParser) Set(value string) error {
 	name, rest, _ := strings.Cut(strings.TrimLeft(value, " "), " ")
 	addn, err := addon.New(name, rest)
 	if err != nil {
-		return err
+		return fmt.Errorf("addon %q: %w", name, err)
 	}
 	*a.addons = append(*a.addons, addn)
 	return nil
