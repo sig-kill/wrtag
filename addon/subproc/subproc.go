@@ -1,4 +1,4 @@
-package addon
+package subproc
 
 import (
 	"context"
@@ -7,25 +7,28 @@ import (
 	"strings"
 
 	"github.com/google/shlex"
+	"go.senan.xyz/wrtag/addon"
 )
+
+func init() {
+	addon.Register("subproc", func(conf string) (addon.Addon, error) {
+		var a SubprocAddon
+		parts, err := shlex.Split(conf)
+		if err != nil {
+			return SubprocAddon{}, err
+		}
+		if len(parts) == 0 {
+			return SubprocAddon{}, fmt.Errorf("no command provided")
+		}
+		a.command = parts[0]
+		a.args = parts[1:]
+		return a, nil
+	})
+}
 
 type SubprocAddon struct {
 	command string
 	args    []string
-}
-
-func NewSubprocAddon(conf string) (SubprocAddon, error) {
-	var a SubprocAddon
-	parts, err := shlex.Split(conf)
-	if err != nil {
-		return SubprocAddon{}, err
-	}
-	if len(parts) == 0 {
-		return SubprocAddon{}, fmt.Errorf("no command provided")
-	}
-	a.command = parts[0]
-	a.args = parts[1:]
-	return a, nil
 }
 
 const (

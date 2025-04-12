@@ -25,6 +25,7 @@ import (
 	"github.com/araddon/dateparse"
 	"github.com/argusdusty/treelock"
 	"go.senan.xyz/natcmp"
+	"go.senan.xyz/wrtag/addon"
 	"go.senan.xyz/wrtag/coverparse"
 	"go.senan.xyz/wrtag/fileutil"
 	"go.senan.xyz/wrtag/musicbrainz"
@@ -108,12 +109,6 @@ const (
 	Confirm
 )
 
-// Addon represents a plugin that can process files after the main import operation.
-type Addon interface {
-	// ProcessRelease is called with the paths of the processed files after a successful import.
-	ProcessRelease(context.Context, []string) error
-}
-
 // Config contains configuration options for processing music directories.
 type Config struct {
 	// MusicBrainzClient is used to search and retrieve release data from MusicBrainz
@@ -132,7 +127,7 @@ type Config struct {
 	KeepFiles map[string]struct{}
 
 	// Addons are plugins that can perform additional processing after the main import
-	Addons []Addon
+	Addons []addon.Addon
 
 	// UpgradeCover specifies whether to attempt to replace existing covers with better versions
 	UpgradeCover bool
