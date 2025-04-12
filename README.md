@@ -157,7 +157,7 @@ flowchart LR
 
 Jobs are added to the queue with an HTTP request like `POST <wrtag.host>/op/<copy|move>` with form value `path=<absolute path to directory>`. The form value can be an `application/x-www-form-urlencoded` form body, or URL query parameter.
 
-Authentication is done via HTTP a basic auth password (without a username), and is configured by `web-api-key`.
+Authentication is done via a HTTP Basic authentication password **without a username**. The password is configured with the `web-api-key` config option.
 
 > [!WARNING]
 > HTTP Basic Authentication is only as secure as the transport layer it runs on. Make sure `wrtagweb` is secured using TLS behind your reverse proxy.
