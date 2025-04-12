@@ -26,7 +26,7 @@ func NewLyricsAddon(conf string) (LyricsAddon, error) {
 	for _, arg := range strings.Fields(conf) {
 		source, err := lyrics.NewSource(arg, 500*time.Millisecond)
 		if err != nil {
-			return LyricsAddon{}, fmt.Errorf("unknown lyrics source %q", arg)
+			return LyricsAddon{}, fmt.Errorf("source %q: %w", arg, err)
 		}
 		sources = append(sources, source)
 	}
