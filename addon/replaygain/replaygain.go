@@ -1,113 +1,85 @@
 package replaygain
 
 import (
-	"bytes"
 	"context"
-	"encoding/csv"
 	"errors"
 	"fmt"
-	"io"
-	"os/exec"
 	"strconv"
+	"strings"
+
+	"go.senan.xyz/wrtag/addon"
+	"go.senan.xyz/wrtag/replaygain"
+	"go.senan.xyz/wrtag/tags"
 )
 
-var ErrNoRsgain = fmt.Errorf("rsgain not found in PATH")
-
-const RsgainCommand = "rsgain"
-
-type Level struct {
-	GaindB, Peak float64
+func init() {
+	addon.Register("replaygain", NewReplayGainAddon)
 }
 
-func Calculate(ctx context.Context, truePeak bool, trackPaths []string) (album Level, tracks []Level, err error) {
-	if _, err := exec.LookPath(RsgainCommand); err != nil {
-		return Level{}, nil, fmt.Errorf("%w: %w", ErrNoRsgain, err)
-	}
-	if len(trackPaths) == 0 {
-		return Level{}, nil, nil
-	}
+type ReplayGainAddon struct {
+	truePeak bool
+	force    bool
+}
 
-	var args []string
-	args = append(args, "custom")
-	args = append(args, "--output")
-	args = append(args, "--tagmode", "s")
-	if truePeak {
-		args = append(args, "--true-peak")
-	}
-	args = append(args, "--album")
-	args = append(args, trackPaths...)
-
-	cmd := exec.CommandContext(ctx, RsgainCommand, args...)
-
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	defer func() {
-		if err != nil && stderr.Len() > 0 {
-			err = fmt.Errorf("%w: stderr: %q", err, stderr.String())
+func NewReplayGainAddon(conf string) (ReplayGainAddon, error) {
+	var a ReplayGainAddon
+	for _, arg := range strings.Fields(conf) {
+		switch arg {
+		case "true-peak":
+			a.truePeak = true
+		case "force":
+			a.force = true
 		}
-	}()
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return Level{}, nil, fmt.Errorf("get stdout pipe: %w", err)
 	}
-	if err := cmd.Start(); err != nil {
-		return Level{}, nil, fmt.Errorf("start cmd: %w", err)
-	}
+	return a, nil
+}
 
-	reader := csv.NewReader(stdout)
-	reader.Comma = '\t'
-	reader.ReuseRecord = true
-
-	if _, err := reader.Read(); err != nil && !errors.Is(err, io.EOF) {
-		return Level{}, nil, fmt.Errorf("read header: %w", err)
+func (a ReplayGainAddon) ProcessRelease(ctx context.Context, paths []string) error {
+	if len(paths) == 0 {
+		return nil
 	}
 
-	for {
-		columns, err := reader.Read()
-		if errors.Is(err, io.EOF) {
-			break
-		}
+	if !a.force {
+		first, err := tags.ReadTags(paths[0])
 		if err != nil {
-			return Level{}, nil, fmt.Errorf("read line: %w", err)
+			return fmt.Errorf("read first file: %w", err)
 		}
-		if len(columns) != numColumns {
-			return Level{}, nil, fmt.Errorf("num columns mismatch %d / %d", len(columns), numColumns)
-		}
-
-		var gaindB, peak float64
-		if gaindB, err = strconv.ParseFloat(columns[GaindB], 64); err != nil {
-			return Level{}, nil, fmt.Errorf("read gain dB: %w", err)
-		}
-		if peak, err = strconv.ParseFloat(columns[Peak], 64); err != nil {
-			return Level{}, nil, fmt.Errorf("read peak: %w", err)
-		}
-
-		switch columns[Filename] {
-		case "Album":
-			album.GaindB = gaindB
-			album.Peak = peak
-		default:
-			tracks = append(tracks, Level{GaindB: gaindB, Peak: peak})
+		if first.Get(tags.ReplayGainTrackGain) != "" {
+			return nil
 		}
 	}
-	if err := cmd.Wait(); err != nil {
-		return Level{}, nil, fmt.Errorf("wait cmd: %w", err)
+
+	albumLev, trackLevs, err := replaygain.Calculate(ctx, a.truePeak, paths)
+	if err != nil {
+		return fmt.Errorf("calculate: %w", err)
 	}
 
-	return album, tracks, nil
+	var trackErrs []error
+	for i := range paths {
+		trackL, path := trackLevs[i], paths[i]
+
+		t := tags.NewTags(
+			tags.ReplayGainTrackGain, fmtdB(trackL.GaindB),
+			tags.ReplayGainTrackPeak, fmtFloat(trackL.Peak, 6),
+			tags.ReplayGainAlbumGain, fmtdB(albumLev.GaindB),
+			tags.ReplayGainAlbumPeak, fmtFloat(albumLev.Peak, 6),
+		)
+		if err := tags.WriteTags(path, t); err != nil {
+			trackErrs = append(trackErrs, err)
+			continue
+		}
+	}
+
+	return errors.Join(trackErrs...)
 }
 
-type Column uint8
+func (a ReplayGainAddon) String() string {
+	return fmt.Sprintf("replaygain (force: %t, true peak: %t)", a.force, a.truePeak)
+}
 
-const (
-	Filename = iota
-	LoudnessLUFS
-	GaindB
-	Peak
-	PeakdB
-	PeakType
-	ClippingAdjustment
-	numColumns
-)
+func fmtFloat(v float64, p int) string {
+	return strconv.FormatFloat(v, 'f', p, 64)
+}
+func fmtdB(v float64) string {
+	return fmt.Sprintf("%.2f dB", v)
+}

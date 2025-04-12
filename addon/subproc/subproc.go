@@ -1,4 +1,4 @@
-package addon
+package subproc
 
 import (
 	"context"
@@ -7,7 +7,12 @@ import (
 	"strings"
 
 	"github.com/google/shlex"
+	"go.senan.xyz/wrtag/addon"
 )
+
+func init() {
+	addon.Register("subproc", NewSubprocAddon)
+}
 
 type SubprocAddon struct {
 	command string

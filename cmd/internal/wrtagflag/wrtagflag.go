@@ -21,6 +21,10 @@ import (
 	"go.senan.xyz/wrtag/pathformat"
 	"go.senan.xyz/wrtag/researchlink"
 	"go.senan.xyz/wrtag/tagmap"
+
+	_ "go.senan.xyz/wrtag/addon/lyrics"
+	_ "go.senan.xyz/wrtag/addon/replaygain"
+	_ "go.senan.xyz/wrtag/addon/subproc"
 )
 
 func DefaultClient() {
@@ -218,22 +222,12 @@ func (kf *keepFileParser) String() string {
 }
 
 type addonsParser struct {
-	addons *[]wrtag.Addon
+	addons *[]addon.Addon
 }
 
 func (a *addonsParser) Set(value string) error {
-	var addn wrtag.Addon
-	var err error
-	switch name, rest, _ := strings.Cut(strings.TrimLeft(value, " "), " "); name {
-	case "lyrics":
-		addn, err = addon.NewLyricsAddon(rest)
-	case "replaygain":
-		addn, err = addon.NewReplayGainAddon(rest)
-	case "subproc":
-		addn, err = addon.NewSubprocAddon(rest)
-	default:
-		err = fmt.Errorf("unknown addon %q", name)
-	}
+	name, rest, _ := strings.Cut(strings.TrimLeft(value, " "), " ")
+	addn, err := addon.New(name, rest)
 	if err != nil {
 		return err
 	}
