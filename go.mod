@@ -1,6 +1,6 @@
 module go.senan.xyz/wrtag
 
-go 1.23.0
+go 1.24
 
 require (
 	github.com/KarpelesLab/reflink v1.0.2
