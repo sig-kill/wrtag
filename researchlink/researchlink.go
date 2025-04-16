@@ -51,10 +51,10 @@ type SearchResult struct {
 	Name, URL string
 }
 
-func (q *Builder) Build(query Query) ([]SearchResult, error) {
+func (b *Builder) Build(query Query) ([]SearchResult, error) {
 	var results []SearchResult
 	var buildErrs []error
-	for _, s := range q.sources {
+	for _, s := range b.sources {
 		var buff strings.Builder
 		if err := s.template.Execute(&buff, query); err != nil {
 			buildErrs = append(buildErrs, fmt.Errorf("%s: %w", s.name, err))

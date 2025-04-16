@@ -10,14 +10,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - name: Setup Golang with cache
+        uses: magnetikonline/action-golang-cache@v5
         with:
           go-version-file: go.mod
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
-          version: v1.60
+          install-mode: goinstall
+          version: v2.1.2
       - name: Test
         run: go test ./...
   release-please:
@@ -53,8 +54,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - name: Setup Golang with cache
+        uses: magnetikonline/action-golang-cache@v5
         with:
           go-version-file: go.mod
       - name: Build
