@@ -3,7 +3,7 @@
 {{ end }}
 
 {{ define "job" }}
-<div id="job-{{ .ID }}" hx-get="/jobs/{{ .ID }}" hx-trigger="sse:job-{{ .ID }}" hx-swap="outerHTML" hx-include="">
+<div id="job-{{ .ID }}" hx-get="/jobs/{{ .ID }}" hx-trigger="sse-job[detail.id=={{ .ID }}] from:body" hx-swap="outerHTML" hx-include="">
 <form
   hx-put="/jobs/{{ .ID }}"
   hx-target="#job-{{ .ID }}"
@@ -101,7 +101,7 @@ origin file info
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="dist/tailwind.js"></script>
     <script src="dist/htmx.js"></script>
-    <script src="dist/htmx-sse.js"></script>
+
     <style type="text/tailwindcss">
       @layer base {
         a { @apply font-normal text-blue-600; }
@@ -113,9 +113,7 @@ origin file info
         .in-progress { @apply animate-pulse opacity-80; }
       }
     </style>
-    <script>
-      document.addEventListener("DOMContentLoaded", () => {
-
+    <script type="module">
       const modal = htmx.find("#modal")
       modal.addEventListener("click", (e) => {
         const rect = modal.getBoundingClientRect();
@@ -146,10 +144,14 @@ origin file info
           e.detail.shouldSwap = true;
       });
 
-      });
+      const sseSource = new EventSource("/sse", { withCredentials: true });
+	  sseSource.onmessage = (event) => {
+		const id = parseInt(event.data);
+		htmx.trigger("body", "sse-job", { id });
+      };
     </script>
   </head>
-  <body hx-ext="sse" sse-connect="/events?stream=jobs" class="font-mono antialiased leading-tight text-sm text-gray-800 flex flex-col items-start gap-3 m-0 p-3">
+  <body class="font-mono antialiased leading-tight text-sm text-gray-800 flex flex-col items-start gap-3 m-0 p-3">
     <h1 class="text-lg">wrtag</h1>
     <form hx-post="/jobs">
       {{ block "job-import" . }}
@@ -171,7 +173,7 @@ origin file info
     {{ block "jobs" . }}
     <div
       hx-get="/jobs"
-      hx-trigger="sse:jobs, input changed from:#job-search delay:300ms, input changed from:#job-filter, input changed from:#job-page"
+      hx-trigger="sse-job from:body, input changed from:#job-search delay:300ms, input changed from:#job-filter, input changed from:#job-page"
       hx-include="#job-search, #job-filter, #job-page"
       hx-swap="outerHTML"
       class="contents"
