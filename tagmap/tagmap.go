@@ -69,6 +69,10 @@ func DiffRelease[T interface{ Get(string) string }](weights TagWeights, release 
 		diffs = append(diffs, diff(fmt.Sprintf("track %d", i+1), a, b))
 	}
 
+	// we can get negative scores sometimes, just clamp to 0 for now
+	score = max(0, score)
+	score = min(100, score)
+
 	return score, diffs
 }
 
