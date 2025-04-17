@@ -41,7 +41,7 @@ func init() {
 		fmt.Fprintf(flag.Output(), "  $ %s write artist \"Sensient\" , genres \"psy\" \"minimal\" \"techno\" -- dir/\n", flag.Name())
 		fmt.Fprintf(flag.Output(), "  $ %s clear -- a.flac\n", flag.Name())
 		fmt.Fprintf(flag.Output(), "  $ %s clear lyrics artist_credit -- *.flac\n", flag.Name())
-		fmt.Fprintf(flag.Output(), "  $ find x/ -type f | %s write artist \"Sensient\" b -\n", flag.Name())
+		fmt.Fprintf(flag.Output(), "  $ find x/ -type f | %s write artist \"Sensient\" , album \"Blue Neevus\" -\n", flag.Name())
 		fmt.Fprintf(flag.Output(), "  $ find y/ -type f | %s read artist title -\n", flag.Name())
 		fmt.Fprintf(flag.Output(), "  $ find y/ -type f -name \"*extended*\" | %s read -properties length -\n", flag.Name())
 		fmt.Fprintf(flag.Output(), "\n")

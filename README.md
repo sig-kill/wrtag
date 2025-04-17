@@ -270,7 +270,7 @@ Since it uses the same tag normalisation as `wrtag` itself, it works well with t
   $ metadata write artist "Sensient" , genres "psy" "minimal" "techno" -- dir/
   $ metadata clear -- a.flac
   $ metadata clear lyrics artist_credit -- *.flac
-  $ find x/ -type f | metadata write artist "Sensient" b -
+  $ find x/ -type f | metadata write artist "Sensient" , album "Blue Neevus" -
   $ find y/ -type f | metadata read artist title -
   $ find y/ -type f -name "*extended*" | metadata read -properties length -
 ```
