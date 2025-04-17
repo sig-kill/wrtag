@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.11.0](https://www.github.com/sentriz/wrtag/compare/v0.9.0...v0.11.0) (2025-04-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **ci:** upgrade to go1.24, bump golangci-lint
+
+### Features
+
+* **ci:** upgrade to go1.24, bump golangci-lint ([1c8c8e0](https://www.github.com/sentriz/wrtag/commit/1c8c8e0fa55aed786b23d34dcf1b4f498e0dff95))
+* **wrtag:** add a `reflink` operation ([343f601](https://www.github.com/sentriz/wrtag/commit/343f6019f579b47be7575ff18bf120b3a0b1eb04)), closes [#87](https://www.github.com/sentriz/wrtag/issues/87)
+* **wrtag:** support atomic copies ([77767dc](https://www.github.com/sentriz/wrtag/commit/77767dc741d79302254af871895ba46b5f1a2d7a))
+* **wrtagweb:** process user actions in job loop ([9ec8b67](https://www.github.com/sentriz/wrtag/commit/9ec8b67198af43fd89d015cfd9470b6d80df9501))
+
+
+### Bug Fixes
+
+* **wrtag:** clamp score to 0-100 ([3f587d4](https://www.github.com/sentriz/wrtag/commit/3f587d44f87f879a4c44e9de58229958078037df))
+
 ## [0.9.0](https://www.github.com/sentriz/wrtag/compare/v0.8.1...v0.9.0) (2025-03-23)
 
 
